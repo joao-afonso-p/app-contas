@@ -1,0 +1,106 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f7f8f8;
+  --surface: #ffffff;
+  --surface-2: #f0f2f1;
+  --border: #e4e7e6;
+  --text: #17201c;
+  --muted: #66736d;
+  --accent: #10b981;
+  --accent-strong: #059669;
+  --accent-soft: #d1fae5;
+  --positive: #059669;
+  --negative: #dc2626;
+  --warn: #d97706;
+  --warn-soft: #fef3c7;
+  --goal: #8b5cf6;
+  --goal-soft: #ede9fe;
+}
+
+.dark {
+  --bg: #0c0f0e;
+  --surface: #141817;
+  --surface-2: #1c2120;
+  --border: #262c2a;
+  --text: #edf1ef;
+  --muted: #8b968f;
+  --accent: #34d399;
+  --accent-strong: #10b981;
+  --accent-soft: #06412e;
+  --positive: #34d399;
+  --negative: #f87171;
+  --warn: #fbbf24;
+  --warn-soft: #422f06;
+  --goal: #a78bfa;
+  --goal-soft: #2e2249;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-goal: var(--goal);
+  --color-goal-soft: var(--goal-soft);
+  --font-sans: 'Inter', 'Inter var', system-ui, -apple-system, sans-serif;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Scrollbars discretas em tabelas largas */
+.thin-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fade-up 0.25s ease both;
+}
+
+/* Safe areas iOS (PWA standalone) + margem visual mínima no topo do conteúdo.
+   Não pode ser combinado com pt-* do Tailwind no mesmo elemento: como esta
+   regra vive fora das layers do Tailwind, qualquer utilitário pt-* perderia
+   sempre a cascata mesmo vindo depois na className. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+}
+@media (min-width: 768px) {
+  .pt-safe {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2.5rem);
+  }
+}
