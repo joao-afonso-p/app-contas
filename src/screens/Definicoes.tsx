@@ -1,8 +1,13 @@
 import { useMemo, useState } from 'react'
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Badge, Button, Card, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
+import { capFor } from '../lib/calc/budgets'
 import { currentMonthKey, fmtEUR, generateSpaceCode, monthLabel, uid } from '../lib/format'
 import { firstPlanMonth, useStore } from '../store/useStore'
+import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, SavingsBucket } from '../types'
 
 type EditableList = {
@@ -140,6 +145,8 @@ export function Definicoes() {
         <ListEditor key={list.collection} {...list} />
       ))}
 
+      <OpenAiSection />
+
       <section>
         <SectionTitle>Sobre</SectionTitle>
         <Card>
@@ -164,6 +171,53 @@ export function Definicoes() {
         {error && <p className="mt-2 text-sm text-negative">{error}</p>}
       </Modal>
     </div>
+  )
+}
+
+function OpenAiSection() {
+  const [key, setKey] = useState(() => getOpenAiKey())
+  const [saved, setSaved] = useState(false)
+  const hasKey = getOpenAiKey().length > 0
+
+  const save = () => {
+    setOpenAiKey(key)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+
+  const clear = () => {
+    clearOpenAiKey()
+    setKey('')
+    setSaved(false)
+  }
+
+  return (
+    <section>
+      <SectionTitle>OpenAI (importar por IA)</SectionTitle>
+      <Card>
+        <p className="mb-3 text-sm text-muted">
+          Cola aqui a tua API key do OpenAI para usar o "Extrair de ficheiro (PDF/Excel)" na
+          importação de extratos. A key fica guardada <strong className="text-text">só neste dispositivo</strong>{' '}
+          (não é sincronizada nem partilhada) e é usada diretamente para falar com o OpenAI.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="password"
+            placeholder="sk-…"
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            className="min-w-0 flex-1"
+            autoComplete="off"
+          />
+          <Button variant="soft" onClick={save} disabled={!key.trim()}>
+            {saved ? 'Guardada ✓' : 'Guardar'}
+          </Button>
+          {hasKey && (
+            <Button variant="ghost" size="sm" onClick={clear}>Remover</Button>
+          )}
+        </div>
+      </Card>
+    </section>
   )
 }
 
@@ -216,7 +270,22 @@ function SavingsSection() {
     setNewKind('fixed')
   }
 
-  const renderBucket = (bucket: SavingsBucket) => {
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active: draggedItem, over } = event
+    if (!over || draggedItem.id === over.id) return
+    const ids = active.map((b) => b.id)
+    const fromIdx = ids.indexOf(String(draggedItem.id))
+    const toIdx = ids.indexOf(String(over.id))
+    if (fromIdx === -1 || toIdx === -1) return
+    arrayMove(ids, fromIdx, toIdx).forEach((id, i) => {
+      const bucket = active.find((b) => b.id === id)!
+      if (bucket.order !== i) void put('savingsBuckets', { ...bucket, order: i })
+    })
+  }
+
+  const renderBucket = (bucket: SavingsBucket, dragHandle?: React.ReactNode) => {
     const saldo = bucketBalance(balanceTable, bucket.id, month)
     const canDelete = Math.abs(saldo) < 0.5
     const deleteHint = canDelete
@@ -238,8 +307,9 @@ function SavingsSection() {
     }
 
     return (
-      <li key={bucket.id} className="flex items-center justify-between gap-2 py-2">
+      <>
         <div className="flex min-w-0 items-center gap-2">
+          {dragHandle}
           <span className={cx('truncate text-sm', bucket.archived && 'text-muted line-through')}>
             {bucket.name}
           </span>
@@ -270,7 +340,7 @@ function SavingsSection() {
             </Button>
           </span>
         </div>
-      </li>
+      </>
     )
   }
 
@@ -281,7 +351,17 @@ function SavingsSection() {
         {active.length === 0 ? (
           <p className="text-sm text-muted">Ainda sem baldes de poupança.</p>
         ) : (
-          <ul className="divide-y divide-border">{active.map(renderBucket)}</ul>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={active.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+              <ul className="divide-y divide-border">
+                {active.map((bucket) => (
+                  <SortableBucketRow key={bucket.id} id={bucket.id}>
+                    {(dragHandle) => renderBucket(bucket, dragHandle)}
+                  </SortableBucketRow>
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         )}
 
         <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
@@ -327,11 +407,51 @@ function SavingsSection() {
             <summary className="cursor-pointer text-xs font-semibold text-muted">
               Arquivadas ({archived.length})
             </summary>
-            <ul className="mt-2 divide-y divide-border">{archived.map(renderBucket)}</ul>
+            <ul className="mt-2 divide-y divide-border">
+              {archived.map((bucket) => (
+                <li key={bucket.id} className="flex items-center justify-between gap-2 py-2">
+                  {renderBucket(bucket)}
+                </li>
+              ))}
+            </ul>
           </details>
         )}
       </Card>
     </section>
+  )
+}
+
+function SortableBucketRow({ id, children }: { id: string; children: (dragHandle: React.ReactNode) => React.ReactNode }) {
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id })
+  const style = { transform: CSS.Transform.toString(transform), transition }
+
+  const dragHandle = (
+    <button
+      type="button"
+      aria-label="Arrastar para reordenar"
+      className="shrink-0 cursor-grab touch-none text-muted hover:text-text active:cursor-grabbing"
+      {...attributes}
+      {...listeners}
+    >
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+        <circle cx="9" cy="6" r="1.5" />
+        <circle cx="9" cy="12" r="1.5" />
+        <circle cx="9" cy="18" r="1.5" />
+        <circle cx="15" cy="6" r="1.5" />
+        <circle cx="15" cy="12" r="1.5" />
+        <circle cx="15" cy="18" r="1.5" />
+      </svg>
+    </button>
+  )
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={cx('flex items-center justify-between gap-2 py-2', isDragging && 'z-10 opacity-50')}
+    >
+      {children(dragHandle)}
+    </li>
   )
 }
 
@@ -354,6 +474,7 @@ function ListEditor({ title, collection, hint }: EditableList) {
   const docs = (data[collection] as unknown as ListDoc[]).slice().sort((a, b) => a.order - b.order)
   const isIncome = collection === 'incomeSources'
   const isVehicle = collection === 'investmentVehicles'
+  const isTxCategory = collection === 'transactionCategories'
 
   const add = () => {
     const name = newName.trim()
@@ -390,6 +511,18 @@ function ListEditor({ title, collection, hint }: EditableList) {
                     <MoneyCell
                       value={doc.initialBalance}
                       onChange={(v) => void put(collection, { ...doc, initialBalance: v } as never)}
+                    />
+                  </div>
+                )}
+                {isTxCategory && !doc.archived && (
+                  <div className="flex items-center gap-1 text-xs text-muted">
+                    Teto/mês
+                    <MoneyCell
+                      value={capFor(data.budgets, doc.id)}
+                      onChange={(v) => {
+                        if (v <= 0) void remove('budgets', doc.id)
+                        else void put('budgets', { id: doc.id, cap: v } as never)
+                      }}
                     />
                   </div>
                 )}

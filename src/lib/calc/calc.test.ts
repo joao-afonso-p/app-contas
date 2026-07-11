@@ -146,17 +146,19 @@ describe('gastos e budgets', () => {
   const txs = [
     { id: '1', date: '2026-06-03', categoryId: 'rest', amount: 40, description: 'a', repoePoupanca: false, reposto: false },
     { id: '2', date: '2026-06-20', categoryId: 'rest', amount: 70, description: 'b', repoePoupanca: false, reposto: false },
-    { id: '3', date: '2026-06-21', categoryId: 'saude', amount: 120, description: 'c', repoePoupanca: true, fonteBucketId: 'geral', reposto: false },
+    { id: '3', date: '2026-06-21', categoryId: 'saude', amount: 120, description: 'c', repoePoupanca: true, fonteBucketId: 'geral', reposto: true },
+    { id: '4', date: '2026-06-22', categoryId: 'casaCat', amount: 50, description: 'd', repoePoupanca: false, reposto: false },
   ]
   it('computeSpend agrega por categoria/mês', () => {
     const spend = computeSpend(txs)
     expect(spend.get('rest')?.get('2026-06')).toBe(110)
     expect(spend.get('saude')?.get('2026-06')).toBe(120)
   })
-  it('monthTotals separa total e sem poupança', () => {
-    const totals = monthTotals(txs).get('2026-06')!
-    expect(totals.total).toBe(230)
-    expect(totals.semPoupanca).toBe(110)
+  it('monthTotals: total, sem repostos, e sem repostos+casa', () => {
+    const totals = monthTotals(txs, 'casaCat').get('2026-06')!
+    expect(totals.total).toBe(280) // tudo
+    expect(totals.semReposto).toBe(160) // exclui o reposto (120)
+    expect(totals.semRepostoSemCasa).toBe(110) // exclui reposto (120) e casa (50)
   })
   it('budgetStatus com limiar de aviso a 80%', () => {
     expect(budgetStatus(50, 100)).toBe('ok')

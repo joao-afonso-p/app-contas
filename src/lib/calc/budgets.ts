@@ -6,9 +6,10 @@ import { round2 } from './allocation'
 
 export type SpendTable = Map<string, Map<MonthKey, number>> // categoryId -> month -> €
 
-export function computeSpend(transactions: Transaction[]): SpendTable {
+export function computeSpend(transactions: Transaction[], opts?: { excludeRepoePoupanca?: boolean }): SpendTable {
   const table: SpendTable = new Map()
   for (const t of transactions) {
+    if (opts?.excludeRepoePoupanca && t.repoePoupanca) continue
     const month = monthOfDate(t.date)
     let row = table.get(t.categoryId)
     if (!row) table.set(t.categoryId, (row = new Map()))
@@ -17,13 +18,22 @@ export function computeSpend(transactions: Transaction[]): SpendTable {
   return table
 }
 
-export function monthTotals(transactions: Transaction[]): Map<MonthKey, { total: number; semPoupanca: number }> {
-  const out = new Map<MonthKey, { total: number; semPoupanca: number }>()
+export interface MonthTotals {
+  total: number // todos os gastos
+  semReposto: number // exclui os já repostos (tag verde "Reposto")
+  semRepostoSemCasa: number // exclui repostos e a categoria "Casas"
+}
+
+export function monthTotals(transactions: Transaction[], casaCategoryId?: string): Map<MonthKey, MonthTotals> {
+  const out = new Map<MonthKey, MonthTotals>()
   for (const t of transactions) {
     const month = monthOfDate(t.date)
-    const cur = out.get(month) || { total: 0, semPoupanca: 0 }
+    const cur = out.get(month) || { total: 0, semReposto: 0, semRepostoSemCasa: 0 }
     cur.total = round2(cur.total + t.amount)
-    if (!t.repoePoupanca) cur.semPoupanca = round2(cur.semPoupanca + t.amount)
+    if (!t.reposto) {
+      cur.semReposto = round2(cur.semReposto + t.amount)
+      if (t.categoryId !== casaCategoryId) cur.semRepostoSemCasa = round2(cur.semRepostoSemCasa + t.amount)
+    }
     out.set(month, cur)
   }
   return out
@@ -40,6 +50,13 @@ export function budgetStatus(spent: number, cap: number): BudgetLevel {
 
 export function capFor(budgets: Budget[], categoryId: string): number | undefined {
   return budgets.find((b) => b.id === categoryId)?.cap
+}
+
+// Gasto "sem categoria": categoryId vazio ou que já não corresponde a nenhuma
+// categoria ativa (ex.: arquivada/órfã). Estes gastos somam nos totais mas
+// desaparecem das vistas por-categoria — daí serem sinalizados na UI.
+export function isUncategorized(t: Transaction, categories: TransactionCategory[]): boolean {
+  return !t.categoryId || !categories.some((c) => c.id === t.categoryId)
 }
 
 // ---------- Categorização automática ----------

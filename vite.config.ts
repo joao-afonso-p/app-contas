@@ -28,6 +28,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // pdf.js e SheetJS (importar extrato por ficheiro) são pesados e só
+        // fazem sentido online (a extração usa a API do OpenAI). Carregam-se
+        // sob demanda em vez de irem para o precache do service worker.
+        globIgnores: ['**/pdf-*.js', '**/xlsx-*.js', '**/pdf.worker.min-*.{js,mjs}'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
       },
     }),
