@@ -22,7 +22,7 @@ import {
   Select,
   cx,
 } from '../components/ui'
-import { allocationSummary } from '../lib/calc/allocation'
+import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
 import {
@@ -35,6 +35,7 @@ import {
   monthRange,
   monthShort,
   parseAmount,
+  todayISO,
 } from '../lib/format'
 import { activeBuckets, autoInvestmentTotals, firstPlanMonth, useStore, vehicleAllocations } from '../store/useStore'
 
@@ -42,7 +43,7 @@ const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6
 
 export function Overview() {
   const data = useStore((s) => s.data)
-  const put = useStore((s) => s.put)
+  const addMovement = useStore((s) => s.addMovement)
   const setScreen = useStore((s) => s.setScreen)
 
   const currentMonth = currentMonthKey()
@@ -129,12 +130,15 @@ export function Overview() {
     if (!forceModal) return
     const parsed = parseAmount(forceModal.value)
     if (parsed === null) return
-    void put('balanceOverrides', {
-      id: `${currentMonth}_${forceModal.bucketId}`,
-      month: currentMonth,
-      bucketId: forceModal.bucketId,
-      balance: parsed,
-    })
+    const delta = round2(parsed - bucketBalance(table, forceModal.bucketId, currentMonth))
+    if (Math.abs(delta) > 0.005) {
+      void addMovement({
+        date: todayISO(),
+        bucketId: forceModal.bucketId,
+        amount: delta,
+        description: 'Ajuste de saldo',
+      })
+    }
     setForceModal(null)
   }
 

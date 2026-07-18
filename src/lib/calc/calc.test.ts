@@ -101,8 +101,19 @@ describe('computeBalances', () => {
       to: '2026-03',
     })
     expect(table.get('geral')?.get('2026-01')).toBe(100)
-    expect(table.get('geral')?.get('2026-02')).toBe(500)
-    expect(table.get('geral')?.get('2026-03')).toBe(600)
+    expect(table.get('geral')?.get('2026-02')).toBe(600)
+    expect(table.get('geral')?.get('2026-03')).toBe(700)
+  })
+  it('override não esconde movimentos do mesmo mês', () => {
+    const table = computeBalances({
+      buckets: [bucket('geral')],
+      plans: [],
+      movements: [{ id: 'm1', date: '2026-02-20', bucketId: 'geral', amount: -50, description: 'gasto' }],
+      overrides: [{ id: 'o1', month: '2026-02', bucketId: 'geral', balance: 500 }],
+      from: '2026-01',
+      to: '2026-02',
+    })
+    expect(table.get('geral')?.get('2026-02')).toBe(450)
   })
 })
 

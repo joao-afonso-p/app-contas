@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import {
   Badge, Button, Card, EmptyState, Input, Modal, Money, ProgressBar, SectionTitle, Select, cx,
 } from '../components/ui'
-import { EditableRow, GroupHeader, SpacerRow, TotalRow } from '../components/PlanTable'
+import { EditableRow, GroupHeader, SpacerRow, StaticRow, TotalRow } from '../components/PlanTable'
 import {
   addMonths, currentMonthKey, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
 } from '../lib/format'
@@ -16,13 +16,19 @@ import type { MonthKey, PlannedMovement, SavingsBucket, SavingsMovement } from '
 
 const HORIZONS = [12, 18, 24, 36]
 
+type Section = 'income' | 'expenses' | 'savings' | 'autoInvestments'
+
 export function Projecoes() {
   const data = useStore((s) => s.data)
   const setMeta = useStore((s) => s.setMeta)
   const setProjectionValue = useStore((s) => s.setProjectionValue)
+  const setProjectionRange = useStore((s) => s.setProjectionRange)
   const syncProjectionToReality = useStore((s) => s.syncProjectionToReality)
+  const addPlannedTransfer = useStore((s) => s.addPlannedTransfer)
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
+
+  const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
 
   const horizon = data.meta[0]?.projectionHorizon ?? 18
   const currentMonth = currentMonthKey()
@@ -70,14 +76,41 @@ export function Projecoes() {
   }, [data, months, buckets, currentMonth])
 
   const [syncOpen, setSyncOpen] = useState(false)
-  const [overrideTarget, setOverrideTarget] = useState<{ month: MonthKey; bucketId: string } | null>(null)
-  const [overrideDraft, setOverrideDraft] = useState('')
 
-  const openOverride = (month: MonthKey, bucketId: string) => {
-    const existing = data.balanceOverrides.find((o) => o.id === `${month}_${bucketId}`)
-    setOverrideDraft(existing ? String(existing.balance).replace('.', ',') : '')
-    setOverrideTarget({ month, bucketId })
+  // ---------- Edição em bloco (intervalo de meses numa linha, ou linha toda) ----------
+  const [selection, setSelection] = useState<{ section: Section; id: string; anchor: MonthKey; months: MonthKey[] } | null>(null)
+  const [bulkValue, setBulkValue] = useState('')
+
+  const selectMonth = (section: Section, id: string, month: MonthKey) => {
+    setSelection((prev) => {
+      if (!prev || prev.section !== section || prev.id !== id) {
+        return { section, id, anchor: month, months: [month] }
+      }
+      const startIdx = months.indexOf(prev.anchor)
+      const endIdx = months.indexOf(month)
+      if (startIdx === -1 || endIdx === -1) return { section, id, anchor: month, months: [month] }
+      const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+      return { ...prev, months: months.slice(lo, hi + 1) }
+    })
   }
+
+  const clearSelection = () => setSelection(null)
+
+  const applySelection = () => {
+    if (!selection) return
+    const parsed = parseAmount(bulkValue)
+    if (parsed === null) return
+    void setProjectionRange(selection.section, selection.id, selection.months, parsed)
+    setSelection(null)
+    setBulkValue('')
+  }
+
+  const rowSelectionProps = (section: Section, id: string) => ({
+    selectedMonths: selection?.section === section && selection.id === id ? selection.months : undefined,
+    onSelectMonth: (m: MonthKey) => selectMonth(section, id, m),
+    onClearSelection: clearSelection,
+    onApplyAll: () => setSelection({ section, id, anchor: months[0], months }),
+  })
 
   // ---------- Criar/editar objetivo (balde) ----------
   const [goalModalOpen, setGoalModalOpen] = useState(false)
@@ -131,10 +164,14 @@ export function Projecoes() {
   }
 
   // ---------- Criar/editar movimento previsto ----------
+  type MovKind = 'entrada' | 'saida' | 'transferencia'
   const [movModalOpen, setMovModalOpen] = useState(false)
   const [editingMovId, setEditingMovId] = useState<string | null>(null)
-  const [movMonth, setMovMonth] = useState(currentMonth)
-  const [movBucket, setMovBucket] = useState(buckets[0]?.id ?? '')
+  const [editingMovTransferGroupId, setEditingMovTransferGroupId] = useState<string | null>(null)
+  const [movKind, setMovKind] = useState<MovKind>('saida')
+  const [movMonth, setMovMonth] = useState('')
+  const [movBucket, setMovBucket] = useState('')
+  const [movToBucket, setMovToBucket] = useState('')
   const [movAmount, setMovAmount] = useState('')
   const [movDesc, setMovDesc] = useState('')
 
@@ -144,36 +181,82 @@ export function Projecoes() {
 
   const openNewMovement = () => {
     setEditingMovId(null)
-    setMovMonth(currentMonth)
-    setMovBucket(buckets[0]?.id ?? '')
+    setEditingMovTransferGroupId(null)
+    setMovKind('saida')
+    setMovMonth('')
+    setMovBucket('')
+    setMovToBucket('')
     setMovAmount('')
     setMovDesc('')
     setMovModalOpen(true)
   }
 
   const openEditMovement = (m: PlannedMovement) => {
-    setEditingMovId(m.id)
-    setMovMonth(m.month)
-    setMovBucket(m.bucketId)
-    setMovAmount(String(m.amount).replace('.', ','))
-    setMovDesc(m.description)
+    if (m.transferGroupId) {
+      const pair = data.plannedMovements.filter((x) => x.transferGroupId === m.transferGroupId)
+      const fromLeg = pair.find((x) => x.amount < 0) ?? m
+      const toLeg = pair.find((x) => x.amount > 0) ?? m
+      setEditingMovId(null)
+      setEditingMovTransferGroupId(m.transferGroupId)
+      setMovKind('transferencia')
+      setMovMonth(m.month)
+      setMovBucket(fromLeg.bucketId)
+      setMovToBucket(toLeg.bucketId)
+      setMovAmount(String(Math.abs(m.amount)).replace('.', ','))
+      setMovDesc(m.description)
+    } else {
+      setEditingMovId(m.id)
+      setEditingMovTransferGroupId(null)
+      setMovKind(m.amount >= 0 ? 'entrada' : 'saida')
+      setMovMonth(m.month)
+      setMovBucket(m.bucketId)
+      setMovToBucket('')
+      setMovAmount(String(Math.abs(m.amount)).replace('.', ','))
+      setMovDesc(m.description)
+    }
     setMovModalOpen(true)
   }
 
   const closeMovModal = () => {
     setMovModalOpen(false)
     setEditingMovId(null)
+    setEditingMovTransferGroupId(null)
   }
 
+  const movSaveDisabled = (() => {
+    const parsed = parseAmount(movAmount)
+    if (parsed === null || parsed <= 0 || !movMonth) return true
+    if (movKind === 'transferencia') return !movBucket || !movToBucket || movBucket === movToBucket
+    return !movBucket
+  })()
+
   const saveMovement = () => {
-    const amount = parseAmount(movAmount)
-    if (amount === null || !movBucket) return
+    const parsed = parseAmount(movAmount)
+    if (parsed === null || parsed <= 0 || !movMonth) return
+    const desc = movDesc.trim()
+    if (movKind === 'transferencia') {
+      if (!movBucket || !movToBucket || movBucket === movToBucket) return
+      if (editingMovTransferGroupId) {
+        const pair = data.plannedMovements.filter((x) => x.transferGroupId === editingMovTransferGroupId)
+        const fromLeg = pair.find((x) => x.amount < 0)
+        const toLeg = pair.find((x) => x.amount > 0)
+        const finalDesc = desc || `Transferência: ${bucketName(movBucket)} → ${bucketName(movToBucket)}`
+        if (fromLeg) void put('plannedMovements', { ...fromLeg, month: movMonth, bucketId: movBucket, amount: -parsed, description: finalDesc })
+        if (toLeg) void put('plannedMovements', { ...toLeg, month: movMonth, bucketId: movToBucket, amount: parsed, description: finalDesc })
+      } else {
+        void addPlannedTransfer({ month: movMonth, fromBucketId: movBucket, toBucketId: movToBucket, amount: parsed, description: desc })
+      }
+      closeMovModal()
+      return
+    }
+    if (!movBucket) return
+    const sign = movKind === 'entrada' ? 1 : -1
     void put('plannedMovements', {
       id: editingMovId ?? uid(),
       month: movMonth,
       bucketId: movBucket,
-      amount,
-      description: movDesc.trim(),
+      amount: parsed * sign,
+      description: desc,
     })
     closeMovModal()
   }
@@ -249,6 +332,7 @@ export function Projecoes() {
                     months={months}
                     getValue={(m) => planByMonth.get(m)?.income[s.id] ?? 0}
                     onChange={(m, v) => void setProjectionValue(m, 'income', s.id, v)}
+                    {...rowSelectionProps('income', s.id)}
                   />
                 ))}
                 <TotalRow
@@ -266,6 +350,7 @@ export function Projecoes() {
                     months={months}
                     getValue={(m) => planByMonth.get(m)?.expenses[c.id] ?? 0}
                     onChange={(m, v) => void setProjectionValue(m, 'expenses', c.id, v)}
+                    {...rowSelectionProps('expenses', c.id)}
                   />
                 ))}
                 <TotalRow
@@ -284,6 +369,7 @@ export function Projecoes() {
                     months={months}
                     getValue={(m) => planByMonth.get(m)?.savings[b.id] ?? 0}
                     onChange={(m, v) => void setProjectionValue(m, 'savings', b.id, v)}
+                    {...rowSelectionProps('savings', b.id)}
                   />
                 ))}
                 <SpacerRow span={months.length + 1} />
@@ -304,6 +390,7 @@ export function Projecoes() {
                         months={months}
                         getValue={(m) => planByMonth.get(m)?.autoInvestments?.[v.id] ?? 0}
                         onChange={(m, val) => void setProjectionValue(m, 'autoInvestments', v.id, val)}
+                        {...rowSelectionProps('autoInvestments', v.id)}
                       />
                     ))}
                     <TotalRow
@@ -317,37 +404,38 @@ export function Projecoes() {
                 <SpacerRow span={months.length + 1} />
                 <GroupHeader label="Saldos" span={months.length + 1} />
                 {buckets.map((b) => (
-                  <tr key={b.id} className="border-t border-border">
-                    <td className="sticky left-0 z-10 bg-surface px-3 py-1.5 text-xs font-medium text-text">
-                      <span className="flex items-center gap-1.5">
-                        {b.name}
-                        {b.kind === 'goal' && <Badge tone="goal">Objetivo</Badge>}
-                      </span>
-                    </td>
-                    {months.map((m) => {
-                      const hasOverride = data.balanceOverrides.some((o) => o.id === `${m}_${b.id}`)
-                      return (
-                        <td key={m} className="px-1 py-1 text-right">
-                          <button
-                            type="button"
-                            onClick={() => openOverride(m, b.id)}
-                            title={hasOverride ? 'Override' : undefined}
-                            className={cx(
-                              'tnum w-full rounded-lg px-2 py-1 text-right text-xs transition-colors hover:bg-surface-2',
-                              hasOverride && 'bg-warn-soft',
-                            )}
-                          >
-                            {fmtEUR(bucketBalance(balanceTable, b.id, m))}
-                          </button>
-                        </td>
-                      )
-                    })}
-                  </tr>
+                  <StaticRow
+                    key={b.id}
+                    label={b.name}
+                    badge={b.kind === 'goal' ? <Badge tone="goal">Objetivo</Badge> : undefined}
+                    months={months}
+                    getValue={(m) => bucketBalance(balanceTable, b.id, m)}
+                  />
                 ))}
                 <TotalRow label="Total" months={months} getValue={(m) => totalBalance(balanceTable, m)} />
               </tbody>
             </table>
           </div>
+          {selection && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-border bg-surface-2 px-3 py-2">
+              <span className="text-xs font-medium text-muted">
+                {selection.months.length} {selection.months.length === 1 ? 'mês selecionado' : 'meses selecionados'}
+              </span>
+              <Input
+                inputMode="decimal"
+                placeholder="Valor €"
+                value={bulkValue}
+                onChange={(e) => setBulkValue(e.target.value)}
+                className="w-28"
+              />
+              <Button size="sm" onClick={applySelection} disabled={parseAmount(bulkValue) === null}>
+                Aplicar
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setSelection(null); setBulkValue('') }}>
+                Cancelar
+              </Button>
+            </div>
+          )}
         </Card>
       </section>
 
@@ -420,44 +508,64 @@ export function Projecoes() {
         >
           Movimentos previstos
         </SectionTitle>
-        <Card>
+        <Card className={visibleMovements.length === 0 ? undefined : 'p-0'}>
           {visibleMovements.length === 0 ? (
             <EmptyState title="Sem movimentos previstos" />
           ) : (
-            <div className="flex flex-col divide-y divide-border">
-              {visibleMovements.map((m) => {
-                const bucket = data.savingsBuckets.find((b) => b.id === m.bucketId)
-                return (
-                  <div key={m.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="tnum w-16 shrink-0 text-xs text-muted">{monthShort(m.month)}</span>
-                      <span className="min-w-0 truncate text-sm font-medium text-text">{bucket?.name ?? '—'}</span>
-                      {m.description && (
-                        <span className="min-w-0 truncate text-xs text-muted" title={m.description}>{m.description}</span>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                      <Money value={m.amount} className="w-20 shrink-0 text-right font-semibold" />
-                      <button
-                        onClick={() => openEditMovement(m)}
-                        className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
-                        aria-label="Editar movimento"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (window.confirm('Apagar este movimento previsto?')) void remove('plannedMovements', m.id)
-                        }}
-                        className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-negative"
-                        aria-label="Apagar movimento"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto thin-scroll">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-surface-2 text-left text-xs font-semibold uppercase tracking-wide text-muted">
+                    <th className="px-3 py-2">Mês</th>
+                    <th className="px-3 py-2">Balde</th>
+                    <th className="px-3 py-2">Descrição</th>
+                    <th className="px-3 py-2 text-right">Valor</th>
+                    <th className="w-8 px-2 py-2" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {visibleMovements.map((m) => {
+                    const isTransfer = !!m.transferGroupId
+                    return (
+                      <tr key={m.id} className="odd:bg-surface-2/40">
+                        <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">{monthShort(m.month)}</td>
+                        <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
+                        <td className="max-w-[160px] truncate px-3 py-1.5 text-xs text-muted" title={m.description}>
+                          {m.description || '—'}
+                          {isTransfer && <span className="ml-1">(transferência)</span>}
+                        </td>
+                        <td
+                          className={cx(
+                            'tnum whitespace-nowrap px-3 py-1.5 text-right font-semibold',
+                            m.amount >= 0 ? 'text-positive' : 'text-negative',
+                          )}
+                        >
+                          {m.amount >= 0 ? '+' : ''}
+                          {fmtEUR(m.amount)}
+                        </td>
+                        <td className="whitespace-nowrap px-2 py-1.5 text-right">
+                          <button
+                            onClick={() => openEditMovement(m)}
+                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
+                            aria-label="Editar movimento"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Apagar este movimento previsto?')) void remove('plannedMovements', m.id)
+                            }}
+                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
+                            aria-label="Apagar movimento"
+                          >
+                            🗑
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>
@@ -509,56 +617,6 @@ export function Projecoes() {
         </div>
       </Modal>
 
-      <Modal open={overrideTarget !== null} onClose={() => setOverrideTarget(null)} title="Override de saldo">
-        {overrideTarget && (() => {
-          const bucket = data.savingsBuckets.find((b) => b.id === overrideTarget.bucketId)
-          const existing = data.balanceOverrides.find(
-            (o) => o.id === `${overrideTarget.month}_${overrideTarget.bucketId}`,
-          )
-          return (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted">{bucket?.name} — {monthLabel(overrideTarget.month, true)}</p>
-              <Input
-                inputMode="decimal"
-                placeholder="Saldo em €"
-                value={overrideDraft}
-                onChange={(e) => setOverrideDraft(e.target.value)}
-              />
-              <div className="flex justify-end gap-2">
-                {existing && (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => {
-                      void remove('balanceOverrides', existing.id)
-                      setOverrideTarget(null)
-                    }}
-                  >
-                    Remover override
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const parsed = parseAmount(overrideDraft)
-                    if (parsed === null) return
-                    void put('balanceOverrides', {
-                      id: `${overrideTarget.month}_${overrideTarget.bucketId}`,
-                      month: overrideTarget.month,
-                      bucketId: overrideTarget.bucketId,
-                      balance: parsed,
-                    })
-                    setOverrideTarget(null)
-                  }}
-                >
-                  Guardar
-                </Button>
-              </div>
-            </div>
-          )
-        })()}
-      </Modal>
-
       <Modal open={goalModalOpen} onClose={closeGoalModal} title={editingGoalId ? 'Editar objetivo' : 'Novo objetivo'}>
         <div className="flex flex-col gap-3">
           <Input placeholder="Nome" value={goalNameDraft} onChange={(e) => setGoalNameDraft(e.target.value)} />
@@ -585,24 +643,91 @@ export function Projecoes() {
         </div>
       </Modal>
 
-      <Modal open={movModalOpen} onClose={closeMovModal} title={editingMovId ? 'Editar movimento previsto' : 'Novo movimento previsto'}>
+      <Modal
+        open={movModalOpen}
+        onClose={closeMovModal}
+        title={editingMovId || editingMovTransferGroupId ? 'Editar movimento previsto' : 'Novo movimento previsto'}
+      >
         <div className="flex flex-col gap-3">
-          <Input type="month" value={movMonth} onChange={(e) => setMovMonth(e.target.value)} />
-          <Select value={movBucket} onChange={(e) => setMovBucket(e.target.value)}>
-            {buckets.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </Select>
-          <Input
-            placeholder="Valor € (negativo = saída)"
-            inputMode="decimal"
-            value={movAmount}
-            onChange={(e) => setMovAmount(e.target.value)}
-          />
-          <Input placeholder="Descrição" value={movDesc} onChange={(e) => setMovDesc(e.target.value)} />
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Mês</label>
+            <Input type="month" value={movMonth} onChange={(e) => setMovMonth(e.target.value)} />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Tipo</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(
+                [
+                  { kind: 'entrada' as const, label: 'Entrada', tone: 'text-positive border-positive bg-positive/10' },
+                  { kind: 'saida' as const, label: 'Saída', tone: 'text-negative border-negative bg-negative/10' },
+                  { kind: 'transferencia' as const, label: 'Transferência', tone: 'text-accent-strong border-accent bg-accent-soft' },
+                ]
+              ).map((opt) => (
+                <button
+                  key={opt.kind}
+                  type="button"
+                  onClick={() => setMovKind(opt.kind)}
+                  className={cx(
+                    'rounded-xl border py-2.5 text-xs font-bold transition-colors',
+                    movKind === opt.kind ? opt.tone : 'border-border bg-surface text-muted',
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {movKind === 'transferencia' ? (
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">De</label>
+                <Select value={movBucket} onChange={(e) => setMovBucket(e.target.value)} className="w-full">
+                  <option value="">Escolhe…</option>
+                  {buckets.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-muted">Para</label>
+                <Select value={movToBucket} onChange={(e) => setMovToBucket(e.target.value)} className="w-full">
+                  <option value="">Escolhe…</option>
+                  {buckets.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-muted">Balde</label>
+              <Select value={movBucket} onChange={(e) => setMovBucket(e.target.value)} className="w-full">
+                <option value="">Escolhe um balde…</option>
+                {buckets.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Valor</label>
+            <Input
+              placeholder="0,00"
+              inputMode="decimal"
+              value={movAmount}
+              onChange={(e) => setMovAmount(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold text-muted">Descrição</label>
+            <Input placeholder="Descrição" value={movDesc} onChange={(e) => setMovDesc(e.target.value)} />
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" size="sm" onClick={closeMovModal}>Cancelar</Button>
-            <Button size="sm" onClick={saveMovement} disabled={parseAmount(movAmount) === null || !movBucket}>Guardar</Button>
+            <Button size="sm" onClick={saveMovement} disabled={movSaveDisabled}>Guardar</Button>
           </div>
         </div>
       </Modal>

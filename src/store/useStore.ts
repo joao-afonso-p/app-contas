@@ -4,6 +4,8 @@ import { firebaseConfigured, FirebaseAdapter } from '../data/firebaseAdapter'
 import { LocalAdapter } from '../data/localAdapter'
 import { addMonths, currentMonthKey, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
 import { syncedProjectionPlans } from '../lib/calc/projections'
+import { bucketBalance, computeBalances } from '../lib/calc/balances'
+import { allocationSummary, round2 } from '../lib/calc/allocation'
 import type {
   AnyDoc,
   AppMeta,
@@ -73,12 +75,14 @@ interface Store {
   // Planeamento
   setPlanValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
   setProjectionValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
+  setProjectionRange(section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, months: MonthKey[], value: number): Promise<void>
   applyPlan(month: MonthKey): Promise<void>
   reopenPlan(month: MonthKey): Promise<void>
 
   // Movimentos e gastos
   addMovement(m: Omit<SavingsMovement, 'id'>): Promise<void>
   addTransfer(p: { date: string; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
+  addPlannedTransfer(p: { month: MonthKey; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
   addTransactions(ts: Omit<Transaction, 'id'>[]): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
 
@@ -99,22 +103,6 @@ async function startAdapter(next: DataAdapter, set: (p: Partial<Store>) => void)
   await next.start((data) => set({ data }))
 }
 
-// Um override de saldo é uma correção pontual — deixa de fazer sentido assim
-// que a fonte (o plano) é editada diretamente, senão a edição fica "escondida"
-// atrás do valor congelado (ver computeBalances em lib/calc/balances.ts).
-async function clearStaleOverride(
-  get: () => Store,
-  month: MonthKey,
-  section: 'income' | 'expenses' | 'savings' | 'autoInvestments',
-  bucketId: string,
-): Promise<void> {
-  if (section !== 'savings') return
-  const overrideId = `${month}_${bucketId}`
-  if (get().data.balanceOverrides.some((o) => o.id === overrideId)) {
-    await adapter!.remove('balanceOverrides', overrideId)
-  }
-}
-
 export const useStore = create<Store>((set, get) => ({
   status: 'boot',
   error: null,
@@ -133,9 +121,11 @@ export const useStore = create<Store>((set, get) => ({
     try {
       if (mode === 'space' && space && firebaseConfigured()) {
         await startAdapter(new FirebaseAdapter(space), set)
+        await migrateBalanceOverrides(get)
         set({ status: 'ready', mode: 'space', spaceCode: space })
       } else if (mode === 'local') {
         await startAdapter(new LocalAdapter(), set)
+        await migrateBalanceOverrides(get)
         set({ status: 'ready', mode: 'local' })
       } else {
         set({ status: 'welcome' })
@@ -268,7 +258,6 @@ export const useStore = create<Store>((set, get) => ({
       closed: false,
     }
     await adapter!.put('monthlyPlans', plan)
-    await clearStaleOverride(get, month, section, id)
   },
 
   async setProjectionValue(month, section, id, value) {
@@ -277,10 +266,26 @@ export const useStore = create<Store>((set, get) => ({
       ? { ...existing, [section]: { ...existing[section], [id]: value } }
       : { id: month, income: {}, expenses: {}, savings: {}, [section]: { [id]: value } }
     await adapter!.put('projectionPlans', plan)
-    await clearStaleOverride(get, month, section, id)
     // Editar uma célula manualmente já conta como "projeções preenchidas" —
     // protege o resto do horizonte de ser reescrito numa sincronização futura.
     if (!get().data.meta[0]?.projectionsInitialized) {
+      await get().setMeta({ projectionsInitialized: true })
+    }
+  },
+
+  // Edição em bloco (linha toda ou um intervalo de meses) — um único putMany
+  // em vez de N chamadas sequenciais a setProjectionValue.
+  async setProjectionRange(section, id, months, value) {
+    const { data } = get()
+    const byMonth = new Map(data.projectionPlans.map((p) => [p.id, p]))
+    const plans: ProjectionPlan[] = months.map((month) => {
+      const existing = byMonth.get(month)
+      return existing
+        ? { ...existing, [section]: { ...existing[section], [id]: value } }
+        : { id: month, income: {}, expenses: {}, savings: {}, [section]: { [id]: value } }
+    })
+    await adapter!.putMany('projectionPlans', plans)
+    if (!data.meta[0]?.projectionsInitialized) {
       await get().setMeta({ projectionsInitialized: true })
     }
   },
@@ -312,6 +317,19 @@ export const useStore = create<Store>((set, get) => ({
     await adapter!.putMany('savingsMovements', [
       { id: uid(), date, bucketId: fromBucketId, amount: -value, description: desc, transferGroupId, createdAt },
       { id: uid(), date, bucketId: toBucketId, amount: value, description: desc, transferGroupId, createdAt },
+    ])
+  },
+
+  async addPlannedTransfer({ month, fromBucketId, toBucketId, amount, description }) {
+    const buckets = get().data.savingsBuckets
+    const fromName = buckets.find((b) => b.id === fromBucketId)?.name ?? '?'
+    const toName = buckets.find((b) => b.id === toBucketId)?.name ?? '?'
+    const desc = description || `Transferência: ${fromName} → ${toName}`
+    const transferGroupId = uid()
+    const value = Math.abs(amount)
+    await adapter!.putMany('plannedMovements', [
+      { id: uid(), month, bucketId: fromBucketId, amount: -value, description: desc, transferGroupId },
+      { id: uid(), month, bucketId: toBucketId, amount: value, description: desc, transferGroupId },
     ])
   },
 
@@ -412,12 +430,67 @@ export const firstPlanMonth = (d: DataSet): MonthKey => {
   return months[0] ?? currentMonthKey()
 }
 
-// Plano "efetivo" a mostrar para um mês: o registo gravado, ou — se ainda não
-// existir — uma cópia (não persistida) do último mês anterior gravado, para o
-// planeamento vir sempre pré-preenchido com o mês respetivo anterior.
+// O conceito de "override de saldo" foi descontinuado (ver Overview.tsx e
+// Projecoes.tsx — nenhuma UI cria overrides novos). Esta migração, executada
+// uma vez no arranque, converte overrides antigos no movimento equivalente
+// (a diferença necessária para atingir o saldo fixado) e remove o override,
+// para nenhum dado antigo ficar "escondido" atrás de um valor congelado.
+async function migrateBalanceOverrides(get: () => Store): Promise<void> {
+  const { data } = get()
+  if (data.balanceOverrides.length === 0) return
+  const overrides = [...data.balanceOverrides].sort((a, b) => a.month.localeCompare(b.month))
+  let movements = [...data.savingsMovements]
+  const newMovements: SavingsMovement[] = []
+  for (const ov of overrides) {
+    const table = computeBalances({
+      buckets: data.savingsBuckets,
+      plans: data.monthlyPlans,
+      movements,
+      overrides: [],
+      from: firstPlanMonth(data),
+      to: ov.month,
+    })
+    const delta = round2(ov.balance - bucketBalance(table, ov.bucketId, ov.month))
+    if (Math.abs(delta) > 0.005) {
+      const mv: SavingsMovement = {
+        id: uid(),
+        date: `${ov.month}-15`,
+        bucketId: ov.bucketId,
+        amount: delta,
+        description: 'Ajuste de saldo (migrado)',
+        createdAt: nowISO(),
+      }
+      newMovements.push(mv)
+      movements = [...movements, mv]
+    }
+  }
+  if (newMovements.length) await adapter!.putMany('savingsMovements', newMovements)
+  await Promise.all(overrides.map((ov) => adapter!.remove('balanceOverrides', ov.id)))
+}
+
+// Plano "efetivo" a mostrar para um mês: o registo gravado; senão, se houver
+// projeções já preenchidas para esse mês, essas alocações (mesmo que não
+// somem 100% — a validação de aplicar o plano em Planeamento.tsx já bloqueia
+// esse caso); senão — uma cópia (não persistida) do último mês anterior
+// gravado, para o planeamento vir sempre pré-preenchido com algo.
 export function effectivePlan(d: DataSet, month: MonthKey): MonthlyPlan {
   const existing = d.monthlyPlans.find((p) => p.id === month)
   if (existing) return existing
+
+  const projection = d.projectionPlans.find((p) => p.id === month)
+  if (projection) {
+    const s = allocationSummary(projection, [])
+    if (s.totalIncome > 0 || s.totalAllocated > 0) {
+      return {
+        id: month,
+        income: { ...projection.income },
+        expenses: { ...projection.expenses },
+        savings: { ...projection.savings },
+        autoInvestments: { ...projection.autoInvestments },
+      }
+    }
+  }
+
   const prior = [...d.monthlyPlans].filter((p) => p.id < month).sort((a, b) => (a.id < b.id ? 1 : -1))[0]
   return prior
     ? {

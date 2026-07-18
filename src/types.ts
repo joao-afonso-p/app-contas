@@ -135,6 +135,8 @@ export interface PlannedMovement {
   bucketId: string
   amount: number
   description: string
+  // Presente nas duas pernas de uma transferência prevista entre baldes (mesmo id nas duas).
+  transferGroupId?: string
 }
 
 // ---------- Distribuição por veículos ----------

@@ -207,13 +207,18 @@ export function Money({ value, className, compact }: { value: number; className?
 // Célula de edição inline de valores €: mostra formatado, edita em texto livre
 // (aceita vírgula decimal), grava em blur/Enter, Esc cancela.
 export function MoneyCell({
-  value, onChange, className, placeholder = '—', disabled,
+  value, onChange, className, placeholder = '—', disabled, onSelect, onEditStart, selected,
 }: {
   value: number | undefined
   onChange: (v: number) => void
   className?: string
   placeholder?: string
   disabled?: boolean
+  // Shift+click seleciona (em vez de editar) — usado na edição em bloco das Projeções.
+  onSelect?: () => void
+  // Clique normal (edição de célula única) — usado para limpar uma seleção ativa noutra linha.
+  onEditStart?: () => void
+  selected?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -248,7 +253,12 @@ export function MoneyCell({
   return (
     <button
       disabled={disabled}
-      onClick={() => {
+      onClick={(e) => {
+        if (e.shiftKey && onSelect) {
+          onSelect()
+          return
+        }
+        onEditStart?.()
         setDraft(value ? String(value).replace('.', ',') : '')
         setEditing(true)
       }}
@@ -256,6 +266,7 @@ export function MoneyCell({
         'tnum rounded-lg px-2 py-1 text-right text-sm transition-colors',
         disabled ? 'cursor-default' : 'hover:bg-surface-2',
         !value && 'text-muted',
+        selected && 'bg-accent-soft',
         className,
       )}
     >

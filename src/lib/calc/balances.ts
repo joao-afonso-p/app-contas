@@ -44,15 +44,14 @@ export function computeBalances({ buckets, plans, movements, overrides = [], fro
       const override = overrideByBucketMonth.get(`${bucket.id}_${month}`)
       if (override !== undefined) {
         running = override
-      } else {
-        const monthPlan = planByMonth.get(month)
-        // Rascunho (closed === false) ainda não conta para os saldos — só depois
-        // de o utilizador aplicar o plano (ver `applyPlan`/`Planeamento.tsx`).
-        if (!monthPlan || monthPlan.closed !== false) {
-          running += monthPlan?.savings[bucket.id] || 0
-        }
-        running += movByBucketMonth.get(`${bucket.id}_${month}`) || 0
       }
+      const monthPlan = planByMonth.get(month)
+      // Rascunho (closed === false) ainda não conta para os saldos — só depois
+      // de o utilizador aplicar o plano (ver `applyPlan`/`Planeamento.tsx`).
+      if (!monthPlan || monthPlan.closed !== false) {
+        running += monthPlan?.savings[bucket.id] || 0
+      }
+      running += movByBucketMonth.get(`${bucket.id}_${month}`) || 0
       row.set(month, round2(running))
     }
     table.set(bucket.id, row)
