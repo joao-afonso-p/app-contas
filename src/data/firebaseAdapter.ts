@@ -4,6 +4,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   initializeFirestore,
   onSnapshot,
   persistentLocalCache,
@@ -116,4 +117,36 @@ export class FirebaseAdapter implements DataAdapter {
 // Firestore rejeita valores undefined
 function stripUndefined<T extends object>(obj: T): T {
   return JSON.parse(JSON.stringify(obj)) as T
+}
+
+// Resgata um código de acesso premium (ver VITE_PREMIUM_CODES): confirma que
+// o código está na lista configurada e regista o seu uso no Firestore de
+// forma atómica — a doc só pode ser criada uma vez (ver firestore.rules),
+// por isso a 2ª tentativa com o mesmo código falha com permission-denied.
+// O getDoc prévio é só para dar um erro claro — a segurança real (impedir
+// reutilização em corrida) está sempre garantida pelo setDoc + regras.
+export async function redeemPremiumCode(code: string, spaceCode: string): Promise<void> {
+  const trimmed = code.trim().toLowerCase()
+  const valid = String(import.meta.env.VITE_PREMIUM_CODES ?? '')
+    .split(',')
+    .map((c) => c.trim().toLowerCase())
+    .filter(Boolean)
+  if (!valid.includes(trimmed)) throw new Error('Código de acesso inválido.')
+  const firestore = ensureFirebase()
+  await signInAnonymously(getAuth(app!))
+  const ref = doc(firestore, 'premiumCodeRedemptions', trimmed)
+  let snap
+  try {
+    snap = await getDoc(ref)
+  } catch {
+    throw new Error(
+      'Não foi possível ligar ao Firestore. Confirma que publicaste as regras de segurança atualizadas (firestore.rules) na consola Firebase.',
+    )
+  }
+  if (snap.exists()) throw new Error('Este código já foi utilizado.')
+  try {
+    await setDoc(ref, { usedAt: new Date().toISOString(), spaceCode })
+  } catch {
+    throw new Error('Este código já foi utilizado.')
+  }
 }

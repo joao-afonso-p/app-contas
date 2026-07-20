@@ -230,9 +230,11 @@ export function Movimentos() {
                     <td className="px-3 py-2">
                       <Badge tone={bucket?.kind === 'goal' ? 'goal' : 'neutral'}>{bucket?.name ?? '—'}</Badge>
                     </td>
-                    <td className="max-w-[140px] truncate px-3 py-2 text-text sm:max-w-none">
-                      {m.description || 'Sem descrição'}
-                      {m.transferGroupId && <span className="ml-1 text-xs text-muted">(transferência)</span>}
+                    <td className="max-w-[140px] px-3 py-2 text-text sm:max-w-none">
+                      <span className="flex items-center gap-1.5">
+                        <span className="min-w-0 truncate">{m.description || 'Sem descrição'}</span>
+                        {m.transferGroupId && <Badge tone="accent">Transferência</Badge>}
+                      </span>
                     </td>
                     <td
                       className={cx(

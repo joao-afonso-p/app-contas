@@ -141,6 +141,7 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Fontes de rendimento</SectionTitle>
+          <p className="mb-2 text-xs text-muted">De onde entra dinheiro todos os meses — ex.: salário, freelance.</p>
           {incomeSources.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {incomeSources.map((s) => (
@@ -175,6 +176,10 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Despesas do planeamento</SectionTitle>
+          <p className="mb-2 text-xs text-muted">
+            Categorias amplas para dividires o orçamento mensal (ex.: casa, carro, lazer) — não precisas de
+            detalhar, isso fica para os Gastos.
+          </p>
           {expenseCategories.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {expenseCategories.map((c) => (
@@ -202,6 +207,11 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Categorias de gastos</SectionTitle>
+          <p className="mb-2 text-xs text-muted">
+            Para classificares cada gasto real que registares em Gastos — podes ser mais granular
+            (supermercado, combustível, subscrições, eletricidade…). Podes começar só com o essencial e
+            acrescentar mais depois de analisares o histórico do banco.
+          </p>
           {transactionCategories.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {transactionCategories.map((c) => (
@@ -229,6 +239,10 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Baldes de poupança e objetivos</SectionTitle>
+          <p className="mb-2 text-xs text-muted">
+            Onde guardas o dinheiro poupado — "Fixo" para poupança contínua, "Objetivo" para uma meta com
+            valor e data (ex.: carro novo).
+          </p>
           {buckets.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {buckets.map((b) => (
@@ -293,6 +307,10 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Veículos de investimento</SectionTitle>
+          <p className="mb-2 text-xs text-muted">
+            Só para acompanhares o total investido fora da app (ex.: XTB, Certificados de Aforro, ETFs) — o
+            dinheiro sai dos baldes mas continua a ser teu.
+          </p>
           {vehicles.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {vehicles.map((v) => (

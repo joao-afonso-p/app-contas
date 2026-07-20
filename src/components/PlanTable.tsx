@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Money, MoneyCell } from './ui'
+import { Money, MoneyCell, cx } from './ui'
 import type { MonthKey } from '../types'
 
 export function SpacerRow({ span }: { span: number }) {
@@ -10,10 +10,16 @@ export function SpacerRow({ span }: { span: number }) {
   )
 }
 
-export function GroupHeader({ label, span }: { label: string; span: number }) {
+export function GroupHeader({ label, span, dark }: { label: string; span: number; dark?: boolean }) {
   return (
     <tr>
-      <td colSpan={span} className="bg-surface-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted">
+      <td
+        colSpan={span}
+        className={cx(
+          'px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-muted',
+          dark ? 'bg-surface-3' : 'bg-surface-2',
+        )}
+      >
         {label}
       </td>
     </tr>
@@ -70,12 +76,13 @@ export function EditableRow({
 
 // Igual ao EditableRow mas sem edição — para tabelas de histórico/consulta.
 export function StaticRow({
-  label, badge, months, getValue,
+  label, badge, months, getValue, dark,
 }: {
   label: ReactNode
   badge?: ReactNode
   months: MonthKey[]
   getValue: (m: MonthKey) => number
+  dark?: boolean
 }) {
   return (
     <tr className="border-t border-border">
@@ -83,7 +90,7 @@ export function StaticRow({
         <span className="flex items-center gap-1.5">{label}{badge}</span>
       </td>
       {months.map((m) => (
-        <td key={m} className="tnum px-3 py-1.5 text-right text-xs">
+        <td key={m} className={cx('tnum px-3 py-1.5 text-right text-xs', dark && 'bg-surface-2')}>
           <Money value={getValue(m)} />
         </td>
       ))}
@@ -92,15 +99,16 @@ export function StaticRow({
 }
 
 export function TotalRow({
-  label, months, getValue,
+  label, months, getValue, dark,
 }: {
   label: string
   months: MonthKey[]
   getValue: (m: MonthKey) => number
+  dark?: boolean
 }) {
   return (
-    <tr className="border-t border-border bg-surface-2 font-bold">
-      <td className="sticky left-0 z-10 bg-surface-2 px-3 py-1.5 text-xs">{label}</td>
+    <tr className={cx('border-t border-border font-bold', dark ? 'bg-surface-3' : 'bg-surface-2')}>
+      <td className={cx('sticky left-0 z-10 px-3 py-1.5 text-xs', dark ? 'bg-surface-3' : 'bg-surface-2')}>{label}</td>
       {months.map((m) => (
         <td key={m} className="px-3 py-1.5 text-right">
           <Money value={getValue(m)} className="text-xs" />

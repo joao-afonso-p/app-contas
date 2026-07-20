@@ -5,10 +5,15 @@ import { useStore } from '../store/useStore'
 export function Welcome() {
   const chooseLocal = useStore((s) => s.chooseLocal)
   const joinSpace = useStore((s) => s.joinSpace)
+  const createPremiumSpace = useStore((s) => s.createPremiumSpace)
   const firebaseAvailable = useStore((s) => s.firebaseAvailable)
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const [premiumCode, setPremiumCode] = useState('')
+  const [premiumBusy, setPremiumBusy] = useState(false)
+  const [premiumError, setPremiumError] = useState('')
 
   const join = async () => {
     setBusy(true)
@@ -18,6 +23,17 @@ export function Welcome() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível entrar no espaço')
       setBusy(false)
+    }
+  }
+
+  const createPremium = async () => {
+    setPremiumBusy(true)
+    setPremiumError('')
+    try {
+      await createPremiumSpace(premiumCode)
+    } catch (e) {
+      setPremiumError(e instanceof Error ? e.message : 'Não foi possível criar o espaço')
+      setPremiumBusy(false)
     }
   }
 
@@ -43,7 +59,7 @@ export function Welcome() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="mb-4">
           <h2 className="font-bold">Entrar num espaço partilhado</h2>
           <p className="mb-3 mt-1 text-sm text-muted">
             Introduz o código de espaço para sincronizar entre dispositivos.
@@ -61,6 +77,30 @@ export function Welcome() {
             </Button>
           </div>
           {error && <p className="mt-2 text-sm text-negative">{error}</p>}
+        </Card>
+
+        <Card>
+          <h2 className="font-bold">Criar um espaço novo</h2>
+          <p className="mb-3 mt-1 text-sm text-muted">
+            Se tens um código de acesso, cria já um espaço sincronizado novo — depois é só partilhares o
+            código gerado com a outra pessoa.
+            {!firebaseAvailable && ' (Indisponível: falta configurar o Firebase no .env)'}
+          </p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Código de acesso"
+              value={premiumCode}
+              onChange={(e) => setPremiumCode(e.target.value)}
+              disabled={!firebaseAvailable || premiumBusy}
+            />
+            <Button
+              disabled={!firebaseAvailable || premiumBusy || !premiumCode.trim()}
+              onClick={() => void createPremium()}
+            >
+              {premiumBusy ? '…' : 'Criar espaço'}
+            </Button>
+          </div>
+          {premiumError && <p className="mt-2 text-sm text-negative">{premiumError}</p>}
         </Card>
       </div>
     </div>

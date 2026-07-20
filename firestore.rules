@@ -6,6 +6,18 @@ service cloud.firestore {
     match /spaces/{space}/{document=**} {
       allow read, write: if request.auth != null;
     }
+    // Ledger de utilização única dos códigos de acesso premium (onboarding).
+    // A existência do documento = código já usado. "get" (ler 1 código que já
+    // sabes) é permitido para dar um erro claro no cliente; "list" continua
+    // proibido, para ninguém poder listar a coleção toda e colher o spaceCode
+    // de outras pessoas. "update"/"delete" ficam sempre proibidos, para
+    // impedir reutilizar um código.
+    match /premiumCodeRedemptions/{code} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }

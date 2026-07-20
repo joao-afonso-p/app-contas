@@ -58,11 +58,26 @@ src/
 
 Ao entrar num espaço vazio, a app **migra automaticamente os dados locais** para o espaço.
 
+### Códigos de acesso premium
+
+Para dares acesso gratuito à sincronização a outras pessoas (ex.: um casal amigo), sem sistema de
+pagamento nenhum: define `VITE_PREMIUM_CODES` no `.env` com uma lista de códigos separados por
+vírgulas (ex.: `VITE_PREMIUM_CODES=abcd-1234,efgh-5678`). Cada código só pode ser usado **uma vez**
+para criar um espaço sincronizado novo (ecrã inicial → "Criar um espaço novo", ou Definições →
+"Criar espaço novo"); depois disso fica inválido. Só é preciso 1 código por casal/agregado — a
+segunda pessoa entra no mesmo espaço com o código de sincronização gerado (não precisa de outro
+código de acesso). Podes ver quais códigos já foram usados e quando na consola Firebase, coleção
+`premiumCodeRedemptions`.
+
+Nota: como esta app é um site estático (sem servidor), esta lista fica no bundle final e é
+tecnicamente extraível por alguém com conhecimentos técnicos — mas como cada código só serve uma
+vez, isso só permite "roubar" um código ainda não usado, nunca reutilizar um já gasto.
+
 ## Deploy no GitHub Pages
 
 1. Cria um repositório no GitHub e faz push do projeto para o branch `main`.
 2. No repositório: **Settings → Pages → Source: GitHub Actions**.
-3. (Para sincronização) **Settings → Secrets and variables → Actions** → adiciona os 6 secrets `VITE_FIREBASE_*` com os valores do teu `.env`.
+3. (Para sincronização) **Settings → Secrets and variables → Actions** → adiciona os 6 secrets `VITE_FIREBASE_*` com os valores do teu `.env`, e opcionalmente `VITE_PREMIUM_CODES` se quiseres dar acesso premium a alguém.
 4. O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) faz build e publica a cada push para `main`. O base path é definido automaticamente como `/<nome-do-repo>/`.
 
 A app fica em `https://<utilizador>.github.io/<nome-do-repo>/`.

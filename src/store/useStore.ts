@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import type { DataAdapter } from '../data/adapter'
-import { firebaseConfigured, FirebaseAdapter } from '../data/firebaseAdapter'
+import { firebaseConfigured, FirebaseAdapter, redeemPremiumCode } from '../data/firebaseAdapter'
 import { LocalAdapter } from '../data/localAdapter'
-import { addMonths, currentMonthKey, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
+import { addMonths, currentMonthKey, generateSpaceCode, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
 import { syncedProjectionPlans } from '../lib/calc/projections'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
@@ -64,6 +64,7 @@ interface Store {
     vehicles: { name: string; initialValue: number }[]
   }): Promise<void>
   joinSpace(code: string, migrateLocal: boolean): Promise<void>
+  createPremiumSpace(premiumCode: string): Promise<void>
   leaveSpace(): Promise<void>
   setScreen(s: Screen): void
   setMonth(m: MonthKey): void
@@ -226,6 +227,17 @@ export const useStore = create<Store>((set, get) => ({
     localStorage.setItem(LS_MODE, 'space')
     localStorage.setItem(LS_SPACE, trimmed)
     set({ status: 'ready', mode: 'space', spaceCode: trimmed })
+  },
+
+  // Cria um espaço sincronizado novo, mas só depois de confirmar que o
+  // código de acesso premium é válido e ainda não foi usado (ver
+  // redeemPremiumCode). Reutiliza joinSpace tal e qual: migra os dados
+  // locais existentes (se houver) para o espaço novo, exatamente como o
+  // botão "Criar espaço novo" já fazia antes de existirem códigos premium.
+  async createPremiumSpace(premiumCode) {
+    const newCode = generateSpaceCode()
+    await redeemPremiumCode(premiumCode, newCode)
+    await get().joinSpace(newCode, true)
   },
 
   async leaveSpace() {

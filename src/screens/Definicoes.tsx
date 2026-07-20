@@ -5,7 +5,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge, Button, Card, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import { capFor } from '../lib/calc/budgets'
-import { currentMonthKey, fmtEUR, generateSpaceCode, monthLabel, uid } from '../lib/format'
+import { currentMonthKey, fmtEUR, monthLabel, uid } from '../lib/format'
 import { firstPlanMonth, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, SavingsBucket } from '../types'
@@ -30,6 +30,7 @@ const LISTS: EditableList[] = [
 export function Definicoes() {
   const { mode, spaceCode, firebaseAvailable, data } = useStore()
   const joinSpace = useStore((s) => s.joinSpace)
+  const createPremiumSpace = useStore((s) => s.createPremiumSpace)
   const leaveSpace = useStore((s) => s.leaveSpace)
   const resetAccount = useStore((s) => s.resetAccount)
 
@@ -38,6 +39,11 @@ export function Definicoes() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState(false)
+
+  const [createOpen, setCreateOpen] = useState(false)
+  const [premiumCode, setPremiumCode] = useState('')
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState('')
 
   const doJoin = async (c: string) => {
     setBusy(true)
@@ -49,6 +55,19 @@ export function Definicoes() {
       setError(e instanceof Error ? e.message : 'Erro ao entrar no espaço')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const doCreate = async () => {
+    setCreateBusy(true)
+    setCreateError('')
+    try {
+      await createPremiumSpace(premiumCode)
+      setCreateOpen(false)
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Erro ao criar o espaço')
+    } finally {
+      setCreateBusy(false)
     }
   }
 
@@ -94,8 +113,8 @@ export function Definicoes() {
               </div>
               {firebaseAvailable ? (
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" onClick={() => void doJoin(generateSpaceCode())}>
-                    Criar espaço novo (gera código)
+                  <Button size="sm" onClick={() => setCreateOpen(true)}>
+                    Criar espaço novo (código de acesso)
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setJoinOpen(true)}>
                     Entrar com código existente
@@ -169,6 +188,24 @@ export function Definicoes() {
           </Button>
         </div>
         {error && <p className="mt-2 text-sm text-negative">{error}</p>}
+      </Modal>
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Criar um espaço novo">
+        <p className="mb-3 text-sm text-muted">
+          Precisas de um código de acesso premium para criar um espaço sincronizado novo. Os dados
+          locais são migrados automaticamente para o espaço criado.
+        </p>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Código de acesso"
+            value={premiumCode}
+            onChange={(e) => setPremiumCode(e.target.value)}
+          />
+          <Button disabled={createBusy || !premiumCode.trim()} onClick={() => void doCreate()}>
+            {createBusy ? '…' : 'Criar espaço'}
+          </Button>
+        </div>
+        {createError && <p className="mt-2 text-sm text-negative">{createError}</p>}
       </Modal>
     </div>
   )

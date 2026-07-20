@@ -402,7 +402,7 @@ export function Projecoes() {
                 )}
 
                 <SpacerRow span={months.length + 1} />
-                <GroupHeader label="Saldos" span={months.length + 1} />
+                <GroupHeader label="Saldos" span={months.length + 1} dark />
                 {buckets.map((b) => (
                   <StaticRow
                     key={b.id}
@@ -410,9 +410,10 @@ export function Projecoes() {
                     badge={b.kind === 'goal' ? <Badge tone="goal">Objetivo</Badge> : undefined}
                     months={months}
                     getValue={(m) => bucketBalance(balanceTable, b.id, m)}
+                    dark
                   />
                 ))}
-                <TotalRow label="Total" months={months} getValue={(m) => totalBalance(balanceTable, m)} />
+                <TotalRow label="Total" months={months} getValue={(m) => totalBalance(balanceTable, m)} dark />
               </tbody>
             </table>
           </div>
@@ -530,9 +531,11 @@ export function Projecoes() {
                       <tr key={m.id} className="odd:bg-surface-2/40">
                         <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">{monthShort(m.month)}</td>
                         <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
-                        <td className="max-w-[160px] truncate px-3 py-1.5 text-xs text-muted" title={m.description}>
-                          {m.description || '—'}
-                          {isTransfer && <span className="ml-1">(transferência)</span>}
+                        <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
+                          <span className="flex items-center gap-1.5">
+                            <span className="min-w-0 truncate">{m.description || '—'}</span>
+                            {isTransfer && <Badge tone="accent">Transferência</Badge>}
+                          </span>
                         </td>
                         <td
                           className={cx(
