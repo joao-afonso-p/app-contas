@@ -5,7 +5,7 @@ import { LocalAdapter } from '../data/localAdapter'
 import { addMonths, currentMonthKey, generateSpaceCode, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
 import { syncedProjectionPlans } from '../lib/calc/projections'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
-import { allocationSummary, round2 } from '../lib/calc/allocation'
+import { allocationSummary, cumulativeAutoInvestmentTotals, round2 } from '../lib/calc/allocation'
 import type {
   AnyDoc,
   AppMeta,
@@ -547,15 +547,9 @@ export const vehicleAllocations = (d: DataSet): VehicleAllocation[] => {
   return [...map.values()].filter((a) => a.invested > 0.005)
 }
 
-// Total acumulado (até ao mês atual, inclusive) de débitos automáticos por veículo.
-export const autoInvestmentTotals = (d: DataSet): Map<string, number> => {
-  const totals = new Map<string, number>()
-  const month = currentMonthKey()
-  for (const plan of d.monthlyPlans) {
-    if (plan.id > month) continue
-    for (const [vehicleId, value] of Object.entries(plan.autoInvestments ?? {})) {
-      totals.set(vehicleId, (totals.get(vehicleId) ?? 0) + value)
-    }
-  }
-  return totals
-}
+// Total acumulado de débitos automáticos por veículo até ao mês contabilístico
+// pedido. O default mantém o comportamento dos restantes consumidores.
+export const autoInvestmentTotals = (
+  d: DataSet,
+  throughMonth: MonthKey = currentMonthKey(),
+): Map<string, number> => cumulativeAutoInvestmentTotals(d.monthlyPlans, throughMonth)

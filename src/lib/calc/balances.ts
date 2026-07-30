@@ -24,6 +24,19 @@ export interface BalanceInputs {
   to: MonthKey
 }
 
+// Mês que representa a realidade já confirmada na app. Normalmente coincide
+// com o calendário, mas avança quando o plano do mês seguinte é aplicado
+// antecipadamente (permitido a partir do dia 25).
+export function activeAccountingMonth(
+  plans: Pick<MonthlyPlan, 'id' | 'closed'>[],
+  calendarMonth: MonthKey,
+): MonthKey {
+  return plans.reduce(
+    (latest, plan) => plan.closed !== false && plan.id > latest ? plan.id : latest,
+    calendarMonth,
+  )
+}
+
 export function computeBalances({ buckets, plans, movements, overrides = [], from, to }: BalanceInputs): BalanceTable {
   const months = monthRange(from, to)
   const planByMonth = new Map(plans.map((p) => [p.id, p]))

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { IncomeSource, SavingsBucket } from '../../types'
 import { addMonths, monthDiff, monthRange, parseAmount } from '../format'
-import { allocationSummary } from './allocation'
-import { computeBalances, goalProgress } from './balances'
+import { allocationSummary, cumulativeAutoInvestmentTotals } from './allocation'
+import { activeAccountingMonth, computeBalances, goalProgress } from './balances'
 import { budgetStatus, computeSpend, matchCategoryByName, monthTotals, parseBankStatement, suggestCategory } from './budgets'
 import { requiredMonthlySaving, syncedProjectionPlans } from './projections'
 
@@ -30,6 +30,19 @@ describe('meses', () => {
     expect(parseAmount('1234.56')).toBe(1234.56)
     expect(parseAmount('-12,5')).toBe(-12.5)
     expect(parseAmount('abc')).toBeNull()
+  })
+  it('mês contabilístico avança apenas com um plano futuro aplicado', () => {
+    expect(activeAccountingMonth([
+      { id: '2026-08', closed: false },
+    ], '2026-07')).toBe('2026-07')
+    expect(activeAccountingMonth([
+      { id: '2026-08', closed: true },
+    ], '2026-07')).toBe('2026-08')
+  })
+  it('mês contabilístico trata planos antigos sem closed como aplicados', () => {
+    expect(activeAccountingMonth([
+      { id: '2026-08' },
+    ], '2026-07')).toBe('2026-08')
   })
 })
 
@@ -64,10 +77,35 @@ describe('allocationSummary', () => {
     expect(s.unallocated).toBe(-200)
     expect(s.transferToSavings).toBe(3500 - 700)
   })
+  it('acumula débitos automáticos aplicados até ao mês contabilístico', () => {
+    const totals = cumulativeAutoInvestmentTotals([
+      { id: '2026-06', autoInvestments: { ppr: 100 } },
+      { id: '2026-07', autoInvestments: { ppr: 150 }, closed: true },
+      { id: '2026-08', autoInvestments: { ppr: 200, etf: 50 }, closed: true },
+      { id: '2026-09', autoInvestments: { ppr: 999 }, closed: false },
+    ], '2026-08')
+    expect(totals.get('ppr')).toBe(450)
+    expect(totals.get('etf')).toBe(50)
+  })
 })
 
 describe('computeBalances', () => {
   const buckets = [bucket('geral'), bucket('viajar')]
+  it('só reflete a poupança do mês seguinte depois de o plano ser aplicado', () => {
+    const balanceFor = (closed: boolean) => computeBalances({
+      buckets: [bucket('geral')],
+      plans: [
+        { id: '2026-07', savings: { geral: 100 }, closed: true },
+        { id: '2026-08', savings: { geral: 250 }, closed },
+      ],
+      movements: [],
+      from: '2026-07',
+      to: '2026-08',
+    }).get('geral')?.get('2026-08')
+
+    expect(balanceFor(false)).toBe(100)
+    expect(balanceFor(true)).toBe(350)
+  })
   it('acumula planeamento + movimentos', () => {
     const table = computeBalances({
       buckets,

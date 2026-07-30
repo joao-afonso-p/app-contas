@@ -23,7 +23,7 @@ import {
   cx,
 } from '../components/ui'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
-import { bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
+import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
 import {
   addMonths,
@@ -46,12 +46,13 @@ export function Overview() {
   const addMovement = useStore((s) => s.addMovement)
   const setScreen = useStore((s) => s.setScreen)
 
-  const currentMonth = currentMonthKey()
+  const calendarMonth = currentMonthKey()
+  const accountingMonth = activeAccountingMonth(data.monthlyPlans, calendarMonth)
   const buckets = useMemo(() => activeBuckets(data), [data])
 
   const months = useMemo(
-    () => monthRange(firstPlanMonth(data), currentMonth),
-    [data, currentMonth],
+    () => monthRange(firstPlanMonth(data), accountingMonth),
+    [data, accountingMonth],
   )
 
   const table = useMemo(
@@ -62,12 +63,12 @@ export function Overview() {
         movements: data.savingsMovements,
         overrides: data.balanceOverrides,
         from: months[0],
-        to: currentMonth,
+        to: accountingMonth,
       }),
-    [buckets, data.monthlyPlans, data.savingsMovements, data.balanceOverrides, months, currentMonth],
+    [buckets, data.monthlyPlans, data.savingsMovements, data.balanceOverrides, months, accountingMonth],
   )
 
-  const totalNow = totalBalance(table, currentMonth)
+  const totalNow = totalBalance(table, accountingMonth)
   const allocations = useMemo(() => vehicleAllocations(data), [data])
   const episodicInvested = allocations.reduce((acc, a) => acc + a.invested, 0)
   // totalNow já é o saldo líquido dos baldes/objetivos — as saídas episódicas
@@ -75,7 +76,10 @@ export function Overview() {
   // por isso "na conta do banco" não volta a subtraí-las.
   const bankBalance = totalNow
 
-  const autoTotals = useMemo(() => autoInvestmentTotals(data), [data])
+  const autoTotals = useMemo(
+    () => autoInvestmentTotals(data, accountingMonth),
+    [data, accountingMonth],
+  )
   const autoInvested = useMemo(
     () => [...autoTotals.values()].reduce((acc, v) => acc + v, 0),
     [autoTotals],
@@ -87,11 +91,12 @@ export function Overview() {
   // parar a veículos de investimento (de qualquer origem).
   const totalSaved = totalNow + totalInvested
 
-  const currentPlan = data.monthlyPlans.find((p) => p.id === currentMonth)
-  const currentSummary = allocationSummary(currentPlan, data.incomeSources)
+  const accountingPlan = data.monthlyPlans.find((p) => p.id === accountingMonth)
+  const currentSummary = allocationSummary(accountingPlan, data.incomeSources)
   const currentRate = savingsRate(currentSummary.totalIncome, currentSummary.totalSavings)
 
-  const showApplyWarning = dayOfMonth() >= 10 && currentPlan?.closed !== true
+  const calendarPlan = data.monthlyPlans.find((p) => p.id === calendarMonth)
+  const showApplyWarning = dayOfMonth() >= 10 && calendarPlan?.closed !== true
 
   // ---------- Evolução de saldos ----------
 
@@ -130,7 +135,7 @@ export function Overview() {
     if (!forceModal) return
     const parsed = parseAmount(forceModal.value)
     if (parsed === null) return
-    const delta = round2(parsed - bucketBalance(table, forceModal.bucketId, currentMonth))
+    const delta = round2(parsed - bucketBalance(table, forceModal.bucketId, accountingMonth))
     if (Math.abs(delta) > 0.005) {
       void addMovement({
         date: todayISO(),
@@ -143,7 +148,7 @@ export function Overview() {
   }
 
   const forceBucket = forceModal ? buckets.find((b) => b.id === forceModal.bucketId) : undefined
-  const forceOldValue = forceModal ? bucketBalance(table, forceModal.bucketId, currentMonth) : 0
+  const forceOldValue = forceModal ? bucketBalance(table, forceModal.bucketId, accountingMonth) : 0
   const forceNewValue = forceModal ? parseAmount(forceModal.value) ?? 0 : 0
 
   // ---------- Distribuição por veículos ----------
@@ -180,14 +185,17 @@ export function Overview() {
 
   return (
     <div className="fade-up flex flex-col gap-6">
-      <h1 className="text-xl font-black">Overview</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-black">Overview</h1>
+        <Badge tone="accent">{monthLabel(accountingMonth, true)}</Badge>
+      </div>
 
       {showApplyWarning && (
         <Card className="border-warn/40 bg-warn-soft">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-lg">⚠️</span>
             <div className="flex flex-1 flex-wrap items-center gap-2 text-sm font-medium">
-              O plano de {monthLabel(currentMonth, true)} ainda não foi aplicado.
+              O plano de {monthLabel(calendarMonth, true)} ainda não foi aplicado.
               <Badge tone="warn">Por aplicar</Badge>
             </div>
             <Button size="sm" onClick={() => setScreen('planeamento')}>Ir para Planeamento</Button>
@@ -209,7 +217,7 @@ export function Overview() {
         <MetricCard
           label="Taxa de poupança (mês)"
           value={fmtPct(currentRate)}
-          hint="do income deste mês"
+          hint={`do income de ${monthLabel(accountingMonth)}`}
         />
       </div>
 
@@ -238,7 +246,7 @@ export function Overview() {
                   {b.kind === 'goal' && <Badge tone="goal">Objetivo</Badge>}
                 </div>
                 <div className="mt-1">
-                  <Money value={bucketBalance(table, b.id, currentMonth)} className="text-lg font-bold" />
+                  <Money value={bucketBalance(table, b.id, accountingMonth)} className="text-lg font-bold" />
                 </div>
               </div>
             ))}
@@ -337,7 +345,7 @@ export function Overview() {
                 const delta = totalBalance(table, m) - totalBalance(table, addMonths(m, -1))
                 return (
                   <tr key={m}>
-                    <td className={cx('py-2 pr-3 font-medium', m === currentMonth && 'text-accent-strong')}>
+                    <td className={cx('py-2 pr-3 font-medium', m === accountingMonth && 'text-accent-strong')}>
                       {monthShort(m)}
                     </td>
                     <td className="tnum px-2 py-2 text-right">{fmtEUR(summary.totalIncome)}</td>

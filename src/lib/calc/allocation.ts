@@ -1,4 +1,4 @@
-import type { IncomeSource, MonthlyPlan, ProjectionPlan } from '../../types'
+import type { IncomeSource, MonthKey, MonthlyPlan, ProjectionPlan } from '../../types'
 
 export interface AllocationSummary {
   totalIncome: number
@@ -47,4 +47,21 @@ export function allocationSummary(
 
 export function round2(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+// Débitos automáticos acumulados até ao mês contabilístico indicado. Tal como
+// nos saldos, rascunhos não contam; registos antigos sem `closed` continuam a
+// ser tratados como aplicados.
+export function cumulativeAutoInvestmentTotals(
+  plans: Pick<MonthlyPlan, 'id' | 'autoInvestments' | 'closed'>[],
+  throughMonth: MonthKey,
+): Map<string, number> {
+  const totals = new Map<string, number>()
+  for (const plan of plans) {
+    if (plan.id > throughMonth || plan.closed === false) continue
+    for (const [vehicleId, value] of Object.entries(plan.autoInvestments ?? {})) {
+      totals.set(vehicleId, (totals.get(vehicleId) ?? 0) + value)
+    }
+  }
+  return totals
 }

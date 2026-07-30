@@ -2,7 +2,9 @@ import { useMemo } from 'react'
 import { Badge, Button, Card, SectionTitle, cx } from '../components/ui'
 import { GroupHeader, SpacerRow, StaticRow, TotalRow } from '../components/PlanTable'
 import { allocationSummary } from '../lib/calc/allocation'
-import { bucketBalance, computeBalances, totalBalance, type BalanceTable } from '../lib/calc/balances'
+import {
+  activeAccountingMonth, bucketBalance, computeBalances, totalBalance, type BalanceTable,
+} from '../lib/calc/balances'
 import { currentMonthKey, fmtEUR, monthRange, monthShort } from '../lib/format'
 import {
   activeBuckets, activeExpenseCategories, activeIncomeSources, activeVehicles, firstPlanMonth, useStore,
@@ -12,10 +14,10 @@ export function Historico() {
   const data = useStore((s) => s.data)
   const setScreen = useStore((s) => s.setScreen)
 
-  const currentMonth = currentMonthKey()
+  const accountingMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
   const months = useMemo(
-    () => monthRange(firstPlanMonth(data), currentMonth),
-    [data, currentMonth],
+    () => monthRange(firstPlanMonth(data), accountingMonth),
+    [data, accountingMonth],
   )
 
   const incomeSources = activeIncomeSources(data)
@@ -36,9 +38,9 @@ export function Historico() {
         movements: data.savingsMovements,
         overrides: data.balanceOverrides,
         from: firstPlanMonth(data),
-        to: currentMonth,
+        to: accountingMonth,
       }),
-    [data, buckets, currentMonth],
+    [data, buckets, accountingMonth],
   )
 
   return (
@@ -65,7 +67,7 @@ export function Historico() {
                       key={m}
                       className="sticky top-0 z-20 whitespace-nowrap bg-surface px-3 py-2 text-right align-bottom"
                     >
-                      <div className={cx('tnum text-xs font-semibold', m === currentMonth ? 'text-accent-strong' : 'text-muted')}>
+                      <div className={cx('tnum text-xs font-semibold', m === accountingMonth ? 'text-accent-strong' : 'text-muted')}>
                         {monthShort(m)}
                       </div>
                     </th>
@@ -167,7 +169,7 @@ export function Historico() {
       </section>
 
       <p className="text-xs text-muted">
-        Valores reais registados nos planeamentos mensais e nos movimentos de poupança até {monthShort(currentMonth)}.
+        Valores reais registados nos planeamentos mensais e nos movimentos de poupança até {monthShort(accountingMonth)}.
         Consulta apenas — para editar, usa o Planeamento.
       </p>
     </div>
