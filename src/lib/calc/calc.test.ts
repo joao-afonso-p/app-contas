@@ -4,7 +4,7 @@ import { addMonths, monthDiff, monthRange, parseAmount } from '../format'
 import { allocationSummary, cumulativeAutoInvestmentTotals } from './allocation'
 import { activeAccountingMonth, computeBalances, goalProgress } from './balances'
 import { budgetStatus, computeSpend, matchCategoryByName, monthTotals, parseBankStatement, suggestCategory } from './budgets'
-import { requiredMonthlySaving, syncedProjectionPlans } from './projections'
+import { computeProjectedBalances, requiredMonthlySaving, syncedProjectionPlans } from './projections'
 
 const bucket = (id: string): SavingsBucket => ({
   id, name: id, kind: 'fixed', archived: false, order: 0,
@@ -166,12 +166,12 @@ describe('objetivos e projeções', () => {
     expect(requiredMonthlySaving(0, 3000, '2027-04', '2027-04')).toBeNull()
   })
 
-  const currentPlan = { income: { sal: 2000 }, expenses: { casa: 900 }, savings: { geral: 500 } }
+  const basePlan = { income: { sal: 2000 }, expenses: { casa: 900 }, savings: { geral: 500 } }
 
-  it('syncedProjectionPlans: sem projeções ainda, gera o horizonte todo igual ao mês atual', () => {
+  it('syncedProjectionPlans: sem projeções ainda, gera o horizonte todo a partir do mês-base', () => {
     const plans = syncedProjectionPlans({
-      currentMonth: '2026-07',
-      currentPlan,
+      baseMonth: '2026-07',
+      basePlan,
       projectionsInitialized: false,
       horizon: 4,
     })
@@ -179,15 +179,102 @@ describe('objetivos e projeções', () => {
     expect(plans.every((p) => p.income.sal === 2000 && p.expenses.casa === 900 && p.savings.geral === 500)).toBe(true)
   })
 
-  it('syncedProjectionPlans: já inicializado, só realinha o mês atual', () => {
+  it('syncedProjectionPlans: já inicializado, só realinha o mês-base', () => {
     const plans = syncedProjectionPlans({
-      currentMonth: '2026-07',
-      currentPlan,
+      baseMonth: '2026-07',
+      basePlan,
       projectionsInitialized: true,
       horizon: 4,
     })
     expect(plans).toHaveLength(1)
     expect(plans[0]).toMatchObject({ id: '2026-07', income: { sal: 2000 }, expenses: { casa: 900 }, savings: { geral: 500 } })
+  })
+
+  it('mantém o saldo real do mês-base apesar de movimentos previstos antigos', () => {
+    const balances = computeProjectedBalances({
+      buckets: [
+        bucket('emergencia'), bucket('investir'), bucket('casa'), bucket('rendas'), bucket('viajar'),
+        bucket('geral'), bucket('pais_ines'), bucket('pais_joao'), bucket('ar_condicionado'),
+      ],
+      realPlans: [{
+        id: '2026-08',
+        savings: {
+          emergencia: 600,
+          investir: 200,
+          casa: 0,
+          rendas: 300,
+          viajar: 0,
+          geral: 2475,
+          pais_ines: 5150,
+          pais_joao: 5000,
+          ar_condicionado: 100,
+        },
+        closed: true,
+      }],
+      realMovements: [],
+      projectionPlans: [],
+      plannedMovements: [
+        { id: 'antigo', month: '2026-08', bucketId: 'geral', amount: -2860, description: 'previsto antigo' },
+      ],
+      overrides: [],
+      baseMonth: '2026-08',
+      from: '2026-08',
+      to: '2026-08',
+    })
+
+    expect(balances.get('geral')?.get('2026-08')).toBe(2475)
+    expect([...balances.values()].reduce((total, row) => total + (row.get('2026-08') ?? 0), 0)).toBe(13825)
+  })
+
+  it('aplica movimentos previstos apenas depois do mês-base', () => {
+    const balances = computeProjectedBalances({
+      buckets: [bucket('geral')],
+      realPlans: [{ id: '2026-08', savings: { geral: 2475 }, closed: true }],
+      realMovements: [],
+      projectionPlans: [{ id: '2026-09', income: {}, expenses: {}, savings: {} }],
+      plannedMovements: [
+        { id: 'futuro', month: '2026-09', bucketId: 'geral', amount: -2860, description: 'previsto futuro' },
+      ],
+      overrides: [],
+      baseMonth: '2026-08',
+      from: '2026-08',
+      to: '2026-09',
+    })
+
+    expect(balances.get('geral')?.get('2026-08')).toBe(2475)
+    expect(balances.get('geral')?.get('2026-09')).toBe(-385)
+  })
+
+  it('parte do plano seguinte quando este já foi aplicado antecipadamente', () => {
+    const realPlans = [
+      { id: '2026-07', savings: { geral: -385 }, closed: true },
+      { id: '2026-08', savings: { geral: 2860 }, closed: true },
+      { id: '2026-09', savings: { geral: 9999 }, closed: false },
+    ]
+    const baseMonth = activeAccountingMonth(realPlans, '2026-07')
+    const overview = computeBalances({
+      buckets: [bucket('geral')],
+      plans: realPlans,
+      movements: [],
+      from: '2026-07',
+      to: baseMonth,
+    })
+    const projections = computeProjectedBalances({
+      buckets: [bucket('geral')],
+      realPlans,
+      realMovements: [],
+      projectionPlans: [{ id: '2026-09', income: {}, expenses: {}, savings: { geral: 100 } }],
+      plannedMovements: [],
+      overrides: [],
+      baseMonth,
+      from: '2026-07',
+      to: '2026-09',
+    })
+
+    expect(baseMonth).toBe('2026-08')
+    expect(projections.get('geral')?.get(baseMonth)).toBe(overview.get('geral')?.get(baseMonth))
+    expect(projections.get('geral')?.get('2026-08')).toBe(2475)
+    expect(projections.get('geral')?.get('2026-09')).toBe(2575)
   })
 })
 

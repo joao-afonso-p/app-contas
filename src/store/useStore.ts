@@ -4,7 +4,7 @@ import { firebaseConfigured, FirebaseAdapter, redeemPremiumCode } from '../data/
 import { LocalAdapter } from '../data/localAdapter'
 import { addMonths, currentMonthKey, generateSpaceCode, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
 import { syncedProjectionPlans } from '../lib/calc/projections'
-import { bucketBalance, computeBalances } from '../lib/calc/balances'
+import { activeAccountingMonth, bucketBalance, computeBalances } from '../lib/calc/balances'
 import { allocationSummary, cumulativeAutoInvestmentTotals, round2 } from '../lib/calc/allocation'
 import type {
   AnyDoc,
@@ -402,22 +402,22 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   // Alinha as projeções com a realidade. Os saldos NUNCA são escritos aqui —
-  // são sempre calculados (ver computeBalances/Projecoes.tsx), pelo que já
-  // encadeiam sozinhos a partir do saldo real do mês atual. Se ainda não há
+  // são sempre calculados (ver computeProjectedBalances/Projecoes.tsx), pelo
+  // que encadeiam a partir do último mês contabilístico aplicado. Se ainda não há
   // projeções (primeira sincronização, ver `projectionsInitialized`), cria a
-  // grelha toda do horizonte igual ao plano real do mês atual. Se já há
+  // grelha toda do horizonte igual ao plano real desse mês. Se já há
   // projeções (o utilizador já as editou ou já sincronizou antes), só realinha
-  // o mês atual — o resto do futuro (as alocações já editadas) fica
+  // o mês-base — o resto do futuro (as alocações já editadas) fica
   // exatamente como estava; os saldos futuros mudam por si só porque o ponto
-  // de partida (o saldo real do mês atual) mudou.
+  // de partida mudou.
   async syncProjectionToReality() {
     const { data } = get()
-    const month = currentMonthKey()
-    const currentPlan = data.monthlyPlans.find((p) => p.id === month)
-    if (!currentPlan) return
+    const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
+    const basePlan = data.monthlyPlans.find((p) => p.id === baseMonth)
+    if (!basePlan) return
     const projectionsInitialized = data.meta[0]?.projectionsInitialized ?? false
     const horizon = data.meta[0]?.projectionHorizon ?? 18
-    const plans = syncedProjectionPlans({ currentMonth: month, currentPlan, projectionsInitialized, horizon })
+    const plans = syncedProjectionPlans({ baseMonth, basePlan, projectionsInitialized, horizon })
     await adapter!.putMany('projectionPlans', plans)
     if (!projectionsInitialized) await get().setMeta({ projectionsInitialized: true })
   },

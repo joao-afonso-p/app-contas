@@ -7,12 +7,12 @@ import {
   addMonths, currentMonthKey, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
 } from '../lib/format'
 import { allocationSummary } from '../lib/calc/allocation'
-import { bucketBalance, computeBalances, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
-import { requiredMonthlySaving, savingsRate } from '../lib/calc/projections'
+import { activeAccountingMonth, bucketBalance, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
+import { computeProjectedBalances, requiredMonthlySaving, savingsRate } from '../lib/calc/projections'
 import {
   activeBuckets, activeExpenseCategories, activeIncomeSources, activeVehicles, firstPlanMonth, useStore,
 } from '../store/useStore'
-import type { MonthKey, PlannedMovement, SavingsBucket, SavingsMovement } from '../types'
+import type { MonthKey, PlannedMovement, SavingsBucket } from '../types'
 
 const HORIZONS = [12, 18, 24, 36]
 
@@ -31,10 +31,10 @@ export function Projecoes() {
   const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
 
   const horizon = data.meta[0]?.projectionHorizon ?? 18
-  const currentMonth = currentMonthKey()
+  const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
   const months = useMemo(
-    () => monthRange(currentMonth, addMonths(currentMonth, horizon - 1)),
-    [currentMonth, horizon],
+    () => monthRange(baseMonth, addMonths(baseMonth, horizon - 1)),
+    [baseMonth, horizon],
   )
 
   const incomeSources = activeIncomeSources(data)
@@ -47,33 +47,22 @@ export function Projecoes() {
     [data.projectionPlans],
   )
 
-  // Saldos: passado + mês atual reais, futuro projetado, no mesmo motor de
-  // cálculo. O real tem sempre prioridade até ao mês atual (inclusive) — o
-  // mês atual pode existir nos dois (data.monthlyPlans e data.projectionPlans,
-  // já que a tabela agora também o mostra), e só o plano real deve contar.
+  // O último mês contabilístico aplicado é sempre realidade; apenas planos
+  // e movimentos posteriores entram como projeção.
   const balanceTable: BalanceTable = useMemo(() => {
-    const plansCombined = [
-      ...data.projectionPlans.filter((p) => months.includes(p.id) && p.id > currentMonth),
-      ...data.monthlyPlans.filter((p) => p.id <= currentMonth),
-    ]
-    const plannedMovs = [...data.plannedMovements]
-    const plannedAsMovements: SavingsMovement[] = plannedMovs.map((m) => ({
-      id: m.id,
-      date: `${m.month}-15`,
-      bucketId: m.bucketId,
-      amount: m.amount,
-      description: m.description,
-    }))
-    const to = months[months.length - 1] ?? currentMonth
-    return computeBalances({
+    const to = months[months.length - 1] ?? baseMonth
+    return computeProjectedBalances({
       buckets,
-      plans: plansCombined,
-      movements: [...data.savingsMovements, ...plannedAsMovements],
+      realPlans: data.monthlyPlans,
+      realMovements: data.savingsMovements,
+      projectionPlans: data.projectionPlans,
+      plannedMovements: data.plannedMovements,
       overrides: data.balanceOverrides,
+      baseMonth,
       from: firstPlanMonth(data),
       to,
     })
-  }, [data, months, buckets, currentMonth])
+  }, [data, months, buckets, baseMonth])
 
   const [syncOpen, setSyncOpen] = useState(false)
 
@@ -262,15 +251,15 @@ export function Projecoes() {
   }
 
   // ---------- Analytics ----------
-  const firstMonth = months[0] ?? currentMonth
-  const lastMonth = months[months.length - 1] ?? currentMonth
+  const firstMonth = months[0] ?? baseMonth
+  const lastMonth = months[months.length - 1] ?? baseMonth
   const firstSummary = allocationSummary(planByMonth.get(firstMonth), incomeSources)
   const rate = savingsRate(firstSummary.totalIncome, firstSummary.totalSavings)
   const growth = totalBalance(balanceTable, lastMonth) - totalBalance(balanceTable, firstMonth)
 
   const goalBuckets = buckets.filter((b) => b.kind === 'goal')
   const displayGoalBuckets = showAllGoals ? data.savingsBuckets.filter((b) => b.kind === 'goal') : goalBuckets
-  const visibleMovements = (showMovHistory ? data.plannedMovements : data.plannedMovements.filter((m) => m.month >= currentMonth))
+  const visibleMovements = (showMovHistory ? data.plannedMovements : data.plannedMovements.filter((m) => m.month > baseMonth))
     .slice()
     .sort((a, b) => a.month.localeCompare(b.month))
 
@@ -460,7 +449,7 @@ export function Projecoes() {
             <div className="grid gap-3 sm:grid-cols-2">
               {displayGoalBuckets.map((b) => {
                 const isDone = b.status === 'done'
-                const current = isDone ? (b.targetAmount ?? 0) : bucketBalance(balanceTable, b.id, currentMonth)
+                const current = isDone ? (b.targetAmount ?? 0) : bucketBalance(balanceTable, b.id, baseMonth)
                 const target = b.targetAmount ?? 0
                 const pct = isDone ? 100 : goalProgress(current, target)
                 return (
@@ -485,7 +474,7 @@ export function Projecoes() {
                       {isDone
                         ? <span className="text-positive">Objetivo atingido ✓</span>
                         : b.targetDate
-                          ? renderSuggestion(requiredMonthlySaving(current, target, currentMonth, b.targetDate), current, target, b.targetDate)
+                          ? renderSuggestion(requiredMonthlySaving(current, target, baseMonth, b.targetDate), current, target, b.targetDate)
                           : 'Sem prazo definido.'}
                     </p>
                   </div>
@@ -604,7 +593,7 @@ export function Projecoes() {
 
       <Modal open={syncOpen} onClose={() => setSyncOpen(false)} title="Sincronizar com a realidade">
         <p className="mb-4 text-sm text-muted">
-          Fixa os saldos do mês atual das projeções nos saldos reais e recalcula o futuro a partir daí.
+          Usa o mês contabilístico atual como base real, atualiza esse plano nas projeções e recalcula apenas o futuro.
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => setSyncOpen(false)}>Cancelar</Button>
@@ -750,4 +739,3 @@ function renderSuggestion(suggestion: number | null, current: number, target: nu
     </span>
   )
 }
-

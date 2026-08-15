@@ -5,34 +5,47 @@ import type {
   PlannedMovement,
   ProjectionPlan,
   SavingsBucket,
+  SavingsMovement,
 } from '../../types'
-import { addMonths, monthDiff, monthRange } from '../format'
+import { addMonths, monthDiff, monthOfDate, monthRange } from '../format'
 import { round2 } from './allocation'
 import { computeBalances, type BalanceTable } from './balances'
 
-// As projeções reutilizam o mesmo motor de saldos do planeamento real:
-// grelha de planos futuros + movimentos previstos + overrides.
+// As projeções reutilizam o mesmo motor de saldos, separando a realidade
+// confirmada do futuro projetado no último mês contabilístico aplicado.
 
 export interface ProjectionInputs {
   buckets: SavingsBucket[]
-  plans: ProjectionPlan[]
+  realPlans: Pick<MonthlyPlan, 'id' | 'savings' | 'closed'>[]
+  realMovements: SavingsMovement[]
+  projectionPlans: ProjectionPlan[]
   plannedMovements: PlannedMovement[]
   overrides: BalanceOverride[]
+  baseMonth: MonthKey
   from: MonthKey
   to: MonthKey
 }
 
 export function computeProjectedBalances(inp: ProjectionInputs): BalanceTable {
-  return computeBalances({
-    buckets: inp.buckets,
-    plans: inp.plans,
-    movements: inp.plannedMovements.map((m) => ({
+  const plans = [
+    ...inp.projectionPlans.filter((p) => p.id > inp.baseMonth && p.id <= inp.to),
+    ...inp.realPlans.filter((p) => p.id <= inp.baseMonth),
+  ]
+  const realMovements = inp.realMovements.filter((m) => monthOfDate(m.date) <= inp.baseMonth)
+  const futureMovements = inp.plannedMovements
+    .filter((m) => m.month > inp.baseMonth && m.month <= inp.to)
+    .map((m) => ({
       id: m.id,
       date: `${m.month}-15`,
       bucketId: m.bucketId,
       amount: m.amount,
       description: m.description,
-    })),
+    }))
+
+  return computeBalances({
+    buckets: inp.buckets,
+    plans,
+    movements: [...realMovements, ...futureMovements],
     overrides: inp.overrides,
     from: inp.from,
     to: inp.to,
@@ -61,31 +74,31 @@ export function savingsRate(totalIncome: number, totalSavings: number): number {
 
 // Decide o que "Sincronizar com a realidade" grava em projectionPlans:
 // - ainda não há projeções (nunca sincronizado nem editado manualmente):
-//   gera o horizonte todo, todos os meses iguais ao plano real do mês atual.
-// - já há projeções: só o mês atual é realinhado com o plano real; os meses
+//   gera o horizonte todo, todos os meses iguais ao plano real do mês-base.
+// - já há projeções: só o mês-base é realinhado com o plano real; os meses
 //   futuros (já editados/definidos) ficam intocados.
 export interface SyncedProjectionPlansInput {
-  currentMonth: MonthKey
-  currentPlan: Pick<MonthlyPlan, 'income' | 'expenses' | 'savings' | 'autoInvestments'>
+  baseMonth: MonthKey
+  basePlan: Pick<MonthlyPlan, 'income' | 'expenses' | 'savings' | 'autoInvestments'>
   projectionsInitialized: boolean
   horizon: number
 }
 
 export function syncedProjectionPlans({
-  currentMonth,
-  currentPlan,
+  baseMonth,
+  basePlan,
   projectionsInitialized,
   horizon,
 }: SyncedProjectionPlansInput): ProjectionPlan[] {
   const copyPlan = (id: MonthKey): ProjectionPlan => ({
     id,
-    income: { ...currentPlan.income },
-    expenses: { ...currentPlan.expenses },
-    savings: { ...currentPlan.savings },
-    autoInvestments: { ...currentPlan.autoInvestments },
+    income: { ...basePlan.income },
+    expenses: { ...basePlan.expenses },
+    savings: { ...basePlan.savings },
+    autoInvestments: { ...basePlan.autoInvestments },
   })
   if (!projectionsInitialized) {
-    return monthRange(currentMonth, addMonths(currentMonth, horizon - 1)).map(copyPlan)
+    return monthRange(baseMonth, addMonths(baseMonth, horizon - 1)).map(copyPlan)
   }
-  return [copyPlan(currentMonth)]
+  return [copyPlan(baseMonth)]
 }
