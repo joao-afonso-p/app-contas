@@ -62,6 +62,7 @@ export function Movimentos() {
         .sort((a, b) => {
           const byDate = b.date.localeCompare(a.date)
           if (byDate !== 0) return byDate
+          if (a.transferGroupId && a.transferGroupId === b.transferGroupId) return a.amount - b.amount
           return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
         }),
     [data.savingsMovements, filterBucket, selectedMonth, currentMonth],
@@ -224,8 +225,9 @@ export function Movimentos() {
             <tbody className="divide-y divide-border bg-surface">
               {movements.map((m) => {
                 const bucket = data.savingsBuckets.find((b) => b.id === m.bucketId)
+                const isTransfer = !!m.transferGroupId
                 return (
-                  <tr key={m.id} className="odd:bg-surface-2/40">
+                  <tr key={m.id} className={cx(isTransfer ? 'border-l-2 border-accent bg-accent-soft/15' : 'odd:bg-surface-2/40')}>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-muted">{fmtDate(m.date)}</td>
                     <td className="px-3 py-2">
                       <Badge tone={bucket?.kind === 'goal' ? 'goal' : 'neutral'}>{bucket?.name ?? '—'}</Badge>
@@ -233,7 +235,7 @@ export function Movimentos() {
                     <td className="max-w-[140px] px-3 py-2 text-text sm:max-w-none">
                       <span className="flex items-center gap-1.5">
                         <span className="min-w-0 truncate">{m.description || 'Sem descrição'}</span>
-                        {m.transferGroupId && <Badge tone="accent">Transferência</Badge>}
+                        {isTransfer && <Badge tone="accent">🔗 Transferência</Badge>}
                       </span>
                     </td>
                     <td
