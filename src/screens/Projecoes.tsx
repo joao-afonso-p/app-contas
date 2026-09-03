@@ -523,13 +523,13 @@ export function Projecoes() {
                   {visibleMovements.map((m) => {
                     const isTransfer = !!m.transferGroupId
                     return (
-                      <tr key={m.id} className={cx(isTransfer ? 'border-l-2 border-accent bg-accent-soft/15' : 'odd:bg-surface-2/40')}>
+                      <tr key={m.id} className={cx('odd:bg-surface-2/40', isTransfer && 'border-l-4 border-l-accent')}>
                         <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">{monthShort(m.month)}</td>
                         <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
                         <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
                           <span className="flex items-center gap-1.5">
                             <span className="min-w-0 truncate">{m.description || '—'}</span>
-                            {isTransfer && <Badge tone="accent">🔗 Transferência</Badge>}
+                            {isTransfer && <Badge tone="accent">Transferência</Badge>}
                           </span>
                         </td>
                         <td
