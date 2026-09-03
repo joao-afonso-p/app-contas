@@ -259,7 +259,7 @@ export function Projecoes() {
 
   const goalBuckets = buckets.filter((b) => b.kind === 'goal')
   const displayGoalBuckets = showAllGoals ? data.savingsBuckets.filter((b) => b.kind === 'goal') : goalBuckets
-  const visibleMovements = (showMovHistory ? data.plannedMovements : data.plannedMovements.filter((m) => m.month > baseMonth))
+  const visibleMovements = (showMovHistory ? data.plannedMovements : data.plannedMovements.filter((m) => m.month >= baseMonth))
     .slice()
     .sort((a, b) => a.month.localeCompare(b.month))
 
