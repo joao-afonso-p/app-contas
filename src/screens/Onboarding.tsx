@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Badge, Button, Card, Input, SectionTitle, Select } from '../components/ui'
+import { RentExplanation } from '../components/RentInfo'
+import { Badge, Button, Card, InfoHint, Input, SectionTitle, Select } from '../components/ui'
 import { parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { BucketKind } from '../types'
@@ -170,6 +171,7 @@ export function Onboarding() {
               <input type="checkbox" checked={incomeIsRent} onChange={(e) => setIncomeIsRent(e.target.checked)} />
               Renda
             </label>
+            <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>
             <Button variant="soft" onClick={addIncomeSource} disabled={!incomeName.trim()}>Adicionar</Button>
           </div>
         </Card>

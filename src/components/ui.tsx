@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { fmtEUR, parseAmount } from '../lib/format'
 
@@ -24,13 +24,15 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
 }
 
 export function MetricCard({
-  label, value, hint, tone = 'default', title,
+  label, value, hint, tone = 'default', title, info,
 }: {
   label: string
   value: string
   hint?: string
   tone?: 'default' | 'positive' | 'negative' | 'warn' | 'accent'
   title?: string
+  // Explicação mostrada num ⓘ ao lado do label (funciona também em mobile, ao contrário do `title`).
+  info?: ReactNode
 }) {
   const tones = {
     default: 'text-text',
@@ -41,7 +43,10 @@ export function MetricCard({
   }
   return (
     <Card className="min-w-0" >
-      <div className="text-xs font-medium text-muted" title={title}>{label}</div>
+      <div className="flex items-center gap-1 text-xs font-medium text-muted" title={title}>
+        {label}
+        {info && <InfoHint label={`Sobre "${label}"`}>{info}</InfoHint>}
+      </div>
       <div className={cx('tnum mt-1 truncate text-2xl font-bold', tones[tone])} title={title}>{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </Card>
@@ -168,6 +173,86 @@ export function Modal({
       </div>
     </div>,
     document.body,
+  )
+}
+
+// Ícone ⓘ que abre uma pequena explicação ao clicar/tocar (o `title` nativo
+// não aparece em mobile). Fecha ao clicar fora, Esc, scroll ou resize.
+export function InfoHint({
+  children, label = 'Mais informação', className,
+}: { children: ReactNode; label?: string; className?: string }) {
+  const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const width = Math.min(288, window.innerWidth - 16)
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), window.innerWidth - width - 8)
+    // Abre para cima quando o ícone está na metade de baixo do ecrã.
+    setPos(
+      r.bottom > window.innerHeight * 0.6
+        ? { left, width, bottom: window.innerHeight - r.top + 6 }
+        : { left, width, top: r.bottom + 6 },
+    )
+
+    const close = () => setOpen(false)
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target as Node
+      if (popRef.current?.contains(t) || btnRef.current?.contains(t)) return
+      close()
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close()
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [open])
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setOpen((o) => !o)
+        }}
+        aria-label={label}
+        aria-expanded={open}
+        className={cx(
+          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border',
+          'text-[10px] font-bold leading-none text-muted transition-colors hover:bg-surface-2 hover:text-text',
+          open && 'bg-surface-2 text-text',
+          className,
+        )}
+      >
+        i
+      </button>
+      {open && pos &&
+        createPortal(
+          <div
+            ref={popRef}
+            role="tooltip"
+            className="fade-up fixed z-[60] rounded-xl border border-border bg-surface p-3 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-text shadow-xl"
+            style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
+    </>
   )
 }
 

@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { MonthPicker } from '../components/MonthPicker'
+import { RentExplanation, TransferToSavingsExplanation } from '../components/RentInfo'
 import {
   Badge,
   Button,
   Card,
   EmptyState,
+  InfoHint,
   Input,
   MetricCard,
   Modal,
@@ -101,7 +103,13 @@ export function Planeamento() {
           label="Transferir para a poupança"
           value={fmtEUR(summary.transferToSavings)}
           hint={`já descontadas rendas de ${fmtEUR(summary.rentIncome)}`}
-          title="Poupanças menos rendas: transfere-se logo com o salário; quando a renda chegar vai direta para a poupança"
+          info={
+            <TransferToSavingsExplanation
+              totalSavings={summary.totalSavings}
+              rentIncome={summary.rentIncome}
+              transferToSavings={summary.transferToSavings}
+            />
+          }
         />
         <MetricCard
           label="Por alocar"
@@ -232,7 +240,11 @@ function LineSection({
             <li key={doc.id} className="flex items-center justify-between gap-2 py-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-sm">{doc.name}</span>
-                {showRentBadge && doc.isRent && <Badge>Renda</Badge>}
+                {showRentBadge && doc.isRent && (
+                  <span title="Chega a meio do mês — é descontada do valor a transferir para a poupança">
+                    <Badge>Renda</Badge>
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <MoneyCell
@@ -277,6 +289,7 @@ function LineSection({
             É renda
           </label>
         )}
+        {collection === 'incomeSources' && <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>}
         <Button variant="soft" onClick={add} disabled={!newName.trim()}>
           Adicionar
         </Button>

@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Badge, Button, Card, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
+import { RentExplanation } from '../components/RentInfo'
+import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import { capFor } from '../lib/calc/budgets'
 import { currentMonthKey, fmtEUR, monthLabel, uid } from '../lib/format'
@@ -526,7 +527,12 @@ function ListEditor({ title, collection, hint }: EditableList) {
     <section>
       <SectionTitle>{title}</SectionTitle>
       <Card>
-        {hint && <p className="mb-2 text-xs text-muted">{hint}</p>}
+        {hint && (
+          <p className="mb-2 flex items-center gap-1 text-xs text-muted">
+            {hint}
+            {isIncome && <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>}
+          </p>
+        )}
         <ul className="divide-y divide-border">
           {docs.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-2 py-2">
