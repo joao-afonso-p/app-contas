@@ -3,7 +3,7 @@ import type { DataAdapter } from '../data/adapter'
 import { firebaseConfigured, FirebaseAdapter, redeemPremiumCode } from '../data/firebaseAdapter'
 import { LocalAdapter } from '../data/localAdapter'
 import { addMonths, currentMonthKey, generateSpaceCode, monthOfDate, nowISO, todayISO, uid } from '../lib/format'
-import { syncedProjectionPlans } from '../lib/calc/projections'
+import { plannedMovementGroup, syncedProjectionPlans } from '../lib/calc/projections'
 import { activeAccountingMonth, bucketBalance, computeBalances } from '../lib/calc/balances'
 import { allocationSummary, cumulativeAutoInvestmentTotals, round2 } from '../lib/calc/allocation'
 import type {
@@ -17,6 +17,7 @@ import type {
   InvestmentVehicle,
   MonthKey,
   MonthlyPlan,
+  PlannedMovement,
   ProjectionPlan,
   SavingsBucket,
   SavingsMovement,
@@ -84,6 +85,9 @@ interface Store {
   addMovement(m: Omit<SavingsMovement, 'id'>): Promise<void>
   addTransfer(p: { date: string; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
   addPlannedTransfer(p: { month: MonthKey; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
+  // Atuam nas duas pernas quando é uma transferência prevista.
+  setPlannedMovementDone(m: PlannedMovement, done: boolean): Promise<void>
+  removePlannedMovement(m: PlannedMovement): Promise<void>
   addTransactions(ts: Omit<Transaction, 'id'>[]): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
 
@@ -343,6 +347,16 @@ export const useStore = create<Store>((set, get) => ({
       { id: uid(), month, bucketId: fromBucketId, amount: -value, description: desc, transferGroupId },
       { id: uid(), month, bucketId: toBucketId, amount: value, description: desc, transferGroupId },
     ])
+  },
+
+  async setPlannedMovementDone(m, done) {
+    const legs = plannedMovementGroup(get().data.plannedMovements, m)
+    await adapter!.putMany('plannedMovements', legs.map((l) => ({ ...l, done })))
+  },
+
+  async removePlannedMovement(m) {
+    const legs = plannedMovementGroup(get().data.plannedMovements, m)
+    await Promise.all(legs.map((l) => adapter!.remove('plannedMovements', l.id)))
   },
 
   async addTransactions(ts) {

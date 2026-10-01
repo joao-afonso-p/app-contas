@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
-  Badge, Button, Card, EmptyState, Input, Modal, Money, ProgressBar, SectionTitle, Select, cx,
+  Badge, Button, Card, EmptyState, InfoHint, Input, Modal, Money, ProgressBar, SectionTitle, Select, cx,
 } from '../components/ui'
 import { EditableRow, GroupHeader, SpacerRow, StaticRow, TotalRow } from '../components/PlanTable'
 import {
@@ -8,7 +8,9 @@ import {
 } from '../lib/format'
 import { allocationSummary } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
-import { computeProjectedBalances, requiredMonthlySaving, savingsRate } from '../lib/calc/projections'
+import {
+  computeProjectedBalances, plannedMovementCounts, plannedMovementHiddenReason, requiredMonthlySaving, savingsRate,
+} from '../lib/calc/projections'
 import {
   activeBuckets, activeExpenseCategories, activeIncomeSources, activeVehicles, firstPlanMonth, useStore,
 } from '../store/useStore'
@@ -25,8 +27,9 @@ export function Projecoes() {
   const setProjectionRange = useStore((s) => s.setProjectionRange)
   const syncProjectionToReality = useStore((s) => s.syncProjectionToReality)
   const addPlannedTransfer = useStore((s) => s.addPlannedTransfer)
+  const setPlannedMovementDone = useStore((s) => s.setPlannedMovementDone)
+  const removePlannedMovement = useStore((s) => s.removePlannedMovement)
   const put = useStore((s) => s.put)
-  const remove = useStore((s) => s.remove)
 
   const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
 
@@ -240,7 +243,9 @@ export function Projecoes() {
     }
     if (!movBucket) return
     const sign = movKind === 'entrada' ? 1 : -1
+    const existing = editingMovId ? data.plannedMovements.find((x) => x.id === editingMovId) : undefined
     void put('plannedMovements', {
+      ...existing, // mantém o estado "feito" ao editar
       id: editingMovId ?? uid(),
       month: movMonth,
       bucketId: movBucket,
@@ -259,7 +264,11 @@ export function Projecoes() {
 
   const goalBuckets = buckets.filter((b) => b.kind === 'goal')
   const displayGoalBuckets = showAllGoals ? data.savingsBuckets.filter((b) => b.kind === 'goal') : goalBuckets
-  const visibleMovements = (showMovHistory ? data.plannedMovements : data.plannedMovements.filter((m) => m.month >= baseMonth))
+  // Por defeito só os que contam nas projeções; o histórico mostra também os
+  // de meses passados e os marcados como feitos.
+  const visibleMovements = (showMovHistory
+    ? data.plannedMovements
+    : data.plannedMovements.filter((m) => plannedMovementCounts(m, baseMonth)))
     .slice()
     .sort((a, b) => {
       const byMonth = a.month.localeCompare(b.month)
@@ -268,6 +277,11 @@ export function Projecoes() {
       if (byGroup !== 0) return byGroup
       return a.amount - b.amount
     })
+
+  // Movimentos previstos do mês-base ainda por fazer — entram no saldo desse mês.
+  const basePending = data.plannedMovements.filter((m) => m.month === baseMonth && plannedMovementCounts(m, baseMonth))
+  const basePendingCount = new Set(basePending.map((m) => m.transferGroupId ?? m.id)).size
+  const basePendingNet = basePending.reduce((acc, m) => acc + m.amount, 0)
 
   return (
     <div className="fade-up flex flex-col gap-6">
@@ -306,7 +320,23 @@ export function Projecoes() {
                         key={m}
                         className="sticky top-0 z-20 whitespace-nowrap bg-surface px-3 py-2 text-right align-bottom"
                       >
-                        <div className="tnum text-xs font-semibold text-muted">{monthShort(m)}</div>
+                        <div className="tnum flex items-center justify-end gap-1 text-xs font-semibold text-muted">
+                          {m === baseMonth && basePendingCount > 0 && (
+                            <InfoHint label={`Sobre os saldos de ${monthLabel(m)}`}>
+                              <p>
+                                Saldo esperado no <strong>fim de {monthLabel(m)}</strong>: além do que já está
+                                registado, inclui {basePendingCount}{' '}
+                                {basePendingCount === 1 ? 'movimento previsto' : 'movimentos previstos'} ainda por
+                                fazer ({basePendingNet > 0 ? '+' : ''}{fmtEUR(basePendingNet)} no total).
+                              </p>
+                              <p className="mt-1.5 text-muted">
+                                Quando acontecerem, regista-os nos Movimentos e marca-os como feitos (✓) em
+                                Movimentos previstos — assim não contam a dobrar.
+                              </p>
+                            </InfoHint>
+                          )}
+                          {monthShort(m)}
+                        </div>
                         <div className={cx('tnum mt-0.5 text-[11px] font-normal', isBalanced ? 'text-muted' : 'text-negative')}>
                           {fmtPct(summary.allocationPct)}
                         </div>
@@ -522,9 +552,16 @@ export function Projecoes() {
                 <tbody className="divide-y divide-border">
                   {visibleMovements.map((m) => {
                     const isTransfer = !!m.transferGroupId
+                    const hiddenReason = plannedMovementHiddenReason(m, baseMonth)
                     return (
                       <tr key={m.id} className={cx('odd:bg-surface-2/40', isTransfer && 'border-l-4 border-l-accent')}>
-                        <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">{monthShort(m.month)}</td>
+                        <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">
+                          <span className="flex items-center gap-1.5">
+                            {monthShort(m.month)}
+                            {hiddenReason === 'done' && <Badge tone="accent">✓ Feito</Badge>}
+                            {hiddenReason === 'past' && <Badge>Mês passado</Badge>}
+                          </span>
+                        </td>
                         <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
                         <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
                           <span className="flex items-center gap-1.5">
@@ -543,6 +580,24 @@ export function Projecoes() {
                         </td>
                         <td className="whitespace-nowrap px-2 py-1.5 text-right">
                           <button
+                            onClick={() => void setPlannedMovementDone(m, !m.done)}
+                            className="group rounded-lg p-1 align-middle hover:bg-surface-2"
+                            aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
+                            aria-pressed={!!m.done}
+                            title={m.done ? 'Feito — clica para voltar a por fazer' : 'Marcar como feito (já aconteceu)'}
+                          >
+                            <span
+                              className={cx(
+                                'inline-flex h-4 w-4 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none transition-colors',
+                                m.done
+                                  ? 'border-positive bg-positive text-white'
+                                  : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
+                              )}
+                            >
+                              ✓
+                            </span>
+                          </button>
+                          <button
                             onClick={() => openEditMovement(m)}
                             className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
                             aria-label="Editar movimento"
@@ -551,7 +606,10 @@ export function Projecoes() {
                           </button>
                           <button
                             onClick={() => {
-                              if (window.confirm('Apagar este movimento previsto?')) void remove('plannedMovements', m.id)
+                              const msg = isTransfer
+                                ? 'Apagar esta transferência prevista (as duas pernas)?'
+                                : 'Apagar este movimento previsto?'
+                              if (window.confirm(msg)) void removePlannedMovement(m)
                             }}
                             className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
                             aria-label="Apagar movimento"

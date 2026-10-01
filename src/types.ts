@@ -137,6 +137,10 @@ export interface PlannedMovement {
   description: string
   // Presente nas duas pernas de uma transferência prevista entre baldes (mesmo id nas duas).
   transferGroupId?: string
+  // Marcado como feito pelo utilizador: já aconteceu (e está registado nos
+  // movimentos reais), por isso deixa de contar nas projeções. `undefined`
+  // (registos anteriores a este campo existir) = por fazer.
+  done?: boolean
 }
 
 // ---------- Distribuição por veículos ----------

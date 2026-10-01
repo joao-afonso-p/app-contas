@@ -4,7 +4,14 @@ import { addMonths, monthDiff, monthRange, parseAmount } from '../format'
 import { allocationSummary, cumulativeAutoInvestmentTotals } from './allocation'
 import { activeAccountingMonth, computeBalances, goalProgress } from './balances'
 import { budgetStatus, computeSpend, matchCategoryByName, monthTotals, parseBankStatement, suggestCategory } from './budgets'
-import { computeProjectedBalances, requiredMonthlySaving, syncedProjectionPlans } from './projections'
+import {
+  computeProjectedBalances,
+  plannedMovementCounts,
+  plannedMovementGroup,
+  plannedMovementHiddenReason,
+  requiredMonthlySaving,
+  syncedProjectionPlans,
+} from './projections'
 
 const bucket = (id: string): SavingsBucket => ({
   id, name: id, kind: 'fixed', archived: false, order: 0,
@@ -190,7 +197,7 @@ describe('objetivos e projeções', () => {
     expect(plans[0]).toMatchObject({ id: '2026-07', income: { sal: 2000 }, expenses: { casa: 900 }, savings: { geral: 500 } })
   })
 
-  it('mantém o saldo real do mês-base apesar de movimentos previstos antigos', () => {
+  it('mantém o saldo real do mês-base quando o movimento previsto já foi feito', () => {
     const balances = computeProjectedBalances({
       buckets: [
         bucket('emergencia'), bucket('investir'), bucket('casa'), bucket('rendas'), bucket('viajar'),
@@ -214,7 +221,7 @@ describe('objetivos e projeções', () => {
       realMovements: [],
       projectionPlans: [],
       plannedMovements: [
-        { id: 'antigo', month: '2026-08', bucketId: 'geral', amount: -2860, description: 'previsto antigo' },
+        { id: 'antigo', month: '2026-08', bucketId: 'geral', amount: -2860, description: 'previsto antigo', done: true },
       ],
       overrides: [],
       baseMonth: '2026-08',
@@ -226,7 +233,57 @@ describe('objetivos e projeções', () => {
     expect([...balances.values()].reduce((total, row) => total + (row.get('2026-08') ?? 0), 0)).toBe(13825)
   })
 
-  it('aplica movimentos previstos apenas depois do mês-base', () => {
+  it('conta movimentos previstos do mês-base ainda por fazer (saldo esperado no fim do mês)', () => {
+    const balances = computeProjectedBalances({
+      buckets: [bucket('geral'), bucket('viajar')],
+      realPlans: [{ id: '2026-10', savings: { geral: 1000, viajar: 2000 }, closed: true }],
+      realMovements: [
+        // Voos já pagos: estão nos movimentos reais e o previsto foi marcado como feito.
+        { id: 'r1', date: '2026-10-03', bucketId: 'viajar', amount: -1600, description: 'Voos' },
+      ],
+      projectionPlans: [{ id: '2026-11', income: {}, expenses: {}, savings: {} }],
+      plannedMovements: [
+        { id: 'voos', month: '2026-10', bucketId: 'viajar', amount: -1600, description: 'Voos', done: true },
+        { id: 'prendas', month: '2026-10', bucketId: 'geral', amount: -150, description: 'Prendas' },
+        { id: 'extra', month: '2026-10', bucketId: 'viajar', amount: 800, description: 'Extra' },
+        { id: 'adiantado', month: '2026-11', bucketId: 'geral', amount: -500, description: 'Já pago', done: true },
+        { id: 'velho', month: '2026-09', bucketId: 'geral', amount: -999, description: 'Mês passado' },
+      ],
+      overrides: [],
+      baseMonth: '2026-10',
+      from: '2026-10',
+      to: '2026-11',
+    })
+
+    expect(balances.get('geral')?.get('2026-10')).toBe(850)
+    expect(balances.get('viajar')?.get('2026-10')).toBe(1200)
+    // Feito num mês futuro também deixa de contar.
+    expect(balances.get('geral')?.get('2026-11')).toBe(850)
+  })
+
+  it('movimentos previstos: estado no histórico e pernas de transferência', () => {
+    const base = '2026-10'
+    const pending = { id: 'a', month: '2026-10', bucketId: 'g', amount: -1, description: '' }
+    const past = { ...pending, id: 'b', month: '2026-09' }
+    const done = { ...pending, id: 'c', month: '2026-12', done: true }
+    const pastDone = { ...past, id: 'd', done: true }
+
+    expect(plannedMovementCounts(pending, base)).toBe(true)
+    expect(plannedMovementCounts(past, base)).toBe(false)
+    expect(plannedMovementCounts(done, base)).toBe(false)
+    expect(plannedMovementHiddenReason(pending, base)).toBeNull()
+    expect(plannedMovementHiddenReason(past, base)).toBe('past')
+    expect(plannedMovementHiddenReason(done, base)).toBe('done')
+    expect(plannedMovementHiddenReason(pastDone, base)).toBe('done')
+
+    const legA = { ...pending, id: 't1', transferGroupId: 'T' }
+    const legB = { ...pending, id: 't2', amount: 1, transferGroupId: 'T' }
+    const all = [pending, legA, legB, past]
+    expect(plannedMovementGroup(all, legA).map((m) => m.id)).toEqual(['t1', 't2'])
+    expect(plannedMovementGroup(all, pending).map((m) => m.id)).toEqual(['a'])
+  })
+
+  it('aplica movimentos previstos dos meses seguintes ao mês-base', () => {
     const balances = computeProjectedBalances({
       buckets: [bucket('geral')],
       realPlans: [{ id: '2026-08', savings: { geral: 2475 }, closed: true }],
