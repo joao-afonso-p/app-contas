@@ -13,6 +13,8 @@ import { computeBalances, type BalanceTable } from './balances'
 
 // As projeções reutilizam o mesmo motor de saldos, separando a realidade
 // confirmada do futuro projetado no último mês contabilístico aplicado.
+// O mês-base = realidade + movimentos previstos desse mês ainda por fazer
+// (ou seja, o saldo esperado no fim do mês).
 
 export interface ProjectionInputs {
   buckets: SavingsBucket[]
@@ -26,6 +28,28 @@ export interface ProjectionInputs {
   to: MonthKey
 }
 
+// Um movimento previsto conta nas projeções enquanto estiver por fazer e for
+// do mês-base em diante. Os do mês-base que já aconteceram são marcados como
+// feitos (estão nos movimentos reais) — assim não contam a dobrar.
+export function plannedMovementCounts(m: PlannedMovement, baseMonth: MonthKey): boolean {
+  return !m.done && m.month >= baseMonth
+}
+
+// Porque é que um movimento previsto está fora das projeções (só visível no histórico).
+export function plannedMovementHiddenReason(m: PlannedMovement, baseMonth: MonthKey): 'done' | 'past' | null {
+  if (m.done) return 'done'
+  if (m.month < baseMonth) return 'past'
+  return null
+}
+
+// As duas pernas de uma transferência prevista andam sempre juntas (editar,
+// marcar como feito, apagar); um movimento simples é só ele próprio.
+export function plannedMovementGroup(all: PlannedMovement[], m: PlannedMovement): PlannedMovement[] {
+  if (!m.transferGroupId) return [m]
+  const legs = all.filter((x) => x.transferGroupId === m.transferGroupId)
+  return legs.length ? legs : [m]
+}
+
 export function computeProjectedBalances(inp: ProjectionInputs): BalanceTable {
   const plans = [
     ...inp.projectionPlans.filter((p) => p.id > inp.baseMonth && p.id <= inp.to),
@@ -33,7 +57,7 @@ export function computeProjectedBalances(inp: ProjectionInputs): BalanceTable {
   ]
   const realMovements = inp.realMovements.filter((m) => monthOfDate(m.date) <= inp.baseMonth)
   const futureMovements = inp.plannedMovements
-    .filter((m) => m.month > inp.baseMonth && m.month <= inp.to)
+    .filter((m) => plannedMovementCounts(m, inp.baseMonth) && m.month <= inp.to)
     .map((m) => ({
       id: m.id,
       date: `${m.month}-15`,
