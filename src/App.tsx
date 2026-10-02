@@ -11,6 +11,7 @@ import { Projecoes } from './screens/Projecoes'
 import { Overview } from './screens/Overview'
 import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
+import { InstallBanner } from './components/InstallGuide'
 
 const NAV: { id: Screen; label: string; icon: string; mobile: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: '📊', mobile: true },
@@ -118,6 +119,7 @@ export function App() {
       {/* Conteúdo */}
       <main className="min-w-0 flex-1 pb-24 md:pb-6">
         <div className="pt-safe mx-auto max-w-6xl px-4 pb-4 md:px-6 md:pb-6">
+          <InstallBanner />
           <Active />
         </div>
       </main>

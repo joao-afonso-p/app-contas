@@ -3,6 +3,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { BackupSettings } from '../components/Backup'
+import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
@@ -76,6 +77,8 @@ export function Definicoes() {
   return (
     <div className="fade-up flex flex-col gap-6">
       <h1 className="text-xl font-black">Definições</h1>
+
+      <InstallSettingsSection />
 
       <section>
         <SectionTitle>Sincronização</SectionTitle>
