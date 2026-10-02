@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Card, Modal, SectionTitle, cx } from './ui'
+import { trackEvent } from '../lib/analytics'
 import { useInstallPrompt } from '../lib/installPrompt'
 import { detectIosNonSafari, detectMac, detectPlatform, isStandalone, type Platform } from '../lib/platform'
 import { useStore } from '../store/useStore'
@@ -53,6 +54,8 @@ export function InstallGuideContent({ compact, initialPlatform }: { compact?: bo
   const mac = detectMac()
   const iosOther = detectIosNonSafari()
   const standalone = isStandalone()
+  // Só é montado dentro de um Modal — montar = o utilizador abriu o guia.
+  useEffect(() => trackEvent('install-guide-open'), [])
 
   const showStorageNote = tab === 'ios' && mode === 'local' && detected === 'ios' && !standalone
 
@@ -180,6 +183,7 @@ export function InstallBanner() {
 
   const dismiss = () => {
     localStorage.setItem(LS_DISMISSED, '1')
+    trackEvent('install-banner-dismissed')
     setDismissed(true)
   }
   const isDesktop = detectPlatform() === 'desktop'
