@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ImportBackupCard } from '../components/Backup'
+import { InstallGuideCard } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { Badge, Button, Card, InfoHint, Input, SectionTitle, Select } from '../components/ui'
 import { parseAmount, uid } from '../lib/format'
@@ -141,6 +142,7 @@ export function Onboarding() {
           </p>
         </div>
 
+        <InstallGuideCard />
         <ImportBackupCard />
 
         <Card className="mb-4">
