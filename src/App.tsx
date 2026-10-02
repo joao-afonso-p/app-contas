@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { needsOnboarding, useStore, type Screen } from './store/useStore'
 import { cx } from './components/ui'
+import { trackEvent, trackView } from './lib/analytics'
 import { Welcome } from './screens/Welcome'
 import { Onboarding } from './screens/Onboarding'
 import { Planeamento } from './screens/Planeamento'
@@ -53,6 +54,16 @@ export function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
+  // Estatísticas anónimas (ver lib/analytics): um "ecrã" por pageview.
+  const onboarding = status === 'ready' && needsOnboarding(data)
+  const view = status === 'welcome' ? 'welcome' : status !== 'ready' ? null : onboarding ? 'onboarding' : screen
+  useEffect(() => {
+    if (view) trackView(view)
+  }, [view])
+  useEffect(() => {
+    if (status === 'ready') trackEvent(mode === 'space' ? 'mode-space' : 'mode-local')
+  }, [status, mode])
+
   if (status === 'boot') {
     return <div className="flex h-dvh items-center justify-center text-muted">A carregar…</div>
   }
@@ -74,7 +85,7 @@ export function App() {
     )
   }
   if (status === 'welcome') return <Welcome />
-  if (needsOnboarding(data)) return <Onboarding />
+  if (onboarding) return <Onboarding />
 
   const Active = SCREENS[screen]
 

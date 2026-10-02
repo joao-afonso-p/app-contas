@@ -180,6 +180,11 @@ export function Definicoes() {
             planeamento e dos movimentos; nada é escrito à mão. {data.savingsBuckets.length} baldes,{' '}
             {data.transactions.length} gastos registados.
           </p>
+          <p className="mt-2 text-xs text-muted">
+            Para sabermos quantas pessoas usam a app, contamos visitas de forma anónima com o GoatCounter
+            (sem cookies e sem guardar o IP). Só é registado qual o ecrã aberto — nunca valores, nomes,
+            categorias ou o código de espaço.
+          </p>
         </Card>
       </section>
 

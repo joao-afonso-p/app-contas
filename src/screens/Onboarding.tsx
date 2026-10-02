@@ -3,6 +3,7 @@ import { ImportBackupCard } from '../components/Backup'
 import { InstallGuideCard } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { Badge, Button, Card, InfoHint, Input, SectionTitle, Select } from '../components/ui'
+import { trackEvent } from '../lib/analytics'
 import { parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { BucketKind } from '../types'
@@ -126,6 +127,7 @@ export function Onboarding() {
       })),
       vehicles: vehicles.map((v) => ({ name: v.name, initialValue: parseAmount(v.initialValue) ?? 0 })),
     })
+    trackEvent('onboarding-complete')
   }
 
   return (
