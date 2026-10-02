@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { BackupSettings } from '../components/Backup'
 import { RentExplanation } from '../components/RentInfo'
 import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
@@ -136,6 +137,7 @@ export function Definicoes() {
         <section>
           <SectionTitle>Dados</SectionTitle>
           <Card>
+            <BackupSettings />
             <p className="mb-3 text-sm text-muted">
               Apaga tudo — categorias, baldes, objetivos, veículos e todo o histórico — e volta a
               mostrar o onboarding para configurares a conta outra vez do zero.
