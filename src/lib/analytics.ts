@@ -66,7 +66,9 @@ export type AnalyticsEvent =
   | 'backup-export'
   | 'backup-import'
   | 'install-guide-open'
-  | 'install-banner-dismissed'
+  | 'install-nudge-done'
+  | 'install-nudge-snoozed'
+  | 'install-nudge-shortcut'
   | 'install-prompt-accepted'
 
 export function trackEvent(name: AnalyticsEvent) {

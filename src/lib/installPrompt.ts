@@ -24,21 +24,23 @@ export function registerInstallPrompt() {
   })
 }
 
-export async function promptInstall(): Promise<void> {
+// Devolve true se o utilizador aceitou instalar.
+export async function promptInstall(): Promise<boolean> {
   const ev = deferred
-  if (!ev) return
+  if (!ev) return false
   deferred = null
   emit()
   try {
     await ev.prompt()
     const { outcome } = await ev.userChoice
     if (outcome === 'accepted') trackEvent('install-prompt-accepted')
+    return outcome === 'accepted'
   } catch {
-    // ignorar
+    return false
   }
 }
 
-export function useInstallPrompt(): { canPrompt: boolean; promptInstall: () => Promise<void> } {
+export function useInstallPrompt(): { canPrompt: boolean; promptInstall: () => Promise<boolean> } {
   const canPrompt = useSyncExternalStore(
     (cb) => {
       listeners.add(cb)
