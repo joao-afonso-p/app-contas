@@ -2,10 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Button, Card, Modal, SectionTitle, cx } from './ui'
 import { trackEvent } from '../lib/analytics'
 import { useInstallPrompt } from '../lib/installPrompt'
+import { hasAppliedPlan, loadNudgeState, saveNudgeState, shouldShowNudge, snoozeNudge, type NudgeState } from '../lib/installNudge'
 import { detectIosNonSafari, detectMac, detectPlatform, isStandalone, type Platform } from '../lib/platform'
 import { useStore } from '../store/useStore'
-
-const LS_DISMISSED = 'contas.installBannerDismissed'
 
 function ShareIcon() {
   return (
@@ -175,25 +174,95 @@ export function InstallGuideCard() {
   )
 }
 
-// Faixa discreta dentro da app.
-export function InstallBanner() {
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(LS_DISMISSED) === '1')
+// Lembrete dentro da app, só depois do primeiro plano aplicado (ver
+// lib/installNudge). Computador: cartão no canto com o atalho dos favoritos
+// (ou "Instalar app" quando o browser o permite). Telemóvel: faixa no topo
+// com botão para instalar / ver como.
+export function InstallNudge() {
+  const plans = useStore((s) => s.data.monthlyPlans)
+  const { canPrompt, promptInstall } = useInstallPrompt()
+  const [state, setState] = useState<NudgeState>(loadNudgeState)
   const [open, setOpen] = useState(false)
-  if (dismissed || isStandalone()) return null
+  const platform = detectPlatform()
+  const mac = detectMac()
+  const visible = shouldShowNudge({ state, hasAppliedPlan: hasAppliedPlan(plans), standalone: isStandalone(), now: new Date() })
 
-  const dismiss = () => {
-    localStorage.setItem(LS_DISMISSED, '1')
-    trackEvent('install-banner-dismissed')
-    setDismissed(true)
+  const update = (next: NudgeState) => {
+    saveNudgeState(next)
+    setState(next)
   }
-  const isDesktop = detectPlatform() === 'desktop'
+  const done = () => {
+    trackEvent('install-nudge-done')
+    update({ ...state, done: true })
+  }
+  const snooze = () => {
+    trackEvent('install-nudge-snoozed')
+    update(snoozeNudge(state, new Date()))
+  }
+  const install = async () => {
+    if (await promptInstall()) update({ ...state, done: true })
+  }
+
+  // Se carregar no atalho dos favoritos com o cartão à vista, damos por feito
+  // (não impedimos o atalho do browser).
+  useEffect(() => {
+    if (!visible || platform !== 'desktop') return
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'd') {
+        trackEvent('install-nudge-shortcut')
+        const next = { ...loadNudgeState(), done: true }
+        saveNudgeState(next)
+        setState(next)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [visible, platform])
+
+  if (!visible) return null
+
+  if (platform === 'desktop') {
+    const shortcut = mac ? <><Kbd>⌘</Kbd> + <Kbd>D</Kbd></> : <><Kbd>Ctrl</Kbd> + <Kbd>D</Kbd></>
+    return (
+      <div role="dialog" aria-label="Ter a app sempre à mão" className="fade-up fixed bottom-6 right-6 z-40 w-80 rounded-2xl border border-border bg-surface p-4 shadow-xl">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl leading-none">{canPrompt ? '🖥️' : '⭐'}</span>
+          <div className="min-w-0">
+            <div className="text-sm font-bold">{canPrompt ? 'Instala a Contas como app' : 'Guarda a Contas nos favoritos'}</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {canPrompt ? (
+                <>Fica com janela e ícone próprios, sempre à mão. Ou guarda só nos favoritos com {shortcut}.</>
+              ) : (
+                <>Carrega em {shortcut} para a teres sempre à mão. É no computador que tens todas as funcionalidades.</>
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={snooze}>Agora não</Button>
+          {canPrompt ? (
+            <Button size="sm" onClick={() => void install()}>Instalar app</Button>
+          ) : (
+            <Button size="sm" onClick={done}>Já guardei ✓</Button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <>
-      <div className="mb-3 flex items-center gap-2 rounded-xl bg-accent-soft px-3 py-2 text-sm text-accent-strong">
-        <button className="min-w-0 flex-1 truncate text-left font-medium" onClick={() => setOpen(true)}>
-          {isDesktop ? '⭐ Guarda a app nos favoritos' : '📲 Adiciona a app ao ecrã principal'}
-        </button>
-        <button onClick={dismiss} aria-label="Dispensar" className="rounded-lg px-1.5 hover:bg-black/5">✕</button>
+      <div className="mb-3 rounded-xl bg-accent-soft p-3">
+        <div className="text-sm font-semibold text-accent-strong">📲 Adiciona a Contas ao ecrã principal</div>
+        <p className="mt-0.5 text-xs text-muted">Abre-a num toque, como qualquer outra app.</p>
+        <div className="mt-2 flex gap-2">
+          {canPrompt ? (
+            <Button size="sm" onClick={() => void install()}>Instalar</Button>
+          ) : (
+            <Button size="sm" onClick={() => setOpen(true)}>Como instalar</Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={snooze}>Agora não</Button>
+        </div>
       </div>
       <Modal open={open} onClose={() => setOpen(false)} title="Ter a app sempre à mão">
         <InstallGuideContent />
