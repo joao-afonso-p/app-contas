@@ -19,7 +19,11 @@ npm test         # testes dos módulos de cálculo
 npm run build    # typecheck + build de produção
 ```
 
-Sem configurar nada, a app corre em **modo local** (IndexedDB). No primeiro arranque escolhe "Começar com dados de exemplo" para veres tudo preenchido com seeds realistas.
+Sem configurar nada, a app corre em **modo local** (IndexedDB). No primeiro arranque passas pelo onboarding (configuras fontes de rendimento, categorias e baldes) ou, se vens de outro dispositivo, importas uma cópia de segurança.
+
+### Cópia de segurança / mudar de dispositivo
+
+Só no modo local: em Definições → Dados, "Exportar dados" gera um ficheiro `contas-backup-AAAA-MM-DD.json` com todos os dados (não inclui a chave da OpenAI nem o tema). No dispositivo novo, escolhe "Usar localmente" e, no ecrã inicial, "Importar cópia de segurança". Importar substitui tudo o que existir no dispositivo; é uma fotografia do momento da exportação. O ficheiro contém dados financeiros — mantém-no privado.
 
 ## Arquitetura
 

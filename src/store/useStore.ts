@@ -57,6 +57,7 @@ interface Store {
   init(): Promise<void>
   chooseLocal(): Promise<void>
   resetAccount(): Promise<void>
+  importBackup(data: DataSet): Promise<void>
   completeOnboarding(input: {
     incomeSources: { name: string; isRent: boolean }[]
     expenseCategories: { name: string }[]
@@ -151,6 +152,27 @@ export const useStore = create<Store>((set, get) => ({
     const local = new LocalAdapter()
     await startAdapter(local, set)
     await local.clear()
+    localStorage.setItem(LS_MODE, 'local')
+    set({ status: 'ready', mode: 'local' })
+  },
+
+  // Importa uma cópia de segurança (só modo local): substitui TODOS os dados
+  // deste dispositivo. Nunca toca no Firebase/espaço.
+  async importBackup(data) {
+    if (get().mode !== 'local') throw new Error('Importar só está disponível no modo local.')
+    const local = new LocalAdapter()
+    await startAdapter(local, set)
+    await local.clear()
+    const toWrite: DataSet = { ...data, meta: [...data.meta] }
+    // Garante que não cai em onboarding se o ficheiro não tiver histórico.
+    if (needsOnboarding(toWrite)) {
+      toWrite.meta = [{ ...(toWrite.meta[0] ?? { id: 'meta' as const }), id: 'meta', onboardingDone: true }]
+    }
+    for (const name of COLLECTIONS) {
+      const docs = toWrite[name]
+      if (docs.length > 0) await local.putMany(name, docs)
+    }
+    await migrateBalanceOverrides(get)
     localStorage.setItem(LS_MODE, 'local')
     set({ status: 'ready', mode: 'local' })
   },
