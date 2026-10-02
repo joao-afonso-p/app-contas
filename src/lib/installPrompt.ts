@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { trackEvent } from './analytics'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -30,7 +31,8 @@ export async function promptInstall(): Promise<void> {
   emit()
   try {
     await ev.prompt()
-    await ev.userChoice
+    const { outcome } = await ev.userChoice
+    if (outcome === 'accepted') trackEvent('install-prompt-accepted')
   } catch {
     // ignorar
   }

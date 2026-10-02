@@ -59,7 +59,15 @@ export function trackView(view: string) {
   send({ path: `/${view}`, title: view })
 }
 
-export type AnalyticsEvent = 'onboarding-complete' | 'mode-local' | 'mode-space'
+export type AnalyticsEvent =
+  | 'onboarding-complete'
+  | 'mode-local'
+  | 'mode-space'
+  | 'backup-export'
+  | 'backup-import'
+  | 'install-guide-open'
+  | 'install-banner-dismissed'
+  | 'install-prompt-accepted'
 
 export function trackEvent(name: AnalyticsEvent) {
   if (!enabled) return

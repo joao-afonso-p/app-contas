@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Button, Card } from './ui'
+import { trackEvent } from '../lib/analytics'
 import { backupFileName, backupSummary, parseBackup, serializeBackup } from '../lib/backup'
 import { deliverFile } from '../lib/download'
 import { useStore } from '../store/useStore'
@@ -46,6 +47,7 @@ export function ExportBackupButton() {
     setError('')
     try {
       await deliverFile(backupFileName(), serializeBackup(data))
+      trackEvent('backup-export')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível exportar os dados.')
     }
@@ -107,6 +109,7 @@ export function ImportBackupFlow({
     setError('')
     try {
       await importBackup(parsed.data)
+      trackEvent('backup-import')
       setParsed(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível importar a cópia de segurança.')
