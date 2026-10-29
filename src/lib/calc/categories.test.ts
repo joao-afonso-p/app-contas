@@ -59,7 +59,7 @@ describe('resolver (categorias novas + antigas)', () => {
     d.transactions = []
   })
   it('txCategoryFields: balde = pago pela poupança; despesa = não', () => {
-    expect(txCategoryFields(d, 'geral')).toMatchObject({ repoePoupanca: true, reposto: true, fonteBucketId: 'geral', planCategoryId: 'geral' })
+    expect(txCategoryFields(d, 'geral')).toMatchObject({ repoePoupanca: true, reposto: false, fonteBucketId: 'geral', planCategoryId: 'geral' })
     expect(txCategoryFields(d, 'casa', 'luz')).toMatchObject({ repoePoupanca: false, reposto: false, fonteBucketId: undefined, subcategoryId: 'luz' })
     expect(txCategoryFields(d, undefined)).toMatchObject({ planCategoryId: undefined, repoePoupanca: false })
   })
@@ -82,7 +82,7 @@ describe('plano vs real', () => {
     tx({ id: '1', planCategoryId: 'casa', subcategoryId: 'luz', amount: 80 }),
     tx({ id: '2', planCategoryId: 'casa', amount: 50 }),
     tx({ id: '3', planCategoryId: 'lazer', amount: 120 }),
-    tx({ id: '4', planCategoryId: 'geral', amount: 400, repoePoupanca: true, reposto: true, fonteBucketId: 'geral' }),
+    tx({ id: '4', planCategoryId: 'geral', amount: 400, repoePoupanca: true, reposto: false, fonteBucketId: 'geral' }),
     tx({ id: '5', categoryId: 'old-x', amount: 15 }),
     tx({ id: '6', date: '2026-09-02', planCategoryId: 'lazer', amount: 999 }),
   ]
