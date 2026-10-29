@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   Badge, Button, Card, EmptyState, Input, MetricCard, Modal, Money, SectionTitle, Select, Spinner, cx,
 } from '../components/ui'
@@ -144,19 +144,6 @@ export function Gastos() {
   const [nome, setNome] = useState('')
   const [description, setDescription] = useState('')
   const [addError, setAddError] = useState('')
-
-  const openAdd = () => {
-    setEditingId(null)
-    setDate(todayISO())
-    setGroupId('')
-    setSubId('')
-    setNewSubName('')
-    setAmountStr('')
-    setNome('')
-    setDescription('')
-    setAddError('')
-    setAddOpen(true)
-  }
 
   const openEdit = (t: Transaction) => {
     setEditingId(t.id)
@@ -362,35 +349,43 @@ export function Gastos() {
     closeImport()
   }
 
+  const changeCategory = (transactionId: string, gid: string | undefined, sid: string | undefined) => {
+    const hasLinked = data.savingsMovements.some((m) => m.transactionId === transactionId && isAutoBucketMovement(m))
+    const goingToBucket = data.savingsBuckets.some((b) => b.id === gid)
+    if (hasLinked && !goingToBucket
+      && !window.confirm('Este gasto tem uma saída automática do balde (de uma versão anterior). Ao mudar de categoria, essa saída é removida. Continuar?')) return
+    void setTransactionCategory(transactionId, gid as string, sid)
+  }
+
   return (
     <div className="fade-up flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-black">Gastos</h1>
-        <div className="flex gap-2">
-          <Button variant="soft" onClick={openAdd}>+ Gasto</Button>
-          <Button variant="ghost" onClick={openImport}>Importar extrato</Button>
+        <div className="hidden gap-2 md:flex">
+          <Button variant="soft" onClick={openImport}>Importar extrato</Button>
           <Button variant="ghost" onClick={() => setExportOpen(true)}>Exportar CSV</Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-stretch gap-3">
-        <Card className="flex flex-1 flex-wrap items-end gap-3">
-          <div>
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-stretch">
+        <Card className="grid grid-cols-2 gap-3 md:flex md:flex-1 md:flex-wrap md:items-end">
+          <div className="min-w-0">
             <label className="mb-1 block text-xs text-muted">Mês</label>
             <div className="flex items-center gap-2">
               <Input
                 type="month"
                 value={selectedMonth ?? ''}
                 onChange={(e) => setSelectedMonth(e.target.value || null)}
+                className="w-full min-w-0"
               />
               {selectedMonth && (
                 <Button variant="ghost" size="sm" onClick={() => setSelectedMonth(null)}>Limpar</Button>
               )}
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <label className="mb-1 block text-xs text-muted">Categoria</label>
-            <Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setSubFilter('all') }}>
+            <Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setSubFilter('all') }} className="w-full min-w-0">
               <option value="all">Todas</option>
               <option value="none">Sem categoria</option>
               {groups.map((g) => (
@@ -399,9 +394,9 @@ export function Gastos() {
             </Select>
           </div>
           {filterSubs.length > 0 && (
-            <div>
+            <div className="col-span-2 md:col-span-1">
               <label className="mb-1 block text-xs text-muted">Subcategoria</label>
-              <Select value={subFilter} onChange={(e) => setSubFilter(e.target.value)}>
+              <Select value={subFilter} onChange={(e) => setSubFilter(e.target.value)} className="w-full md:w-auto">
                 <option value="all">Todas</option>
                 <option value="none">Sem subcategoria</option>
                 {filterSubs.map((sc) => (
@@ -411,26 +406,32 @@ export function Gastos() {
             </div>
           )}
         </Card>
-        <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={`${filtered.length} gasto(s)`} />
+        <div className="flex items-baseline justify-between rounded-2xl border border-border bg-surface px-4 py-3 md:hidden">
+          <span className="text-xs text-muted">Total filtrado · {filtered.length} gasto(s)</span>
+          <span className="tnum text-lg font-bold text-negative">{fmtEUR(total)}</span>
+        </div>
+        <div className="hidden md:block">
+          <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={`${filtered.length} gasto(s)`} />
+        </div>
       </div>
 
       {pendingLegacy.length > 0 && (
-        <Card className="flex flex-wrap items-center justify-between gap-2 border-warn/40 bg-warn-soft/40">
-          <span className="flex items-center gap-2 text-sm text-text">
+        <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
+          <span className="flex min-w-0 items-start gap-2 text-sm text-text">
             <span>🔗</span>
             {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} por associar às categorias do plano — até lá, esses gastos não contam no Analytics.`}
           </span>
-          <Button size="sm" variant="soft" onClick={() => setScreen('definicoes')}>Associar</Button>
+          <Button size="sm" variant="soft" className="shrink-0" onClick={() => setScreen('definicoes')}>Associar</Button>
         </Card>
       )}
 
       {uncategorizedCount > 0 && categoryFilter !== 'none' && (
-        <Card className="flex flex-wrap items-center justify-between gap-2 border-warn/40 bg-warn-soft/40">
-          <span className="flex items-center gap-2 text-sm text-text">
+        <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
+          <span className="flex min-w-0 items-start gap-2 text-sm text-text">
             <span>⚠️</span>
             {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria — atribui-${uncategorizedCount === 1 ? 'o' : 'os'} a uma categoria do plano para o Analytics ficar certo.`}
           </span>
-          <Button size="sm" variant="soft" onClick={() => { setSelectedMonth(null); setCategoryFilter('none'); setSubFilter('all') }}>
+          <Button size="sm" variant="soft" className="shrink-0" onClick={() => { setSelectedMonth(null); setCategoryFilter('none'); setSubFilter('all') }}>
             Ver
           </Button>
         </Card>
@@ -439,7 +440,7 @@ export function Gastos() {
       <Card>
         <SectionTitle
           right={filtered.length > 0 ? (
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted">
+            <label className="hidden cursor-pointer items-center gap-1.5 text-xs font-medium text-muted md:flex">
               <input type="checkbox" checked={allSelected} onChange={toggleAll} />
               Selecionar todos
             </label>
@@ -459,11 +460,31 @@ export function Gastos() {
           </div>
         )}
         {filtered.length === 0 ? (
-          <EmptyState title="Sem gastos neste filtro" hint="Regista um gasto manualmente ou importa o extrato do banco." />
+          <EmptyState title="Sem gastos neste filtro" hint="Os gastos entram pelo extrato do banco (Importar extrato, em desktop)." />
         ) : (
           <div className="flex flex-col divide-y divide-border">
             {filtered.map((t) => (
-              <div key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <Fragment key={t.id}>
+              <div className="flex flex-col gap-1.5 py-3 md:hidden">
+                <div className="flex items-baseline justify-between gap-3">
+                  <button onClick={() => openEdit(t)} className="min-w-0 truncate text-left text-sm font-medium text-text">
+                    {t.nome || t.description}
+                  </button>
+                  <Money value={-t.amount} className="shrink-0 text-sm font-semibold" />
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted">
+                  <span className="tnum shrink-0">{fmtDate(t.date)}</span>
+                  <CategoryPicker
+                    groups={groups}
+                    subcategories={data.subcategories}
+                    value={resolve(t)}
+                    fallbackLabel={legacyName(t)}
+                    onSelect={(gid, sid) => changeCategory(t.id, gid, sid)}
+                    onCreateSubcategory={createSubcategory}
+                  />
+                </div>
+              </div>
+              <div className="hidden flex-col gap-2 py-3 md:flex md:flex-row md:items-center md:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <input
                     type="checkbox"
@@ -478,13 +499,7 @@ export function Gastos() {
                     subcategories={data.subcategories}
                     value={resolve(t)}
                     fallbackLabel={legacyName(t)}
-                    onSelect={(gid, sid) => {
-                      const hasLinked = data.savingsMovements.some((m) => m.transactionId === t.id && isAutoBucketMovement(m))
-                      const goingToBucket = data.savingsBuckets.some((b) => b.id === gid)
-                      if (hasLinked && !goingToBucket
-                        && !window.confirm('Este gasto tem uma saída automática do balde (de uma versão anterior). Ao mudar de categoria, essa saída é removida. Continuar?')) return
-                      void setTransactionCategory(t.id, gid, sid)
-                    }}
+                    onSelect={(gid, sid) => changeCategory(t.id, gid, sid)}
                     onCreateSubcategory={createSubcategory}
                   />
                   <div className="min-w-0">
@@ -520,18 +535,19 @@ export function Gastos() {
                   </button>
                 </div>
               </div>
+              </Fragment>
             ))}
           </div>
         )}
       </Card>
 
-      <p className="text-xs text-muted">
+      <p className="hidden text-xs text-muted md:block">
         Dica: escolhe como categoria um balde de poupança (ex.: Geral) quando o gasto é pago pela poupança —
         não conta contra o orçamento do mês. Não mexe no saldo do balde: se quiseres, regista a saída em Movimentos.
       </p>
 
       {/* Modal +Gasto / Editar gasto */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title={editingId ? 'Editar gasto' : 'Novo gasto'}>
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Editar gasto">
         <div className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -611,6 +627,19 @@ export function Gastos() {
           </div>
           {addError && <p className="text-sm text-negative">{addError}</p>}
           <div className="mt-1 flex justify-end gap-2">
+            {editingId && (
+              <Button
+                variant="danger"
+                className="mr-auto"
+                onClick={() => {
+                  const linked = data.savingsMovements.some((m) => m.transactionId === editingId)
+                  const msg = linked ? 'Apagar este gasto? A saída correspondente na poupança também é removida.' : 'Apagar este gasto?'
+                  if (window.confirm(msg)) { void deleteTransaction(editingId); setAddOpen(false) }
+                }}
+              >
+                Apagar
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
             <Button onClick={submitAdd}>Guardar</Button>
           </div>

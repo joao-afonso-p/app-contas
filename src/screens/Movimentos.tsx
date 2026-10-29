@@ -185,7 +185,7 @@ export function Movimentos() {
         <Button onClick={openModal}>+ Movimento</Button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
         <Select value={filterBucket} onChange={(e) => setFilterBucket(e.target.value)} className="flex-1">
           <option value="all">Todos os baldes</option>
           {buckets.map((b) => (
@@ -211,7 +211,34 @@ export function Movimentos() {
           hint="Regista entradas e saídas de poupança para veres o histórico aqui."
         />
       ) : (
-        <div className="overflow-x-auto thin-scroll rounded-2xl border border-border">
+        <>
+        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface md:hidden">
+          {movements.map((m) => {
+            const bucket = data.savingsBuckets.find((b) => b.id === m.bucketId)
+            return (
+              <li key={m.id} className="flex items-center gap-2 px-3 py-2.5">
+                <button onClick={() => openEdit(m)} className="min-w-0 flex-1 text-left">
+                  <div className="truncate text-sm font-medium text-text">
+                    {m.description || 'Sem descrição'}
+                    {m.transferGroupId && <span className="ml-1.5 text-[11px] font-normal text-accent-strong">transferência</span>}
+                  </div>
+                  <div className="text-xs text-muted">{fmtDate(m.date)} · {bucket?.name ?? '—'}</div>
+                </button>
+                <span className={cx('tnum shrink-0 text-sm font-semibold', m.amount >= 0 ? 'text-positive' : 'text-negative')}>
+                  {m.amount >= 0 ? '+' : ''}{fmtEUR(m.amount)}
+                </span>
+                <button
+                  onClick={() => handleDelete(m.id)}
+                  className="shrink-0 rounded-lg p-1.5 text-muted hover:text-negative"
+                  aria-label="Apagar movimento"
+                >
+                  ✕
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        <div className="hidden overflow-x-auto thin-scroll rounded-2xl border border-border md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-surface-2 text-left text-xs font-semibold uppercase tracking-wide text-muted">
@@ -269,6 +296,7 @@ export function Movimentos() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <p className="text-xs text-muted">
