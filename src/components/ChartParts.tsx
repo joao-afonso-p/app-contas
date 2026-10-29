@@ -1,4 +1,4 @@
-import { fmtEUR } from '../lib/format'
+import { fmtEUR, fmtEURWhole } from '../lib/format'
 
 // Peças partilhadas dos gráficos: tooltip e legenda compactas, na linguagem
 // visual da app (em vez das predefinições do recharts, que pintam o texto com
@@ -93,7 +93,7 @@ export function diffLabelRenderer(data: { gasto: number; planeado: number | null
         x={x} y={y} textAnchor="middle" fontSize={11} fontWeight={700}
         fill="var(--text)" stroke="var(--surface)" strokeWidth={3} paintOrder="stroke"
       >
-        {`${diff > 0 ? '+' : '−'}${fmtEUR(Math.abs(diff), true)}`}
+        {`${diff > 0 ? '+' : '−'}${fmtEURWhole(Math.abs(diff))}`}
       </text>
     )
   }

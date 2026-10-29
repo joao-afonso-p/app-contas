@@ -74,6 +74,8 @@ export interface SavingsMovement {
   transferGroupId?: string
   // Gerado automaticamente ao confirmar a reposição de um gasto (Transaction.id).
   transactionId?: string
+  // Entrada criada ao resgatar dinheiro de um veículo/ativo para este balde (AssetEntry.id).
+  assetEntryId?: string
   // Timestamp de criação (ISO datetime) — não mostrado na UI, só para desempate de sort.
   createdAt?: string
 }
@@ -185,6 +187,7 @@ export interface InvestmentVehicle {
   expectedRate?: number
   // Entrada mensal assumida na projeção (€); sem valor = mediana dos últimos 6 meses.
   monthlyContribution?: number
+  contributionGrowth?: number // aumento anual da entrada mensal (%), só na projeção
 }
 
 // Ativo dentro de um veículo (ex.: um ETF na Degiro, a conta poupança da Amélia).
@@ -198,13 +201,14 @@ export interface InvestmentAsset {
   order: number
   expectedRate?: number // % anual esperada (projeções)
   monthlyContribution?: number
+  contributionGrowth?: number // aumento anual da entrada mensal (%), só na projeção
 }
 
 // Movimento de dinheiro ao nível dos ativos:
 // - 'distribute': parte do dinheiro que entrou no veículo (plano/movimentos) atribuída a este ativo;
 // - 'external': dinheiro que entra (+) ou sai (−) fora do que a app já acompanha (ex.: depósito direto na corretora);
 // - 'transfer': perna de uma transferência entre ativos (mesmo transferGroupId nas duas pernas).
-// `assetId` vazio = "por distribuir" do veículo.
+// `assetId` vazio = "saldo livre" do veículo.
 export interface AssetEntry {
   id: string
   date: string // YYYY-MM-DD
@@ -217,7 +221,7 @@ export interface AssetEntry {
   createdAt?: string
 }
 
-// Valor real de um ativo (ou do "por distribuir" de um veículo) numa data,
+// Valor real de um ativo (ou do "saldo livre" de um veículo) numa data,
 // registado à mão quando o utilizador quiser.
 export interface ValueCheckpoint {
   id: string

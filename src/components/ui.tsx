@@ -99,12 +99,16 @@ export function Button({
   )
 }
 
+// O padding vertical por defeito (py-2) só se aplica se o className não definir o seu
+// (em Tailwind 4 duas classes py-* em conflito resolvem-se pela ordem do CSS, não da string).
+const hasPy = (c?: string) => /(^|\s)py-/.test(c ?? '')
+
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
       className={cx(
-        'w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text',
+        'w-full rounded-xl border border-border bg-surface px-3 text-sm text-text', !hasPy(props.className) && 'py-2',
         'placeholder:text-muted focus:border-accent focus:outline-none',
         props.className,
       )}
@@ -117,7 +121,8 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={cx(
-        'app-select rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+        'app-select rounded-xl border border-border bg-surface px-3 text-sm text-text focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+        !hasPy(props.className) && 'py-2',
         props.className,
       )}
     />

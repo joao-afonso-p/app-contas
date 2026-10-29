@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { breakdownTable, topSeries, type Series } from '../lib/calc/breakdown'
-import { fmtEUR, monthLabel, monthShort } from '../lib/format'
+import { fmtEURWhole as fmtEUR, monthLabel, monthShort } from '../lib/format'
 import type { MonthKey } from '../types'
 import { ChartLegend, ChartTooltip, compactEUR, cursorStyle } from './ChartParts'
 import { Card, EmptyState, cx } from './ui'
@@ -52,7 +52,7 @@ export function BreakdownPanel({
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" tick={axis} axisLine={false} tickLine={false} />
               <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
-              <Tooltip content={<ChartTooltip total />} cursor={cursorStyle} isAnimationActive={false} />
+              <Tooltip content={<ChartTooltip total format={fmtEUR} />} cursor={cursorStyle} isAnimationActive={false} />
               <Legend content={<ChartLegend />} />
               {top.map((s) => (
                 <Bar key={s.key} dataKey={s.label} stackId="b" fill={colorOf(s.key)} maxBarSize={56} />

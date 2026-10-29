@@ -4,10 +4,11 @@ import { ChartLegend, ChartTooltip, compactEUR, cursorStyle } from '../component
 import { Badge, Button, Card, EmptyState, Input, MetricCard, Modal, SectionTitle, Select, cx } from '../components/ui'
 import { round2 } from '../lib/calc/allocation'
 import {
-  accountingMonth, buildVehicleSummaries, holdingsSeries, injectedBreakdown, medianMonthlyInjection, projectWithContributions, seriesMonths, transferLegs,
+  accountingMonth, buildVehicleSummaries, holdingsSeries, injectedBreakdown, medianMonthlyInjection, monthlyAfterYears, projectWithContributions, seriesMonths,
   type Holding, type VehicleSummary,
 } from '../lib/calc/investments'
-import { addMonths, currentMonthKey, fmtDate, fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
+import { InvestmentSimulator } from '../components/InvestmentSimulator'
 import { useStore } from '../store/useStore'
 
 const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#84cc16', '#f97316']
@@ -18,7 +19,6 @@ type ModalState =
   | { type: 'checkpoint'; holding: Holding }
   | { type: 'entry'; holding: Holding }
   | { type: 'distribute'; summary: VehicleSummary }
-  | { type: 'transfer'; from?: string }
   | { type: 'asset'; vehicleId: string }
   | null
 
@@ -82,6 +82,7 @@ export function Investimentos() {
   const [injGroup, setInjGroup] = useState<'vehicle' | 'asset'>('vehicle')
   const [injCumulative, setInjCumulative] = useState(false)
   const [projContrib, setProjContrib] = useState(true)
+  const [projOpen, setProjOpen] = useState<Set<string>>(new Set())
   const [newVehicle, setNewVehicle] = useState('')
 
   const totalContributed = round2(summaries.reduce((s, v) => s + v.contributed, 0))
@@ -177,29 +178,28 @@ export function Investimentos() {
     return next
   })
 
-  const assetHoldings = allHoldings.filter((h) => h.asset)
   // Projeção: entrada mensal = a definida pelo utilizador, ou a mediana dos últimos 6 meses.
   const projRows = allHoldings.map((h) => {
     const median = medianMonthlyInjection(h, through)
     const monthly = projContrib ? (h.monthlyContribution ?? median) : 0
     const rate = h.expectedRate ?? 0
+    const growth = projContrib ? (h.contributionGrowth ?? 0) : 0
     const active = rate > 0 || monthly > 0
-    return { h, median, monthly, rate, active }
+    return { h, median, monthly, rate, growth, active }
   }).filter((r) => r.h.value > 0 || r.median > 0 || (r.h.monthlyContribution ?? 0) > 0)
-  const projFuture = (r: { h: Holding; monthly: number; rate: number }, y: number) =>
-    projectWithContributions(r.h.value, r.rate, y, r.monthly)
+  const projFuture = (r: { h: Holding; monthly: number; rate: number; growth: number }, y: number) =>
+    projectWithContributions(r.h.value, r.rate, y, r.monthly, r.growth)
 
   return (
     <div className="fade-up flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-black">Investimento</h1>
         <div className="flex gap-2">
-          {assetHoldings.length >= 2 && <Button variant="soft" onClick={() => setModal({ type: 'transfer' })}>Transferir entre ativos</Button>}
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard label="Total investido" value={fmtEUR(totalContributed)} hint="o que meteste, líquido de saídas" />
+        <MetricCard label="Total investido" value={fmtEUR(Math.max(0, totalContributed))} hint="o que meteste, líquido de saídas" />
         <MetricCard
           label="Valor atual (estimado)"
           value={fmtEUR(totalValue)}
@@ -221,7 +221,16 @@ export function Investimentos() {
       </div>
 
       <section>
-        <SectionTitle>Veículos</SectionTitle>
+        <SectionTitle
+          right={
+            <span className="max-w-xl text-right text-xs font-normal normal-case tracking-normal text-muted">
+              <strong className="text-text">Movimento</strong> (direto) = dinheiro que entra (depósito) ou sai (resgate) sem vir de um balde,
+              ex.: depósito da conta à ordem na corretora.
+            </span>
+          }
+        >
+          Veículos
+        </SectionTitle>
         <Card className="p-0">
           <table className="w-full text-sm">
             <thead>
@@ -237,31 +246,50 @@ export function Investimentos() {
             </thead>
             <tbody>
               {summaries.map((s) => {
-                const open = openVehicles.has(s.vehicle.id) || !s.hasAssets
-                const rows = s.hasAssets ? s.holdings : s.holdings
+                const open = openVehicles.has(s.vehicle.id)
+                const rows = s.holdings
+                const single = !s.hasAssets // o veículo é o próprio ativo: uma só linha
+                const pool = s.pool
                 return (
                   <Fragment key={s.vehicle.id}>
-                    <tr className="border-b border-border bg-surface-2/40">
+                    <tr className={cx('border-b border-border bg-surface-2/40', single && detail === pool.key && 'border-b-0')}>
                       <td className="px-4 py-2.5 font-semibold">
-                        <button className="flex items-center gap-1.5 text-left" onClick={() => s.hasAssets && toggleVehicle(s.vehicle.id)}>
-                          {s.hasAssets && <span className="text-xs text-muted">{open ? '▾' : '▸'}</span>}
+                        <button
+                          className="flex items-center gap-1.5 text-left"
+                          onClick={() => (single ? setDetail(detail === pool.key ? null : pool.key) : toggleVehicle(s.vehicle.id))}
+                        >
+                          <span className="text-xs text-muted">{(single ? detail === pool.key : open) ? '▾' : '▸'}</span>
                           {s.vehicle.name}
                           {s.vehicle.archived && <Badge tone="warn">Arquivado</Badge>}
+                          {!single && s.undistributed > 0.004 && (
+                            <span className="text-xs font-normal text-warn" title="Dinheiro do veículo que ainda não está atribuído a nenhum ativo (ex.: saldo na corretora). Usa Distribuir.">
+                              ⚠ {fmtEUR(s.undistributed)} em saldo livre
+                            </span>
+                          )}
                         </button>
                       </td>
-                      <td className="tnum px-2 text-right">{fmtEUR(s.contributed)}</td>
+                      <td className="tnum px-2 text-right" title={s.contributed < -0.004 ? 'Já resgataste mais do que investiste: a diferença é lucro realizado' : undefined}>{fmtEUR(Math.max(0, s.contributed))}</td>
                       <td className="tnum px-2 text-right font-semibold">{fmtEUR(s.value)}</td>
                       <td className={cx('tnum px-2 text-right', gainTone(s.gain))}>{signed(s.gain)}</td>
                       <td className={cx('tnum px-2 text-right', gainTone(s.gain))}>{s.pct !== null ? fmtPct(s.pct) : '—'}</td>
                       <td className="px-2 text-xs text-muted"><CheckpointDate iso={s.lastCheckpoint} /></td>
                       <td className="whitespace-nowrap px-4 text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'asset', vehicleId: s.vehicle.id })}>+ Ativo</Button>
-                        {s.hasAssets && Math.abs(s.undistributed) > 0.004 && (
-                          <Button size="sm" variant="soft" onClick={() => setModal({ type: 'distribute', summary: s })}>Distribuir</Button>
-                        )}
+                        <span className="inline-flex items-center gap-1">
+                          {s.hasAssets && Math.abs(s.undistributed) > 0.004 && (
+                            <Button size="sm" variant="soft" onClick={() => setModal({ type: 'distribute', summary: s })}>Distribuir</Button>
+                          )}
+                          {single && (
+                            <>
+                              <RowAction onClick={() => setModal({ type: 'checkpoint', holding: pool })}>Checkpoint</RowAction>
+                              <RowAction onClick={() => setModal({ type: 'entry', holding: pool })}>Movimento</RowAction>
+                            </>
+                          )}
+                          <RowAction onClick={() => setModal({ type: 'asset', vehicleId: s.vehicle.id })}>Ativo</RowAction>
+                        </span>
                       </td>
                     </tr>
-                    {open && rows.map((h) => (
+                    {single && detail === pool.key && <HoldingDetail holding={pool} />}
+                    {!single && open && rows.map((h) => (
                       <HoldingRow
                         key={h.key}
                         holding={h}
@@ -270,8 +298,7 @@ export function Investimentos() {
                         onToggle={() => setDetail(detail === h.key ? null : h.key)}
                         onCheckpoint={() => setModal({ type: 'checkpoint', holding: h })}
                         onEntry={() => setModal({ type: 'entry', holding: h })}
-                        onTransfer={h.asset ? () => setModal({ type: 'transfer', from: h.key }) : undefined}
-                        undistributedLabel={s.hasAssets && !h.asset}
+                                                undistributedLabel={s.hasAssets && !h.asset}
                       />
                     ))}
                   </Fragment>
@@ -281,12 +308,12 @@ export function Investimentos() {
           </table>
           <div className="flex items-center gap-2 border-t border-border p-3">
             <Input value={newVehicle} onChange={(e) => setNewVehicle(e.target.value)} placeholder="Novo veículo (ex.: Trade Republic)…" onKeyDown={(e) => e.key === 'Enter' && addVehicle()} />
-            <Button size="sm" variant="soft" onClick={addVehicle} disabled={!newVehicle.trim()}>+ Veículo</Button>
+            <Button variant="soft" className="shrink-0 whitespace-nowrap" onClick={addVehicle} disabled={!newVehicle.trim()}>+ Veículo</Button>
           </div>
         </Card>
         <p className="mt-2 text-xs text-muted">
-          Investido = débitos automáticos do Planeamento + saídas de baldes para o veículo (Movimentos) + entradas que registares aqui.
-          Para dividir um veículo em ativos, cria ativos e usa "Distribuir".
+          Investido = débitos automáticos do Planeamento + saídas de baldes para o veículo (Movimentos) + depósitos que registares aqui.
+          Para dividir um veículo em ativos, cria ativos e usa "Distribuir" (o dinheiro que ainda não atribuíste fica em "Saldo livre").
         </p>
       </section>
 
@@ -305,7 +332,7 @@ export function Investimentos() {
                 Ativo
                 <Select value={assetSel} onChange={(e) => setASel(e.target.value)} disabled={!assetOptions.some((h) => h.asset)} className="py-1.5 text-xs">
                   <option value="total">Total</option>
-                  {assetOptions.map((h) => <option key={h.key} value={h.key}>{h.asset ? h.name : 'Por distribuir'}</option>)}
+                  {assetOptions.map((h) => <option key={h.key} value={h.key}>{h.asset ? h.name : 'Saldo livre'}</option>)}
                 </Select>
               </label>
             </div>
@@ -326,7 +353,7 @@ export function Investimentos() {
                     tick={axis} axisLine={false} tickLine={false} tickFormatter={axisEUR} width={52}
                     domain={fitDomain(valueData.flatMap((d) => [d.investido, ...(d.valor !== null ? [d.valor] : [])]))}
                   />
-                  <Tooltip content={<ChartTooltip />} cursor={cursorStyle} isAnimationActive={false} />
+                  <Tooltip content={<ChartTooltip format={fmtEUR} />} cursor={cursorStyle} isAnimationActive={false} />
                   <Legend content={<ChartLegend />} />
                   <Line type="monotone" dataKey="investido" name="Investido" stroke="var(--warn)" strokeWidth={2.5} dot={false} />
                   <Line
@@ -399,9 +426,9 @@ export function Investimentos() {
               </ResponsiveContainer>
               <p className="mt-2 text-[11px] text-muted">
                 {injCumulative ? 'Acumulado: tudo o que foi injetado até ao fim de cada mês (inclui meses anteriores à janela).' : 'Mensal: o que foi injetado em cada mês.'}
-                {' '}Conta débitos automáticos dos planos aplicados, saídas de baldes marcadas com o veículo e entradas externas; não conta saldos
+                {' '}Conta débitos automáticos dos planos aplicados, saídas de baldes marcadas com o veículo e depósitos/resgates externos; não conta saldos
                 iniciais nem transferências entre ativos.
-                {' '}"Por distribuir" é o dinheiro do veículo que ainda não atribuíste a um ativo; ao distribuíres, aparece um valor negativo aí
+                {' '}"Saldo livre" é o dinheiro do veículo que ainda não atribuíste a um ativo (ex.: saldo na corretora); ao distribuíres, aparece um valor negativo aí
                 no mês da distribuição e positivo no ativo.
                 {injGroup === 'asset' && injVehicleSel === 'all' && ' Lado a lado: uma barra por veículo em cada mês, dividida pelos seus ativos.'}
               </p>
@@ -425,41 +452,78 @@ export function Investimentos() {
           Projeção (rendimento esperado)
         </SectionTitle>
         <Card>
-          <p className="mb-3 text-xs text-muted">
-            Como funciona: escreve a taxa anual que esperas de cada ativo (ex.: 3 para 3% ao ano). A app faz o valor atual crescer a essa taxa
-            (juros compostos) e, com "Com entradas mensais" ligado, soma uma entrada por mês: por defeito a <strong className="text-text">mediana
-            dos últimos 6 meses</strong> (ignora meses atípicos, como uma entrada grande única), que podes corrigir em "Entrada/mês".
-            Mostra o valor daqui a 5, 10 e 20 anos, sem impostos nem comissões: é só uma ilustração. Fica guardado no ativo (ou no veículo, se não tiver ativos).
-          </p>
+          <ul className="mb-4 list-disc space-y-0.5 pl-4 text-xs text-muted">
+            <li><strong className="text-text">Taxa anual:</strong> rendimento que esperas (ex.: 3 = 3% ao ano), com juros compostos.</li>
+            <li><strong className="text-text">Entrada/mês:</strong> por defeito a mediana dos últimos 6 meses (ignora meses atípicos); podes corrigi-la.</li>
+            <li><strong className="text-text">Aumento anual:</strong> quanto a entrada sobe por ano (ex.: 3 = +3%). Com aumento, a seta mostra a entrada daqui a 1, 2, 5, 10 e 15 anos.</li>
+            <li>Sem impostos nem comissões: é só uma ilustração. Fica guardado no ativo (ou no veículo, se não tiver ativos).</li>
+          </ul>
           {projRows.length === 0 ? (
             <p className="text-sm text-muted">Ainda não há nenhum ativo com valor.</p>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm [&_td]:py-1.5 [&_td]:pr-3 [&_th]:pb-2 [&_th]:pr-3 [&_td:last-child]:pr-0 [&_th:last-child]:pr-0">
               <thead>
                 <tr className="text-left text-xs font-medium text-muted">
-                  <th className="py-1">Ativo</th><th className="text-right">Hoje</th><th className="px-2 text-right">Taxa anual (%)</th>
-                  <th className="px-2 text-right">Entrada/mês</th>
+                  <th className="py-1">Ativo</th><th className="text-right">Hoje</th><th className="text-right">Taxa anual (%)</th>
+                  <th className="text-right">Entrada/mês</th>
+                  <th className="text-right" title="A entrada mensal sobe esta percentagem uma vez por ano">Aumento anual (%)</th>
                   <th className="text-right">5 anos</th><th className="text-right">10 anos</th><th className="text-right">20 anos</th>
                 </tr>
               </thead>
               <tbody>
-                {projRows.map((r) => (
-                  <tr key={r.h.key} className="border-t border-border">
-                    <td className="py-1.5">{vehicleName(summaries, r.h)}</td>
-                    <td className="tnum text-right">{fmtEUR(r.h.value)}</td>
-                    <td className="px-2 text-right"><RateInput key={`${r.h.key}:${r.h.expectedRate}`} holding={r.h} /></td>
-                    <td className="px-2 text-right">
-                      {projContrib ? <MonthlyInput key={`${r.h.key}:${r.h.monthlyContribution}`} holding={r.h} median={r.median} /> : <span className="text-muted">—</span>}
-                    </td>
-                    {[5, 10, 20].map((y) => (
-                      <td key={y} className="tnum text-right">{r.active ? fmtEUR(projFuture(r, y)) : '—'}</td>
-                    ))}
-                  </tr>
-                ))}
+                {projRows.map((r) => {
+                  const canExpand = projContrib && r.growth > 0 && r.monthly > 0
+                  const expanded = canExpand && projOpen.has(r.h.key)
+                  return (
+                    <Fragment key={r.h.key}>
+                      <tr className="border-t border-border">
+                        <td className="py-1.5">
+                          {canExpand ? (
+                            <button
+                              className="flex items-center gap-1.5 text-left"
+                              onClick={() => setProjOpen((prev) => {
+                                const next = new Set(prev)
+                                if (next.has(r.h.key)) next.delete(r.h.key); else next.add(r.h.key)
+                                return next
+                              })}
+                            >
+                              <span className="text-xs text-muted">{expanded ? '▾' : '▸'}</span>
+                              {vehicleName(summaries, r.h)}
+                            </button>
+                          ) : vehicleName(summaries, r.h)}
+                        </td>
+                        <td className="tnum text-right">{fmtEUR(r.h.value)}</td>
+                        <td className="text-right"><RateInput key={`${r.h.key}:${r.h.expectedRate}`} holding={r.h} /></td>
+                        <td className="text-right">
+                          {projContrib ? <MonthlyInput key={`${r.h.key}:${r.h.monthlyContribution}`} holding={r.h} median={r.median} /> : <span className="text-muted">—</span>}
+                        </td>
+                        <td className="text-right">
+                          {projContrib ? <GrowthInput key={`${r.h.key}:${r.h.contributionGrowth}`} holding={r.h} /> : <span className="text-muted">—</span>}
+                        </td>
+                        {[5, 10, 20].map((y) => (
+                          <td key={y} className="tnum text-right">{r.active ? fmtEUR(projFuture(r, y)) : '—'}</td>
+                        ))}
+                      </tr>
+                      {expanded && (
+                        <tr>
+                          <td colSpan={8} className="pb-2 pl-6 pt-0 text-xs text-muted">
+                            Entrada mensal daqui a:{' '}
+                            {[1, 2, 5, 10, 15].map((y, i) => (
+                              <span key={y} className="tnum">
+                                {i > 0 && ' · '}
+                                {y} {y === 1 ? 'ano' : 'anos'}: <span className="font-semibold text-text">{fmtEUR(monthlyAfterYears(r.monthly, r.growth, y))}</span>
+                              </span>
+                            ))}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
                 {projRows.some((r) => r.active) && (
                   <tr className="border-t border-border font-semibold">
                     <td className="py-1.5">Total</td>
-                    <td className="tnum text-right">{fmtEUR(round2(projRows.filter((r) => r.active).reduce((a, r) => a + r.h.value, 0)))}</td><td /><td />
+                    <td className="tnum text-right">{fmtEUR(round2(projRows.filter((r) => r.active).reduce((a, r) => a + r.h.value, 0)))}</td><td /><td /><td />
                     {[5, 10, 20].map((y) => (
                       <td key={y} className="tnum text-right">{fmtEUR(round2(projRows.filter((r) => r.active).reduce((a, r) => a + projFuture(r, y), 0)))}</td>
                     ))}
@@ -474,7 +538,14 @@ export function Investimentos() {
         </Card>
       </section>
 
-      <InvestModals modal={modal} onClose={() => setModal(null)} summaries={summaries} assetHoldings={assetHoldings} />
+      <InvestmentSimulator
+        starts={projRows.map((r) => ({
+          key: r.h.key, name: vehicleName(summaries, r.h), value: r.h.value,
+          monthly: r.h.monthlyContribution ?? r.median, growth: r.h.contributionGrowth ?? 0, rate: r.h.expectedRate ?? 0,
+        }))}
+      />
+
+      <InvestModals modal={modal} onClose={() => setModal(null)} summaries={summaries} />
     </div>
   )
 }
@@ -485,14 +556,27 @@ function InjectedTooltip({ bars, total, ...rest }: { bars: { dk: string; name: s
     const b = bars.find((x) => x.dk === p.dataKey)
     return { ...p, name: b?.name ?? String(p.dataKey), color: b?.color }
   })
-  return <ChartTooltip active={rest.active} label={rest.label} payload={named} total={total} />
+  return <ChartTooltip format={fmtEUR} active={rest.active} label={rest.label} payload={named} total={total} />
+}
+
+// Ação de linha: texto discreto (sem caixa) que ganha cor e sublinhado ao passar o rato.
+function RowAction({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg px-2 py-1 text-xs font-medium text-muted underline-offset-4 transition-colors hover:bg-accent-soft hover:text-accent-strong hover:underline"
+    >
+      {children}
+    </button>
+  )
 }
 
 function vehicleName(summaries: VehicleSummary[], h: Holding): string {
   const v = summaries.find((s) => s.vehicle.id === h.vehicleId)
   if (h.asset) return `${v?.vehicle.name ?? ''} › ${h.name}`
-  // Sem ativo: o veículo inteiro, ou o "por distribuir" de um veículo com ativos.
-  return v?.hasAssets ? `${v.vehicle.name} › Por distribuir` : (v?.vehicle.name ?? h.name)
+  // Sem ativo: o veículo inteiro, ou o "saldo livre" de um veículo com ativos.
+  return v?.hasAssets ? `${v.vehicle.name} › Saldo livre` : (v?.vehicle.name ?? h.name)
 }
 
 // Taxa anual esperada: guardada no ativo, ou no veículo se a posição não for um ativo.
@@ -510,8 +594,8 @@ function RateInput({ holding: h, left }: { holding: Holding; left?: boolean }) {
     }
   }
   return (
-    <div className={cx('w-24', !left && 'ml-auto')}>
-      <Input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} inputMode="decimal" placeholder="ex.: 3" className={left ? '' : 'text-right'} />
+    <div className={cx('w-20', !left && 'ml-auto')}>
+      <Input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} inputMode="decimal" placeholder="ex.: 3" className={cx('py-1', !left && 'text-right')} />
     </div>
   )
 }
@@ -531,17 +615,38 @@ function MonthlyInput({ holding: h, median }: { holding: Holding; median: number
     }
   }
   return (
-    <div className="ml-auto w-28" title="Vazio = mediana dos últimos 6 meses">
-      <Input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} inputMode="decimal" placeholder={String(median)} className="text-right" />
+    <div className="ml-auto w-24" title="Vazio = mediana dos últimos 6 meses">
+      <Input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} inputMode="decimal" placeholder={String(median)} className="py-1 text-right" />
+    </div>
+  )
+}
+
+// Aumento anual da entrada mensal (%) usado na projeção.
+function GrowthInput({ holding: h }: { holding: Holding }) {
+  const data = useStore((s) => s.data)
+  const put = useStore((s) => s.put)
+  const [val, setVal] = useState(h.contributionGrowth !== undefined ? String(h.contributionGrowth) : '')
+  const save = () => {
+    const n = val.trim() === '' ? undefined : parseAmount(val)
+    if (val.trim() !== '' && (n === null || n === undefined || n < 0)) return
+    if (h.asset) void put('investmentAssets', { ...h.asset, contributionGrowth: n ?? undefined })
+    else {
+      const v = data.investmentVehicles.find((x) => x.id === h.vehicleId)
+      if (v) void put('investmentVehicles', { ...v, contributionGrowth: n ?? undefined })
+    }
+  }
+  return (
+    <div className="ml-auto w-20" title="A entrada mensal sobe esta percentagem uma vez por ano">
+      <Input value={val} onChange={(e) => setVal(e.target.value)} onBlur={save} inputMode="decimal" placeholder="0" className="py-1 text-right" />
     </div>
   )
 }
 
 function HoldingRow({
-  holding: h, indent, expanded, onToggle, onCheckpoint, onEntry, onTransfer, undistributedLabel,
+  holding: h, indent, expanded, onToggle, onCheckpoint, onEntry, undistributedLabel,
 }: {
   holding: Holding; indent: boolean; expanded: boolean; onToggle: () => void
-  onCheckpoint: () => void; onEntry: () => void; onTransfer?: () => void; undistributedLabel: boolean
+  onCheckpoint: () => void; onEntry: () => void; undistributedLabel: boolean
 }) {
   return (
     <>
@@ -551,19 +656,20 @@ function HoldingRow({
             <span className="text-xs text-muted">{expanded ? '▾' : '▸'}</span>
             {h.name}
             {h.asset?.kind && <span className="text-xs text-muted">· {h.asset.kind}</span>}
-            {undistributedLabel && <Badge>sem ativo</Badge>}
+            {undistributedLabel && <Badge>saldo</Badge>}
             {h.asset?.archived && <Badge tone="warn">Arquivado</Badge>}
           </button>
         </td>
-        <td className="tnum px-2 text-right">{fmtEUR(h.contributed)}</td>
+        <td className="tnum px-2 text-right" title={h.contributed < -0.004 ? 'Já resgataste mais do que investiste: a diferença é lucro realizado' : undefined}>{fmtEUR(Math.max(0, h.contributed))}</td>
         <td className="tnum px-2 text-right">{fmtEUR(h.value)}</td>
         <td className={cx('tnum px-2 text-right', gainTone(h.gain))}>{signed(h.gain)}</td>
         <td className={cx('tnum px-2 text-right', gainTone(h.gain))}>{h.pct !== null ? fmtPct(h.pct) : '—'}</td>
         <td className="px-2 text-xs text-muted"><CheckpointDate iso={h.lastCheckpoint} /></td>
         <td className="whitespace-nowrap px-4 text-right">
-          <Button size="sm" variant="ghost" onClick={onCheckpoint}>+ Checkpoint</Button>
-          <Button size="sm" variant="ghost" onClick={onEntry}>+ Entrada</Button>
-          {onTransfer && <Button size="sm" variant="ghost" onClick={onTransfer}>Transferir</Button>}
+          <span className="inline-flex items-center gap-1">
+            <RowAction onClick={onCheckpoint}>Checkpoint</RowAction>
+            <RowAction onClick={onEntry}>Movimento</RowAction>
+          </span>
         </td>
       </tr>
       {expanded && <HoldingDetail holding={h} />}
@@ -577,11 +683,16 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
   const remove = useStore((s) => s.remove)
 
   const entries = data.assetEntries.filter((e) => (h.asset ? e.assetId === h.asset.id : e.vehicleId === h.vehicleId && !e.assetId))
-  // Distribuições para ativos do mesmo veículo (saem do "por distribuir").
+  // Distribuições para ativos do mesmo veículo (saem do "saldo livre").
   const outgoing = h.asset ? [] : data.assetEntries.filter((e) => e.vehicleId === h.vehicleId && e.assetId && e.source === 'distribute')
   const items = [
     ...entries.map((e) => ({ id: e.id, date: e.date, kind: 'entry' as const, text: entryText(e.source, e.amount, e.note), amount: e.amount })),
-    ...outgoing.map((e) => ({ id: e.id, date: e.date, kind: 'entry' as const, text: `Distribuído para ${data.investmentAssets.find((a) => a.id === e.assetId)?.name ?? 'ativo'}`, amount: -e.amount })),
+    ...outgoing.map((e) => ({
+      id: e.id, date: e.date, kind: 'entry' as const, amount: -e.amount,
+      text: e.amount >= 0
+        ? `Distribuído para ${data.investmentAssets.find((a) => a.id === e.assetId)?.name ?? 'ativo'}`
+        : `Recebido de ${data.investmentAssets.find((a) => a.id === e.assetId)?.name ?? 'ativo'}`,
+    })),
     ...h.checkpoints.map((c) => ({ id: c.id, date: c.date, kind: 'cp' as const, text: `Checkpoint${c.note ? ` — ${c.note}` : ''}`, amount: c.value })),
   ].sort((a, b) => b.date.localeCompare(a.date))
   const derived = h.flows.filter((f) => f.kind === 'auto' || f.kind === 'movement' || f.kind === 'initial')
@@ -597,6 +708,13 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
               <RateInput key={`${h.key}:${h.expectedRate}`} holding={h} left />
               <span className="text-muted">só para a projeção</span>
             </div>
+            {h.withdrawn > 0.004 && (
+              <div className="mt-3 text-muted">
+                Depositado <span className="font-semibold text-text">{fmtEUR(h.deposited)}</span> · Resgatado{' '}
+                <span className="font-semibold text-text">{fmtEUR(h.withdrawn)}</span>
+                <div className="mt-0.5">Ganho = valor atual + resgatado − depositado.</div>
+              </div>
+            )}
             <div className="mt-3 text-muted">
               Rentabilidade anual estimada:{' '}
               <span className="font-semibold text-text">{h.annualized !== null ? fmtPct(h.annualized) : '—'}</span>
@@ -630,10 +748,14 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
                       onClick={() => {
                         if (!window.confirm('Apagar este registo?')) return
                         if (it.kind === 'cp') { void remove('valueCheckpoints', it.id); return }
-                        // Transferências: apaga as duas pernas.
+                        // Transferências: apaga as duas pernas; resgates: apaga também a entrada criada no balde.
                         const e = data.assetEntries.find((x) => x.id === it.id)
                         const legs = e?.transferGroupId ? data.assetEntries.filter((x) => x.transferGroupId === e.transferGroupId) : [e]
-                        for (const l of legs) if (l) void remove('assetEntries', l.id)
+                        for (const l of legs) {
+                          if (!l) continue
+                          for (const m of data.savingsMovements.filter((x) => x.assetEntryId === l.id)) void remove('savingsMovements', m.id)
+                          void remove('assetEntries', l.id)
+                        }
                       }}
                     >
                       🗑
@@ -657,13 +779,13 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
 
 function entryText(source: string, amount: number, note?: string): string {
   const base = source === 'transfer' ? (amount < 0 ? 'Transferência (saída)' : 'Transferência (entrada)')
-    : source === 'distribute' ? 'Distribuído' : amount < 0 ? 'Saída' : 'Entrada'
+    : source === 'distribute' ? (amount < 0 ? 'Movido para o saldo livre' : 'Do saldo livre') : amount < 0 ? 'Resgate' : 'Depósito'
   return note ? `${base} — ${note}` : base
 }
 
 function InvestModals({
-  modal, onClose, summaries, assetHoldings,
-}: { modal: ModalState; onClose: () => void; summaries: VehicleSummary[]; assetHoldings: Holding[] }) {
+  modal, onClose, summaries,
+}: { modal: ModalState; onClose: () => void; summaries: VehicleSummary[] }) {
   const put = useStore((s) => s.put)
   const data = useStore((s) => s.data)
   const [date, setDate] = useState(todayISO())
@@ -671,18 +793,23 @@ function InvestModals({
   const [note, setNote] = useState('')
   const [dir, setDir] = useState<'in' | 'out'>('in')
   const [pick, setPick] = useState('')
-  const [pick2, setPick2] = useState('')
   const [name, setName] = useState('')
   const [kind, setKind] = useState('')
   const [error, setError] = useState('')
 
   // Reset sempre que abre um modal novo.
-  const modalKey = modal ? `${modal.type}:${'holding' in modal ? modal.holding.key : 'summary' in modal ? modal.summary.vehicle.id : 'vehicleId' in modal ? modal.vehicleId : modal.from ?? ''}` : ''
+  const modalKey = modal ? `${modal.type}:${'holding' in modal ? modal.holding.key : 'summary' in modal ? modal.summary.vehicle.id : modal.vehicleId}` : ''
   const [lastKey, setLastKey] = useState('')
   if (modalKey !== lastKey) {
     setLastKey(modalKey)
     setDate(todayISO()); setAmount(''); setNote(''); setDir('in'); setError(''); setName(''); setKind('')
-    setPick(modal?.type === 'transfer' ? (modal.from ?? '') : ''); setPick2('')
+    setPick('')
+    if (modal?.type === 'distribute') {
+      // Com um só ativo: tudo pré-preenchido (ativo + valor em saldo livre).
+      const targets = modal.summary.holdings.filter((h) => h.asset && !h.asset.archived)
+      if (targets.length === 1) setPick(targets[0].key)
+      if (modal.summary.undistributed > 0.004) setAmount(String(modal.summary.undistributed).replace('.', ','))
+    }
   }
 
   if (!modal) return null
@@ -722,33 +849,67 @@ function InvestModals({
 
   if (modal.type === 'entry') {
     const h = modal.holding
+    const buckets = data.savingsBuckets.filter((b) => !b.archived).sort((a, b) => a.order - b.order)
     return (
-      <Modal open onClose={onClose} title={`Entrada / saída — ${vehicleName(summaries, h)}`}>
+      <Modal open onClose={onClose} title={`Movimento direto — ${vehicleName(summaries, h)}`}>
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted">
-            Para dinheiro que entra ou sai e que a app ainda não conhece (ex.: depósito direto na corretora).
+            Dinheiro que entra ou sai sem vir de um balde (ex.: depósito direto da conta à ordem na corretora, ou resgate para fora).
             O que vem do Planeamento ou de Movimentos já conta sozinho.
           </p>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted">Tipo</label>
               <Select value={dir} onChange={(e) => setDir(e.target.value as 'in' | 'out')} className="w-full">
-                <option value="in">Entrada</option><option value="out">Saída (resgate)</option>
+                <option value="in">Depósito</option><option value="out">Resgate</option>
               </Select>
             </div>
             <div><label className="mb-1 block text-xs text-muted">Data</label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><label className="mb-1 block text-xs text-muted">Valor (€)</label><Input inputMode="decimal" autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" /></div>
           </div>
+          {dir === 'out' && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Para onde vai o dinheiro?</label>
+              <Select value={pick} onChange={(e) => setPick(e.target.value)} className="w-full">
+                <option value="">— escolher —</option>
+                {h.asset && <option value="__free">Saldo livre (fica no veículo)</option>}
+                {buckets.map((b) => <option key={b.id} value={b.id}>Balde: {b.name}</option>)}
+                <option value="__account">Conta à ordem (sem balde)</option>
+              </Select>
+              <p className="mt-1 text-xs text-muted">
+                {h.asset && 'Saldo livre: o dinheiro sai do ativo mas fica no veículo (ex.: vendeste o ativo e o dinheiro ficou na corretora); depois podes usar "Distribuir" para o pôr noutro ativo. '}
+                Com um balde, cria-se também a entrada desse valor nesse balde (em Movimentos), ligada a este resgate.
+                Se o dinheiro vai para a conta à ordem, escolhe a última opção.
+              </p>
+            </div>
+          )}
           <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Nota (opcional)" />
           {error && <p className="text-sm text-negative">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>Cancelar</Button>
             <Button onClick={() => {
               const v = needAmount(); if (v === null) return
+              if (dir === 'out' && !pick) { setError('Escolhe para onde vai o dinheiro (um balde ou a conta à ordem).'); return }
+              const entryId = uid()
+              if (dir === 'out' && pick === '__free' && h.asset) {
+                // Ativo → saldo livre do mesmo veículo (registo de distribuição negativo).
+                void put('assetEntries', {
+                  id: entryId, date, vehicleId: h.vehicleId, assetId: h.asset.id, amount: -v,
+                  source: 'distribute', note: note.trim() || undefined, createdAt: nowISO(),
+                })
+                done()
+                return
+              }
               void put('assetEntries', {
-                id: uid(), date, vehicleId: h.vehicleId, assetId: h.asset?.id, amount: dir === 'in' ? v : -v,
+                id: entryId, date, vehicleId: h.vehicleId, assetId: h.asset?.id, amount: dir === 'in' ? v : -v,
                 source: 'external', note: note.trim() || undefined, createdAt: nowISO(),
               })
+              if (dir === 'out' && pick !== '__account' && pick !== '__free') {
+                void put('savingsMovements', {
+                  id: uid(), date, bucketId: pick, amount: v, description: `Resgate de ${vehicleName(summaries, h)}`,
+                  assetEntryId: entryId, createdAt: nowISO(),
+                })
+              }
               done()
             }}>Guardar</Button>
           </div>
@@ -763,7 +924,7 @@ function InvestModals({
     return (
       <Modal open onClose={onClose} title={`Distribuir — ${s.vehicle.name}`}>
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-muted">Por distribuir: <strong className="text-text">{fmtEUR(s.undistributed)}</strong>. Escolhe quanto vai para cada ativo — o total do veículo não muda.</p>
+          <p className="text-xs text-muted">Saldo livre: <strong className="text-text">{fmtEUR(s.undistributed)}</strong>. Escolhe quanto vai para cada ativo — o total do veículo não muda.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted">Ativo</label>
@@ -781,57 +942,10 @@ function InvestModals({
             <Button onClick={() => {
               if (!pick) { setError('Escolhe o ativo.'); return }
               const v = needAmount(); if (v === null) return
-              if (v > s.undistributed + 0.004 && !window.confirm('É mais do que o valor por distribuir. Continuar mesmo assim?')) return
+              if (v > s.undistributed + 0.004 && !window.confirm('É mais do que o valor em saldo livre. Continuar mesmo assim?')) return
               void put('assetEntries', { id: uid(), date, vehicleId: s.vehicle.id, assetId: pick, amount: v, source: 'distribute', createdAt: nowISO() })
               done()
             }}>Distribuir</Button>
-          </div>
-        </div>
-      </Modal>
-    )
-  }
-
-  if (modal.type === 'transfer') {
-    const label = (h: Holding) => vehicleName(summaries, h)
-    return (
-      <Modal open onClose={onClose} title="Transferir entre ativos">
-        <div className="flex flex-col gap-3">
-          <p className="text-xs text-muted">Move dinheiro de um ativo para outro (ex.: da conta poupança da Amélia para os certificados). Não conta como dinheiro novo.</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs text-muted">De</label>
-              <Select value={pick} onChange={(e) => setPick(e.target.value)} className="w-full">
-                <option value="">— escolher —</option>
-                {assetHoldings.map((h) => <option key={h.key} value={h.key}>{label(h)} ({fmtEUR(h.contributed)})</option>)}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted">Para</label>
-              <Select value={pick2} onChange={(e) => setPick2(e.target.value)} className="w-full">
-                <option value="">— escolher —</option>
-                {assetHoldings.filter((h) => h.key !== pick).map((h) => <option key={h.key} value={h.key}>{label(h)}</option>)}
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="mb-1 block text-xs text-muted">Valor (€)</label><Input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" /></div>
-            <div><label className="mb-1 block text-xs text-muted">Data</label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-          </div>
-          {error && <p className="text-sm text-negative">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-            <Button onClick={() => {
-              const from = assetHoldings.find((h) => h.key === pick)
-              const to = assetHoldings.find((h) => h.key === pick2)
-              if (!from || !to || from.key === to.key) { setError('Escolhe dois ativos diferentes.'); return }
-              const v = needAmount(); if (v === null) return
-              const legs = transferLegs(
-                { vehicleId: from.vehicleId, assetId: from.asset!.id }, { vehicleId: to.vehicleId, assetId: to.asset!.id },
-                v, date, uid(), [uid(), uid()],
-              )
-              for (const l of legs) void put('assetEntries', { ...l, createdAt: nowISO() })
-              done()
-            }}>Transferir</Button>
           </div>
         </div>
       </Modal>

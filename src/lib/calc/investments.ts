@@ -3,7 +3,7 @@ import { addMonths, monthOfDate, monthRange } from '../format'
 import { round2 } from './allocation'
 import { activeAccountingMonth } from './balances'
 
-// Investimentos: veículo → ativos (+ "por distribuir"). Tudo derivado dos dados
+// Investimentos: veículo → ativos (+ "saldo livre"). Tudo derivado dos dados
 // já existentes (débitos automáticos do plano, saídas de baldes com veículo) e
 // de três coleções novas (assetEntries, valueCheckpoints, investmentAssets).
 //
@@ -20,7 +20,7 @@ export interface Flow {
 export interface Holding {
   key: string // assetId, ou `pool:${vehicleId}`
   vehicleId: string
-  asset?: InvestmentAsset // undefined = "por distribuir" / veículo sem ativos
+  asset?: InvestmentAsset // undefined = "saldo livre" / veículo sem ativos
   name: string
   flows: Flow[]
   checkpoints: ValueCheckpoint[] // por data crescente
@@ -32,19 +32,22 @@ export interface Holding {
   annualized: number | null // rentabilidade anual estimada (≥2 checkpoints, ≥90 dias)
   expectedRate?: number
   monthlyContribution?: number // definida pelo utilizador (projeção)
+  contributionGrowth?: number // aumento anual da entrada (%)
+  deposited: number // dinheiro que entrou de fora (planos, movimentos, depósitos), bruto
+  withdrawn: number // dinheiro que saiu para fora (resgates), bruto
   hasData: boolean
 }
 
 export interface VehicleSummary {
   vehicle: InvestmentVehicle
   holdings: Holding[] // pool primeiro, depois ativos
-  pool: Holding // "por distribuir" (ou o veículo inteiro, se não tem ativos) — mesmo oculto na tabela
+  pool: Holding // "saldo livre" (ou o veículo inteiro, se não tem ativos) — mesmo oculto na tabela
   hasAssets: boolean
   contributed: number
   value: number
   gain: number
   pct: number | null
-  undistributed: number // investido ainda por distribuir (pode ser <0 se distribuíste a mais)
+  undistributed: number // investido ainda em saldo livre (pode ser <0 se distribuíste a mais)
   lastCheckpoint?: string
 }
 
@@ -100,6 +103,7 @@ function makeHolding(
   key: string, vehicleId: string, asset: InvestmentAsset | undefined, name: string,
   flows: Flow[], checkpoints: ValueCheckpoint[], expectedRate: number | undefined, today: string,
   monthlyContribution?: number,
+  contributionGrowth?: number,
 ): Holding {
   const sortedFlows = [...flows].sort(byDate)
   const cps = [...checkpoints].sort(byDate)
@@ -112,6 +116,9 @@ function makeHolding(
     annualized: annualizedReturn(sortedFlows, cps),
     expectedRate,
     monthlyContribution,
+    contributionGrowth,
+    deposited: round2(sortedFlows.filter((f) => f.amount > 0 && ['initial', 'auto', 'movement', 'external'].includes(f.kind)).reduce((a, f) => a + f.amount, 0)),
+    withdrawn: round2(-sortedFlows.filter((f) => f.amount < 0 && ['movement', 'external'].includes(f.kind)).reduce((a, f) => a + f.amount, 0)),
     hasData: Math.abs(contributed) > 0.004 || Math.abs(value) > 0.004 || cps.length > 0,
   }
 }
@@ -133,20 +140,20 @@ export function buildVehicleSummaries(d: DataSet, calendarMonth: MonthKey, today
     const poolFlows: Flow[] = [
       ...derivedVehicleFlows(d, vehicle.id, through),
       ...entries.filter((e) => !e.assetId && e.source === 'external').map(entryFlow),
-      // distribuir tira do "por distribuir" o mesmo que põe no ativo
+      // distribuir tira do "saldo livre" o mesmo que põe no ativo
       ...entries.filter((e) => e.assetId && e.source === 'distribute')
         .map((e) => ({ date: e.date, amount: -e.amount, kind: 'distribute' as const, entryId: e.id })),
     ]
     const poolCps = d.valueCheckpoints.filter((c) => c.vehicleId === vehicle.id && !c.assetId)
     const pool = makeHolding(
-      `pool:${vehicle.id}`, vehicle.id, undefined, assets.length ? 'Por distribuir' : vehicle.name,
-      poolFlows, poolCps, vehicle.expectedRate, today, vehicle.monthlyContribution,
+      `pool:${vehicle.id}`, vehicle.id, undefined, assets.length ? 'Saldo livre' : vehicle.name,
+      poolFlows, poolCps, vehicle.expectedRate, today, vehicle.monthlyContribution, vehicle.contributionGrowth,
     )
 
     const assetHoldings = assets.map((a) => makeHolding(
       a.id, vehicle.id, a, a.name,
       entries.filter((e) => e.assetId === a.id).map(entryFlow),
-      d.valueCheckpoints.filter((c) => c.assetId === a.id), a.expectedRate ?? vehicle.expectedRate, today, a.monthlyContribution,
+      d.valueCheckpoints.filter((c) => c.assetId === a.id), a.expectedRate ?? vehicle.expectedRate, today, a.monthlyContribution, a.contributionGrowth,
     )).filter((h) => !h.asset!.archived || h.hasData)
 
     const holdings = [pool, ...assetHoldings].filter((h, i) => i > 0 || h.hasData || assets.length === 0)
@@ -224,29 +231,15 @@ export function projectValue(value: number, ratePct: number, years: number): num
   return round2(value * Math.pow(1 + ratePct / 100, years))
 }
 
-// ---------- Transferência entre ativos ----------
-
-export function transferLegs(
-  from: { vehicleId: string; assetId: string },
-  to: { vehicleId: string; assetId: string },
-  amount: number, date: string, groupId: string, ids: [string, string], note?: string,
-): AssetEntry[] {
-  const v = Math.abs(amount)
-  return [
-    { id: ids[0], date, vehicleId: from.vehicleId, assetId: from.assetId, amount: -v, source: 'transfer', transferGroupId: groupId, note },
-    { id: ids[1], date, vehicleId: to.vehicleId, assetId: to.assetId, amount: v, source: 'transfer', transferGroupId: groupId, note },
-  ]
-}
-
 // ---------- Injetado: por veículo e por ativo, mensal ou acumulado ----------
 
 export interface InjectedSeries { key: string; name: string; perMonth: number[] }
 export interface InjectedVehicle { vehicleId: string; name: string; series: InjectedSeries[]; perMonth: number[] }
 
-// Para cada veículo: uma série por ativo + "Por distribuir" (ou o próprio veículo, se
+// Para cada veículo: uma série por ativo + "Saldo livre" (ou o próprio veículo, se
 // não tem ativos). Conta débitos automáticos, movimentos e entradas externas; ignora
 // saldos iniciais e transferências. `cumulative` soma tudo até ao fim de cada mês
-// (incluindo meses anteriores à janela). Distribuir tira do "por distribuir" o que
+// (incluindo meses anteriores à janela). Distribuir tira do "saldo livre" o que
 // põe no ativo, por isso o total do veículo não depende de como distribuíste.
 export function injectedBreakdown(summaries: VehicleSummary[], months: MonthKey[], cumulative: boolean): InjectedVehicle[] {
   const monthly = (h: Holding): number[] => {
@@ -258,7 +251,7 @@ export function injectedBreakdown(summaries: VehicleSummary[], months: MonthKey[
   const out: InjectedVehicle[] = []
   for (const sm of summaries) {
     const series: InjectedSeries[] = [
-      { key: sm.pool.key, name: sm.hasAssets ? 'Por distribuir' : sm.vehicle.name, perMonth: monthly(sm.pool) },
+      { key: sm.pool.key, name: sm.hasAssets ? 'Saldo livre' : sm.vehicle.name, perMonth: monthly(sm.pool) },
       ...sm.holdings.filter((h) => h.asset).map((h) => ({ key: h.key, name: h.name, perMonth: monthly(h) })),
     ].filter((x) => x.perMonth.some((v) => Math.abs(v) > 0.004))
     if (series.length === 0) continue
@@ -284,10 +277,18 @@ export function medianMonthlyInjection(h: Holding, through: MonthKey, n = 6): nu
 }
 
 // Valor futuro com juros compostos e uma entrada mensal (no fim de cada mês).
-export function projectWithContributions(value: number, ratePct: number, years: number, monthly: number): number {
-  const base = value * Math.pow(1 + ratePct / 100, years)
+// `growthPct`: aumento anual da entrada, em degraus (sobe uma vez por ano).
+export function projectWithContributions(value: number, ratePct: number, years: number, monthly: number, growthPct = 0): number {
   const rm = Math.pow(1 + ratePct / 100, 1 / 12) - 1
-  const n = 12 * years
-  const annuity = Math.abs(rm) < 1e-9 ? monthly * n : monthly * ((Math.pow(1 + rm, n) - 1) / rm)
-  return round2(base + annuity)
+  let bal = value
+  for (let i = 1; i <= Math.round(12 * years); i++) {
+    const contrib = monthly * Math.pow(1 + growthPct / 100, Math.floor((i - 1) / 12))
+    bal = bal * (1 + rm) + contrib
+  }
+  return round2(bal)
+}
+
+// Entrada mensal daqui a `years` anos, com um aumento anual em degraus.
+export function monthlyAfterYears(monthly: number, growthPct: number, years: number): number {
+  return round2(monthly * Math.pow(1 + growthPct / 100, years))
 }

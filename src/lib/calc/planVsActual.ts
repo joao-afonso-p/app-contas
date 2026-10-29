@@ -1,5 +1,5 @@
 import type { MonthKey, Subcategory, Transaction } from '../../types'
-import { addMonths, fmtEUR, monthOfDate } from '../format'
+import { addMonths, fmtEURWhole as fmtEUR, monthOfDate } from '../format'
 import { round2 } from './allocation'
 import type { Group, Resolved } from './categories'
 

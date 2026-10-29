@@ -15,7 +15,7 @@ import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { offPlanBreakdown } from '../lib/calc/breakdown'
 import type { MonthReport } from '../lib/calc/planVsActual'
-import { currentMonthKey, fmtEUR, fmtPct, monthLabel, monthShort } from '../lib/format'
+import { currentMonthKey, fmtEURWhole as fmtEUR, fmtPct, monthLabel, monthShort } from '../lib/format'
 import { effectivePlan, firstPlanMonth, useStore } from '../store/useStore'
 import type { MonthKey } from '../types'
 import { ChartLegend, ChartTooltip, compactEUR, cursorStyle } from './ChartParts'
@@ -156,7 +156,7 @@ export function SavingsAnalytics({
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" tick={axis} axisLine={false} tickLine={false} />
               <YAxis tick={axis} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
-              <Tooltip content={<ChartTooltip total />} cursor={cursorStyle} isAnimationActive={false} />
+              <Tooltip content={<ChartTooltip total format={fmtEUR} />} cursor={cursorStyle} isAnimationActive={false} />
               <Legend content={<ChartLegend />} />
               {contribBuckets.map((b, i) => (
                 <Bar key={b.id} dataKey={b.name} stackId="s" fill={PALETTE[i % PALETTE.length]} maxBarSize={56} />

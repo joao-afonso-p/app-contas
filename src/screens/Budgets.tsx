@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
+  Rectangle,
   CartesianGrid,
   ComposedChart,
   Legend,
@@ -22,7 +23,7 @@ import {
 } from '../lib/calc/planVsActual'
 import { SavingsAnalytics } from '../components/SavingsAnalytics'
 import { SubcategoryAnalytics } from '../components/SubcategoryAnalytics'
-import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthRange, monthShort } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, monthRange, monthShort } from '../lib/format'
 import { effectivePlan, useStore } from '../store/useStore'
 import type { MonthKey, Transaction } from '../types'
 
@@ -149,7 +150,11 @@ export function Budgets() {
   // ----- Gráfico: planeado vs gasto por mês -----
   const chartData = months.map((m) => {
     const r = reports.get(m)!
-    return { month: monthShort(m), planeado: r.hasPlan ? r.plannedTotal : null, gasto: r.spentCash }
+    // Gasto total (no plano + sem categoria) para a diferença; as duas partes empilham-se na barra.
+    return {
+      month: monthShort(m), planeado: r.hasPlan ? r.plannedTotal : null, gasto: r.spentCash,
+      noPlano: r.spentInPlan, semCategoria: r.unassignedTotal,
+    }
   })
 
   // ----- Histórico por categoria (% do plano) -----
@@ -345,15 +350,22 @@ export function Budgets() {
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
-              <Tooltip content={<ChartTooltip />} cursor={cursorStyle} isAnimationActive={false} />
+              <Tooltip content={<ChartTooltip format={fmtEUR} />} cursor={cursorStyle} isAnimationActive={false} />
               <Legend content={<ChartLegend />} />
-              <Bar dataKey="gasto" name="Gasto (do orçamento)" fill="var(--accent-strong)" radius={[6, 6, 0, 0]}>
-                <LabelList dataKey="gasto" content={diffLabelRenderer(chartData)} />
+              <Bar
+                dataKey="noPlano" name="Gasto no plano" stackId="g" fill="var(--accent-strong)"
+                shape={(props: unknown) => {
+                  const p = props as React.ComponentProps<typeof Rectangle> & { payload?: { semCategoria?: number } }
+                  return <Rectangle {...p} radius={(p.payload?.semCategoria ?? 0) > 0 ? 0 : [6, 6, 0, 0]} />
+                }}
+              />
+              <Bar dataKey="semCategoria" name="Sem categoria" stackId="g" fill="#94a3b8" radius={[6, 6, 0, 0]}>
+                <LabelList dataKey="semCategoria" content={diffLabelRenderer(chartData)} />
               </Bar>
               <Line type="monotone" dataKey="planeado" name="Planeado" stroke="var(--warn)" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
             </ComposedChart>
           </ResponsiveContainer>
-          <p className="mt-2 text-[11px] text-muted">Valor sobre a barra = gasto face ao planeado (+ gastaste a mais, − gastaste a menos).</p>
+          <p className="mt-2 text-[11px] text-muted">Valor sobre a barra = gasto total (no plano + sem categoria) face ao planeado (+ gastaste a mais, − gastaste a menos). A parte cinzenta são gastos que ainda não têm categoria do plano.</p>
         </Card>
       </section>
 
@@ -464,7 +476,7 @@ export function Budgets() {
                   <CartesianGrid vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
-                  <Tooltip content={<ChartTooltip />} cursor={cursorStyle} isAnimationActive={false} />
+                  <Tooltip content={<ChartTooltip format={fmtEUR} />} cursor={cursorStyle} isAnimationActive={false} />
                   <Legend content={<ChartLegend />} />
                   <Bar dataKey="gasto" name="Gasto" fill="var(--accent-strong)" radius={[6, 6, 0, 0]}>
                     <LabelList dataKey="gasto" content={diffLabelRenderer(evolutionData)} />

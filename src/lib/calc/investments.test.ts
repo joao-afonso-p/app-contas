@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyDataSet } from '../../types'
-import { medianMonthlyInjection, projectWithContributions, injectedBreakdown, interpolatedValue, annualizedReturn, buildVehicleSummaries, holdingsSeries, projectValue, transferLegs, valueAt } from './investments'
+import { monthlyAfterYears, medianMonthlyInjection, projectWithContributions, injectedBreakdown, interpolatedValue, annualizedReturn, buildVehicleSummaries, holdingsSeries, projectValue, valueAt } from './investments'
 
 const base = () => {
   const d = emptyDataSet()
@@ -23,7 +23,7 @@ describe('investimentos', () => {
     expect(s.find((x) => x.vehicle.id === 'dg')!.contributed).toBe(500)
     expect(s.find((x) => x.vehicle.id === 'am')!.gain).toBe(0)
   })
-  it('distribuir não muda o total do veículo; sobra fica por distribuir', () => {
+  it('distribuir não muda o total do veículo; sobra fica em saldo livre', () => {
     const d = base()
     d.investmentAssets = [
       { id: 'cp', vehicleId: 'am', name: 'Conta poupança', archived: false, order: 0 },
@@ -36,21 +36,7 @@ describe('investimentos', () => {
     const am = buildVehicleSummaries(d, '2026-10', '2026-10-20').find((x) => x.vehicle.id === 'am')!
     expect(am.contributed).toBe(500)
     expect(am.undistributed).toBe(100)
-    expect(am.holdings.map((h) => [h.name, h.contributed])).toEqual([['Por distribuir', 100], ['Conta poupança', 300], ['Certificados', 100]])
-  })
-  it('transferir entre ativos mantém o total', () => {
-    const d = base()
-    d.investmentAssets = [
-      { id: 'cp', vehicleId: 'am', name: 'CP', archived: false, order: 0 },
-      { id: 'ca', vehicleId: 'am', name: 'CA', archived: false, order: 1 },
-    ]
-    d.assetEntries = [
-      { id: 'e1', date: '2026-10-06', vehicleId: 'am', assetId: 'cp', amount: 500, source: 'distribute' },
-      ...transferLegs({ vehicleId: 'am', assetId: 'cp' }, { vehicleId: 'am', assetId: 'ca' }, 200, '2026-10-10', 'g', ['t1', 't2']),
-    ]
-    const am = buildVehicleSummaries(d, '2026-10', '2026-10-20').find((x) => x.vehicle.id === 'am')!
-    expect(am.holdings.map((h) => [h.name, h.contributed])).toEqual([['CP', 300], ['CA', 200]])
-    expect(am.contributed).toBe(500)
+    expect(am.holdings.map((h) => [h.name, h.contributed])).toEqual([['Saldo livre', 100], ['Conta poupança', 300], ['Certificados', 100]])
   })
   it('checkpoint: valor = checkpoint + entradas posteriores', () => {
     const flows = [{ date: '2026-01-01', amount: 1000, kind: 'external' as const }, { date: '2026-06-01', amount: 100, kind: 'external' as const }]
@@ -93,14 +79,14 @@ describe('investimentos', () => {
     expect(mid.value).toBeLessThan(1300)
     expect(interpolatedValue(h, '2026-12-31').value).toBe(1300) // depois do último: ganho constante
   })
-  it('injetado: mensal e acumulado, por ativo + por distribuir', () => {
+  it('injetado: mensal e acumulado, por ativo + saldo livre', () => {
     const d = base()
     d.investmentAssets = [{ id: 'cp', vehicleId: 'am', name: 'CP', archived: false, order: 0 }]
     d.assetEntries = [{ id: 'e1', date: '2026-10-06', vehicleId: 'am', assetId: 'cp', amount: 300, source: 'distribute' }]
     const sm = buildVehicleSummaries(d, '2026-10', '2026-10-20')
     const months = ['2026-09', '2026-10']
     const monthly = injectedBreakdown(sm, months, false).find((v) => v.vehicleId === 'am')!
-    expect(monthly.series.map((x) => [x.name, x.perMonth])).toEqual([['Por distribuir', [100, 100]], ['CP', [0, 300]]])
+    expect(monthly.series.map((x) => [x.name, x.perMonth])).toEqual([['Saldo livre', [100, 100]], ['CP', [0, 300]]])
     expect(monthly.perMonth).toEqual([100, 400]) // total do veículo = plano + movimentos
     const cum = injectedBreakdown(sm, months, true).find((v) => v.vehicleId === 'am')!
     expect(cum.perMonth).toEqual([100, 500])
@@ -120,5 +106,28 @@ describe('investimentos', () => {
     const v = projectWithContributions(0, 12, 1, 100)
     expect(v).toBeGreaterThan(1200)
     expect(v).toBeLessThan(1300)
+  })
+  it('mover do ativo para o saldo livre: total do veículo igual; resgate reduz investido e mostra bruto', () => {
+    const d = base()
+    d.investmentAssets = [{ id: 'cp', vehicleId: 'am', name: 'CP', archived: false, order: 0 }]
+    d.assetEntries = [
+      { id: 'e1', date: '2026-10-06', vehicleId: 'am', assetId: 'cp', amount: 500, source: 'distribute' },
+      { id: 'e2', date: '2026-10-08', vehicleId: 'am', assetId: 'cp', amount: -200, source: 'distribute' }, // ativo → saldo livre
+    ]
+    let am = buildVehicleSummaries(d, '2026-10', '2026-10-20').find((x) => x.vehicle.id === 'am')!
+    expect(am.holdings.map((h) => [h.name, h.contributed])).toEqual([['Saldo livre', 200], ['CP', 300]])
+    expect(am.contributed).toBe(500)
+    // resgate externo do saldo livre: sai do veículo
+    d.assetEntries.push({ id: 'e3', date: '2026-10-09', vehicleId: 'am', amount: -150, source: 'external' })
+    am = buildVehicleSummaries(d, '2026-10', '2026-10-20').find((x) => x.vehicle.id === 'am')!
+    expect(am.contributed).toBe(350)
+    expect(am.pool.withdrawn).toBe(150)
+    expect(am.pool.deposited).toBe(500) // plano 200 + movimento 300 (distribuir não conta como depósito)
+  })
+  it('aumento anual da entrada: degraus por ano', () => {
+    // 2 anos, 100/mês, 0% juros, +10% ao ano → 12×100 + 12×110
+    expect(projectWithContributions(0, 0, 2, 100, 10)).toBe(2520)
+    expect(projectWithContributions(0, 0, 2, 100, 0)).toBe(2400)
+    expect(monthlyAfterYears(100, 10, 2)).toBe(121)
   })
 })
