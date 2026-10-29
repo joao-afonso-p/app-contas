@@ -23,7 +23,7 @@ describe('backup', () => {
     expect(Object.keys(file).sort()).toEqual(['app', 'data', 'exportedAt', 'version'])
     expect(file.version).toBe(BACKUP_VERSION)
     expect(file.exportedAt).toBe('2026-07-01T10:00:00.000Z')
-    expect(Object.keys(file.data)).toHaveLength(14)
+    expect(Object.keys(file.data)).toHaveLength(18)
   })
 
   it('rejeita texto que não é JSON', () => {

@@ -75,3 +75,12 @@ describe('buildStatementHistory', () => {
     expect(buildStatementHistory(txs, cats, '2026-07-10')).toHaveLength(0)
   })
 })
+
+import { isSavingsTransfer } from './openai'
+describe('reforços de poupança', () => {
+  it('deteta transferências para a poupança e não gastos normais', () => {
+    expect(isSavingsTransfer('REFORÇO POUPANÇA BPI', '')).toBe(true)
+    expect(isSavingsTransfer('Transferência para Poupança', '')).toBe(true)
+    expect(isSavingsTransfer('PINGO DOCE LISBOA', 'Compras')).toBe(false)
+  })
+})

@@ -2,29 +2,30 @@ import { useMemo, useState, type ReactNode } from 'react'
 import {
   Badge, Button, Card, EmptyState, InfoHint, Input, Modal, Money, ProgressBar, SectionTitle, Select, cx,
 } from '../components/ui'
-import { EditableRow, GroupHeader, SpacerRow, StaticRow, TotalRow } from '../components/PlanTable'
+import { GroupHeader, SpacerRow, StaticRow, TotalRow } from '../components/PlanTable'
+import {
+  GridContainer, GridHeaderCell, GridRow, GridSelectionBar, GridTopBar, useProjectionGrid, type GridRowDef,
+} from '../components/ProjectionGrid'
 import {
   addMonths, currentMonthKey, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
 } from '../lib/format'
 import { allocationSummary } from '../lib/calc/allocation'
+import { withResidual } from '../lib/calc/archive'
 import { activeAccountingMonth, bucketBalance, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
 import {
   computeProjectedBalances, plannedMovementCounts, plannedMovementHiddenReason, requiredMonthlySaving, savingsRate,
 } from '../lib/calc/projections'
 import {
-  activeBuckets, activeExpenseCategories, activeIncomeSources, activeVehicles, firstPlanMonth, useStore,
+  activeBuckets, firstPlanMonth, useStore,
 } from '../store/useStore'
 import type { MonthKey, PlannedMovement, SavingsBucket } from '../types'
 
 const HORIZONS = [12, 18, 24, 36]
 
-type Section = 'income' | 'expenses' | 'savings' | 'autoInvestments'
-
 export function Projecoes() {
   const data = useStore((s) => s.data)
   const setMeta = useStore((s) => s.setMeta)
-  const setProjectionValue = useStore((s) => s.setProjectionValue)
-  const setProjectionRange = useStore((s) => s.setProjectionRange)
+  const setProjectionCells = useStore((s) => s.setProjectionCells)
   const syncProjectionToReality = useStore((s) => s.syncProjectionToReality)
   const addPlannedTransfer = useStore((s) => s.addPlannedTransfer)
   const setPlannedMovementDone = useStore((s) => s.setPlannedMovementDone)
@@ -40,10 +41,15 @@ export function Projecoes() {
     [baseMonth, horizon],
   )
 
-  const incomeSources = activeIncomeSources(data)
-  const expenseCategories = activeExpenseCategories(data)
+  // Ativos + arquivados que ainda têm valor nalguma projeção (para poderem ser
+  // corrigidos — esse valor conta nos totais e nos 100%).
+  const projectionList = data.projectionPlans
+  const incomeSources = withResidual(data.incomeSources, projectionList, 'income')
+  const expenseCategories = withResidual(data.expenseCategories, projectionList, 'expenses')
   const buckets = activeBuckets(data)
-  const vehicles = activeVehicles(data)
+  const savingsRows = withResidual(data.savingsBuckets, projectionList, 'savings')
+  const vehicles = withResidual(data.investmentVehicles, projectionList, 'autoInvestments')
+  const tagArchived = (name: string, residual?: boolean) => (residual ? `${name} (arquivada)` : name)
 
   const planByMonth = useMemo(
     () => new Map(data.projectionPlans.map((p) => [p.id, p])),
@@ -69,39 +75,27 @@ export function Projecoes() {
 
   const [syncOpen, setSyncOpen] = useState(false)
 
-  // ---------- Edição em bloco (intervalo de meses numa linha, ou linha toda) ----------
-  const [selection, setSelection] = useState<{ section: Section; id: string; anchor: MonthKey; months: MonthKey[] } | null>(null)
-  const [bulkValue, setBulkValue] = useState('')
+  // ---------- Grelha editável (seleção, copiar/colar, preencher, desfazer) ----------
+  const gridRows: GridRowDef[] = [
+    ...incomeSources.map((x) => ({ section: 'income' as const, id: x.id })),
+    ...expenseCategories.map((x) => ({ section: 'expenses' as const, id: x.id })),
+    ...savingsRows.map((x) => ({ section: 'savings' as const, id: x.id })),
+    ...vehicles.map((x) => ({ section: 'autoInvestments' as const, id: x.id })),
+  ]
+  const expensesStart = incomeSources.length
+  const savingsStart = expensesStart + expenseCategories.length
+  const vehiclesStart = savingsStart + savingsRows.length
 
-  const selectMonth = (section: Section, id: string, month: MonthKey) => {
-    setSelection((prev) => {
-      if (!prev || prev.section !== section || prev.id !== id) {
-        return { section, id, anchor: month, months: [month] }
-      }
-      const startIdx = months.indexOf(prev.anchor)
-      const endIdx = months.indexOf(month)
-      if (startIdx === -1 || endIdx === -1) return { section, id, anchor: month, months: [month] }
-      const [lo, hi] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
-      return { ...prev, months: months.slice(lo, hi + 1) }
-    })
+  const cellValue = (r: number, c: number): number => {
+    const row = gridRows[r]
+    const plan = planByMonth.get(months[c])
+    return (plan?.[row?.section] as Record<string, number> | undefined)?.[row?.id] ?? 0
   }
-
-  const clearSelection = () => setSelection(null)
-
-  const applySelection = () => {
-    if (!selection) return
-    const parsed = parseAmount(bulkValue)
-    if (parsed === null) return
-    void setProjectionRange(selection.section, selection.id, selection.months, parsed)
-    setSelection(null)
-    setBulkValue('')
-  }
-
-  const rowSelectionProps = (section: Section, id: string) => ({
-    selectedMonths: selection?.section === section && selection.id === id ? selection.months : undefined,
-    onSelectMonth: (m: MonthKey) => selectMonth(section, id, m),
-    onClearSelection: clearSelection,
-    onApplyAll: () => setSelection({ section, id, anchor: months[0], months }),
+  const grid = useProjectionGrid({
+    rows: gridRows,
+    months,
+    getValue: cellValue,
+    write: (changes) => setProjectionCells(changes.map((c) => ({ month: c.month, section: c.section, id: c.id, value: c.after }))),
   })
 
   // ---------- Criar/editar objetivo (balde) ----------
@@ -305,21 +299,23 @@ export function Projecoes() {
       <section>
         <SectionTitle>Saldos projetados</SectionTitle>
         <Card className="p-0">
-          <div className="max-h-[70vh] overflow-auto thin-scroll">
+          <GridTopBar grid={grid} />
+          <GridContainer grid={grid}>
             <table className="w-full min-w-[900px] border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="sticky left-0 top-0 z-30 bg-surface px-3 py-2 text-left align-bottom text-xs font-semibold text-muted">
+                  <th
+                    onPointerDown={() => grid.selectAll()}
+                    title="Clica para selecionar tudo"
+                    className="sticky left-0 top-0 z-30 cursor-pointer bg-surface px-3 py-2 text-left align-bottom text-xs font-semibold text-muted hover:bg-surface-2"
+                  >
                     Categoria
                   </th>
-                  {months.map((m) => {
+                  {months.map((m, ci) => {
                     const summary = allocationSummary(planByMonth.get(m), incomeSources)
                     const isBalanced = Math.abs(summary.unallocated) < 0.005
                     return (
-                      <th
-                        key={m}
-                        className="sticky top-0 z-20 whitespace-nowrap bg-surface px-3 py-2 text-right align-bottom"
-                      >
+                      <GridHeaderCell key={m} grid={grid} c={ci}>
                         <div className="tnum flex items-center justify-end gap-1 text-xs font-semibold text-muted">
                           {m === baseMonth && basePendingCount > 0 && (
                             <InfoHint label={`Sobre os saldos de ${monthLabel(m)}`}>
@@ -343,21 +339,21 @@ export function Projecoes() {
                         <div className={cx('tnum text-[11px] font-normal', isBalanced ? 'text-muted' : 'text-negative')}>
                           {fmtEUR(summary.unallocated)}
                         </div>
-                      </th>
+                      </GridHeaderCell>
                     )
                   })}
                 </tr>
               </thead>
               <tbody>
                 <GroupHeader label="Income" span={months.length + 1} />
-                {incomeSources.map((s) => (
-                  <EditableRow
+                {incomeSources.map((s, i) => (
+                  <GridRow
                     key={s.id}
-                    label={s.name}
+                    grid={grid}
+                    r={i}
+                    label={tagArchived(s.name, s.residual)}
                     months={months}
-                    getValue={(m) => planByMonth.get(m)?.income[s.id] ?? 0}
-                    onChange={(m, v) => void setProjectionValue(m, 'income', s.id, v)}
-                    {...rowSelectionProps('income', s.id)}
+                    getValue={cellValue}
                   />
                 ))}
                 <TotalRow
@@ -368,14 +364,14 @@ export function Projecoes() {
 
                 <SpacerRow span={months.length + 1} />
                 <GroupHeader label="Despesas" span={months.length + 1} />
-                {expenseCategories.map((c) => (
-                  <EditableRow
+                {expenseCategories.map((c, i) => (
+                  <GridRow
                     key={c.id}
-                    label={c.name}
+                    grid={grid}
+                    r={expensesStart + i}
+                    label={tagArchived(c.name, c.residual)}
                     months={months}
-                    getValue={(m) => planByMonth.get(m)?.expenses[c.id] ?? 0}
-                    onChange={(m, v) => void setProjectionValue(m, 'expenses', c.id, v)}
-                    {...rowSelectionProps('expenses', c.id)}
+                    getValue={cellValue}
                   />
                 ))}
                 <TotalRow
@@ -386,15 +382,15 @@ export function Projecoes() {
 
                 <SpacerRow span={months.length + 1} />
                 <GroupHeader label="Poupanças" span={months.length + 1} />
-                {buckets.map((b) => (
-                  <EditableRow
+                {savingsRows.map((b, i) => (
+                  <GridRow
                     key={b.id}
-                    label={b.name}
-                    badge={b.kind === 'goal' ? <Badge tone="goal">Objetivo</Badge> : undefined}
+                    grid={grid}
+                    r={savingsStart + i}
+                    label={tagArchived(b.name, b.residual)}
+                    badge={b.kind === 'goal' && !b.residual ? <Badge tone="goal">Objetivo</Badge> : undefined}
                     months={months}
-                    getValue={(m) => planByMonth.get(m)?.savings[b.id] ?? 0}
-                    onChange={(m, v) => void setProjectionValue(m, 'savings', b.id, v)}
-                    {...rowSelectionProps('savings', b.id)}
+                    getValue={cellValue}
                   />
                 ))}
                 <SpacerRow span={months.length + 1} />
@@ -408,14 +404,14 @@ export function Projecoes() {
                   <>
                     <SpacerRow span={months.length + 1} />
                     <GroupHeader label="Débitos automáticos" span={months.length + 1} />
-                    {vehicles.map((v) => (
-                      <EditableRow
+                    {vehicles.map((v, i) => (
+                      <GridRow
                         key={v.id}
-                        label={v.name}
+                        grid={grid}
+                        r={vehiclesStart + i}
+                        label={tagArchived(v.name, v.residual)}
                         months={months}
-                        getValue={(m) => planByMonth.get(m)?.autoInvestments?.[v.id] ?? 0}
-                        onChange={(m, val) => void setProjectionValue(m, 'autoInvestments', v.id, val)}
-                        {...rowSelectionProps('autoInvestments', v.id)}
+                        getValue={cellValue}
                       />
                     ))}
                     <TotalRow
@@ -441,27 +437,8 @@ export function Projecoes() {
                 <TotalRow label="Total" months={months} getValue={(m) => totalBalance(balanceTable, m)} dark />
               </tbody>
             </table>
-          </div>
-          {selection && (
-            <div className="flex flex-wrap items-center gap-2 border-t border-border bg-surface-2 px-3 py-2">
-              <span className="text-xs font-medium text-muted">
-                {selection.months.length} {selection.months.length === 1 ? 'mês selecionado' : 'meses selecionados'}
-              </span>
-              <Input
-                inputMode="decimal"
-                placeholder="Valor €"
-                value={bulkValue}
-                onChange={(e) => setBulkValue(e.target.value)}
-                className="w-28"
-              />
-              <Button size="sm" onClick={applySelection} disabled={parseAmount(bulkValue) === null}>
-                Aplicar
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setSelection(null); setBulkValue('') }}>
-                Cancelar
-              </Button>
-            </div>
-          )}
+          </GridContainer>
+          <GridSelectionBar grid={grid} />
         </Card>
       </section>
 

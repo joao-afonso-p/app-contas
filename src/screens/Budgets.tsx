@@ -1,38 +1,52 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
-  ReferenceLine,
+  Line,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts'
-import { Badge, Button, Card, MetricCard, SectionTitle, cx } from '../components/ui'
-import { round2 } from '../lib/calc/allocation'
-import { capFor, computeSpend, isUncategorized, monthTotals, normalizeDesc } from '../lib/calc/budgets'
-import { addMonths, currentMonthKey, fmtEUR, monthRange, monthShort } from '../lib/format'
-import { useStore } from '../store/useStore'
+import { ChartLegend, ChartTooltip, compactEUR, cursorStyle, diffLabelRenderer } from '../components/ChartParts'
+import { MonthPicker } from '../components/MonthPicker'
+import { Badge, Button, Card, EmptyState, MacroTitle, MetricCard, ProgressBar, SectionTitle, cx } from '../components/ui'
+import { allGroups, legacyNeedingMapping, makeResolver } from '../lib/calc/categories'
+import { findOrphanExpenses } from '../lib/calc/mergeExpenses'
+import {
+  buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, sortByAttention,
+  type CategoryRow, type MonthReport, type SubRow,
+} from '../lib/calc/planVsActual'
+import { SavingsAnalytics } from '../components/SavingsAnalytics'
+import { SubcategoryAnalytics } from '../components/SubcategoryAnalytics'
+import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthRange, monthShort } from '../lib/format'
+import { effectivePlan, useStore } from '../store/useStore'
+import type { MonthKey, Transaction } from '../types'
 
-// Cor da célula do heatmap de tetos: sem gasto = cinza; dentro do teto = verde
-// leve; ultrapassado = vermelho cada vez mais escuro conforme o excesso relativo
-// ao próprio teto da categoria.
-function tetoHeatCell(spent: number, cap: number): { bg: string; fg: string } {
-  if (spent <= 0 || cap <= 0) return { bg: 'var(--surface-2)', fg: 'var(--muted)' }
-  if (spent <= cap) {
-    const alpha = 0.15 + 0.2 * (spent / cap) // 0.15 → 0.35
+// Cor da célula do histórico: sem gasto = cinza; dentro do plano = verde leve;
+// acima do plano = vermelho cada vez mais escuro conforme o excesso relativo.
+function heatCell(spent: number, planned: number): { bg: string; fg: string } {
+  if (spent <= 0) return { bg: 'var(--surface-2)', fg: 'var(--muted)' }
+  if (planned <= 0) return { bg: 'rgba(217, 119, 6, 0.25)', fg: 'var(--text)' } // gasto sem plano
+  if (spent <= planned) {
+    const alpha = 0.15 + 0.2 * (spent / planned)
     return { bg: `rgba(16, 185, 129, ${alpha.toFixed(2)})`, fg: 'var(--text)' }
   }
-  const over = Math.min(1, (spent - cap) / cap) // 0 → 1
-  const alpha = 0.4 + 0.5 * over // 0.4 → 0.9
+  const over = Math.min(1, (spent - planned) / planned)
+  const alpha = 0.4 + 0.5 * over
   return { bg: `rgba(220, 38, 38, ${alpha.toFixed(2)})`, fg: over > 0.35 ? '#fff' : 'var(--text)' }
 }
 
-// Dropdown de seleção múltipla de categorias: o painel fica aberto entre
-// cliques (ao contrário de um <select>) para o utilizador ir marcando várias
-// categorias e ver a soma a atualizar dinamicamente no gráfico.
+function daysInMonth(m: MonthKey): number {
+  const [y, mo] = m.split('-').map(Number)
+  return new Date(y, mo, 0).getDate()
+}
+
+// Dropdown de seleção múltipla: o painel fica aberto entre cliques para ir
+// marcando várias categorias e ver a soma a atualizar no gráfico.
 function CategoryMultiSelect({
   categories, selectedIds, onToggle,
 }: { categories: { id: string; name: string }[]; selectedIds: string[]; onToggle: (id: string) => void }) {
@@ -82,290 +96,534 @@ function CategoryMultiSelect({
   )
 }
 
+
 export function Budgets() {
   const data = useStore((s) => s.data)
   const setScreen = useStore((s) => s.setScreen)
+  const put = useStore((s) => s.put)
 
   const currentMonth = currentMonthKey()
-  // Janela fixa: últimos 12 meses (atual em último) para todos os gráficos/tabelas.
-  const months = useMemo(() => monthRange(addMonths(currentMonth, -11), currentMonth), [currentMonth])
+  const [month, setMonth] = useState<MonthKey>(currentMonth)
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [showSubs, setShowSubs] = useState(false)
+  // Janela de 12 meses terminada no mês escolhido (para gráfico/histórico).
+  const months = useMemo(() => monthRange(addMonths(month, -11), month), [month])
 
-  const categories = useMemo(
-    () => data.transactionCategories.filter((c) => !c.archived).sort((a, b) => a.order - b.order),
-    [data.transactionCategories],
+  const resolve = useMemo(() => makeResolver(data), [data])
+  const groups = useMemo(() => allGroups(data), [data])
+
+  // Plano de um mês: o gravado; para o mês atual/futuros, o "efetivo" (rascunho
+  // ou cópia do último). Meses passados sem plano gravado ficam sem plano.
+  const planFor = (m: MonthKey) => {
+    const saved = data.monthlyPlans.find((p) => p.id === m)
+    if (saved) return saved.expenses
+    return m >= currentMonth ? effectivePlan(data, m).expenses : undefined
+  }
+
+  const reports = useMemo(() => {
+    const map = new Map<MonthKey, MonthReport>()
+    const totals = groupMonthTotals(data.transactions, resolve)
+    for (const m of months) {
+      const elapsed = m === currentMonth ? new Date().getDate() / daysInMonth(m) : undefined
+      map.set(m, buildMonthReport({
+        month: m, transactions: data.transactions, resolve, groups,
+        subcategories: data.subcategories, planExpenses: planFor(m), elapsed,
+        fixedIds: detectFixedGroups(groups, totals, m),
+      }))
+    }
+    return map
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [months, data, resolve, groups, currentMonth])
+
+  const report = reports.get(month)!
+  const insights = useMemo(
+    () => computeInsights(monthRange(addMonths(month, -3), month).map((m) => reports.get(m)).filter((r): r is MonthReport => Boolean(r))),
+    [reports, month],
   )
+  const isCurrent = month === currentMonth
+  const rows = sortByAttention(report.rows.filter((r) => r.planned > 0 || r.spent > 0))
+  const diff = report.plannedTotal - report.spentInPlan
+  const pendingLegacy = legacyNeedingMapping(data)
+  const orphanExpenses = useMemo(() => findOrphanExpenses(data).filter((o) => o.deleted), [data])
 
-  const casaCategoryId = useMemo(
-    () => categories.find((c) => normalizeDesc(c.name) === 'casas')?.id,
-    [categories],
-  )
+  // ----- Gráfico: planeado vs gasto por mês -----
+  const chartData = months.map((m) => {
+    const r = reports.get(m)!
+    return { month: monthShort(m), planeado: r.hasPlan ? r.plannedTotal : null, gasto: r.spentCash }
+  })
 
-  const spend = useMemo(() => computeSpend(data.transactions), [data.transactions])
-  // Gasto "discricionário": exclui despesas marcadas para repor da poupança —
-  // são compras planeadas/financiadas pela poupança, não devem contar para o
-  // teto mensal (o teto mede o que sai do cash-flow normal). Usado só na
-  // heatmap de tetos; a tabela "Por categoria" e os gastos continuam a
-  // mostrar o total real, incluindo essas compras.
-  const discretionarySpend = useMemo(
-    () => computeSpend(data.transactions, { excludeRepoePoupanca: true }),
-    [data.transactions],
-  )
-  const totals = useMemo(() => monthTotals(data.transactions, casaCategoryId), [data.transactions, casaCategoryId])
+  // ----- Histórico por categoria (% do plano) -----
+  const historyGroups = groups.filter((g) => g.kind === 'expense' && months.some((m) => {
+    const row = reports.get(m)?.rows.find((x) => x.group.id === g.id)
+    return row && (row.spent > 0 || row.planned > 0)
+  })).sort((a, b) => a.order - b.order)
 
-  const uncategorized = useMemo(
-    () => data.transactions.filter((t) => isUncategorized(t, categories)),
-    [data.transactions, categories],
-  )
-  const uncategorizedTotal = uncategorized.reduce((sum, t) => sum + t.amount, 0)
-
-  const categoriesWithData = useMemo(
-    () =>
-      categories.filter((c) => {
-        const hasSpend = months.some((m) => (spend.get(c.id)?.get(m) ?? 0) > 0)
-        const hasCap = capFor(data.budgets, c.id) !== undefined
-        return hasSpend || hasCap
-      }),
-    [categories, months, spend, data.budgets],
-  )
-
-  const categoriesWithSpend = useMemo(
-    () => categories.filter((c) => months.some((m) => (spend.get(c.id)?.get(m) ?? 0) > 0)),
-    [categories, months, spend],
-  )
-
-  const currentTotal = totals.get(currentMonth)?.total ?? 0
-  const currentSemReposto = totals.get(currentMonth)?.semReposto ?? 0
-
-  const chartData = months.map((m) => ({
-    month: monthShort(m),
-    total: totals.get(m)?.total ?? 0,
-    semReposto: totals.get(m)?.semReposto ?? 0,
-    semRepostoSemCasa: totals.get(m)?.semRepostoSemCasa ?? 0,
-  }))
-
-  // Categorias com teto ativo (cap > 0), para o heatmap de tetos.
-  const tetoCategories = useMemo(
-    () => categories
-      .map((c) => ({ category: c, cap: capFor(data.budgets, c.id) }))
-      .filter((x): x is { category: (typeof categories)[number]; cap: number } => (x.cap ?? 0) > 0),
-    [categories, data.budgets],
-  )
-
-  // Multi-seleção de categorias para o gráfico "Evolução": sem seleção do
-  // utilizador ainda, assume-se a 1ª categoria com gastos (paridade com o
-  // comportamento anterior de single-select).
+  // ----- Evolução por categoria (multi-seleção) -----
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const effectiveIds = selectedIds.length > 0
-    ? selectedIds
-    : (categoriesWithSpend[0] ? [categoriesWithSpend[0].id] : [])
-  const toggleSelected = (id: string) => {
+  const spendGroups = historyGroups
+  // Por defeito: "Outros" (se existir), senão a primeira categoria.
+  const defaultGroup = spendGroups.find((g) => g.name.trim().toLowerCase() === 'outros') ?? spendGroups[0]
+  const effectiveIds = selectedIds.length > 0 ? selectedIds : (defaultGroup ? [defaultGroup.id] : [])
+  const toggleSelected = (id: string) =>
     setSelectedIds((prev) => {
       const base = prev.length > 0 ? prev : effectiveIds
       return base.includes(id) ? base.filter((x) => x !== id) : [...base, id]
     })
-  }
-  const selectedCategories = categoriesWithSpend.filter((c) => effectiveIds.includes(c.id))
-  // Teto de referência: soma dos tetos das categorias selecionadas que tiverem um definido.
-  const selectedCapSum = selectedCategories.reduce((sum, c) => sum + (capFor(data.budgets, c.id) ?? 0), 0)
-  const selectedCap = selectedCapSum > 0 ? selectedCapSum : undefined
-  const selectedChartData = selectedCategories.length > 0
-    ? months.map((m) => ({
-        month: monthShort(m),
-        gasto: selectedCategories.reduce((sum, c) => sum + (spend.get(c.id)?.get(m) ?? 0), 0),
-      }))
+  const selectedGroups = spendGroups.filter((g) => effectiveIds.includes(g.id))
+  const evolutionData = selectedGroups.length > 0
+    ? months.map((m) => {
+        const rs = selectedGroups.map((g) => reports.get(m)!.rows.find((x) => x.group.id === g.id))
+        const planned = rs.reduce((s, r) => s + (r?.planned ?? 0), 0)
+        return {
+          month: monthShort(m),
+          gasto: rs.reduce((s, r) => s + (r?.spent ?? 0), 0),
+          planeado: reports.get(m)!.hasPlan ? planned : null,
+        }
+      })
     : []
+
+  // Subcategorias de uma categoria com gasto na janela (para as linhas expandidas do histórico).
+  const subRowsOf = (groupId: string) => {
+    const acc = new Map<string, { id: string; name: string; total: number }>()
+    for (const m of months) {
+      for (const sub of reports.get(m)!.rows.find((x) => x.group.id === groupId)?.subs ?? []) {
+        if (sub.spent <= 0) continue
+        const cur = acc.get(sub.id) ?? { id: sub.id, name: sub.name, total: 0 }
+        cur.total += sub.spent
+        acc.set(sub.id, cur)
+      }
+    }
+    const list = [...acc.values()].sort((a, b) => b.total - a.total)
+    // Só vale a pena expandir se houver subcategorias nomeadas.
+    return list.some((x) => x.id !== '') ? list : []
+  }
+
+  const noPlanData = !report.hasPlan && report.spentInPlan === 0 && report.offPlanTotal === 0 && report.unassigned.length === 0
 
   return (
     <div className="fade-up flex flex-col gap-6">
-      <h1 className="text-xl font-black">Budgets</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-black">Analytics</h1>
+        <MonthPicker month={month} onChange={setMonth} />
+      </div>
 
-      {uncategorized.length > 0 && (
+      {pendingLegacy.length > 0 && (
         <Card className="flex flex-wrap items-center gap-2 border-warn/40 bg-warn-soft/40">
-          <span>⚠️</span>
+          <span>🔗</span>
           <span className="flex-1 text-sm text-text">
-            {`${uncategorized.length} gasto${uncategorized.length === 1 ? '' : 's'} sem categoria (${fmtEUR(uncategorizedTotal)}) não estão a contar em nenhum budget. Atribui-lhes categoria na página de Gastos.`}
+            {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} de gastos por associar às categorias do plano. Enquanto não o fizeres, esses gastos (${fmtEUR(pendingLegacy.reduce((s, p) => s + p.total, 0))}) não entram nesta análise por categoria.`}
           </span>
-          <Badge tone="warn">Sem categoria</Badge>
+          <Button size="sm" variant="soft" onClick={() => setScreen('definicoes')}>Associar</Button>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <MetricCard label="Gasto este mês" value={fmtEUR(currentTotal)} />
+      {orphanExpenses.length > 0 && (
+        <Card className="flex flex-wrap items-center gap-2 border-warn/40 bg-warn-soft/40">
+          <span>🔗</span>
+          <span className="flex-1 text-sm text-text">
+            {`${orphanExpenses.length} ${orphanExpenses.length === 1 ? 'despesa apagada ainda tem' : 'despesas apagadas ainda têm'} valor planeado em meses passados (${fmtEUR(orphanExpenses.reduce((s, o) => s + o.total, 0))}). Esse valor não entra nas comparações por categoria — junta-o a uma despesa ativa.`}
+          </span>
+          <Button size="sm" variant="soft" onClick={() => setScreen('definicoes')}>Corrigir</Button>
+        </Card>
+      )}
+
+      {!report.hasPlan && (report.spentInPlan > 0 || !noPlanData) && (
+        <Card className="flex flex-wrap items-center gap-2">
+          <span className="flex-1 text-sm text-muted">
+            Não há despesas planeadas para este mês — sem plano não há com o que comparar. Define-as em Planeamento.
+          </span>
+          <Button size="sm" variant="soft" onClick={() => setScreen('planeamento')}>Ir para Planeamento</Button>
+        </Card>
+      )}
+
+      {insights.length > 0 && (
+        <Card>
+          <SectionTitle>Atenção</SectionTitle>
+          <ul className="flex flex-col gap-2">
+            {insights.map((i, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm">
+                <span className="mt-0.5">
+                  {i.kind === 'over' ? '🔴' : i.kind === 'recurring' ? '🔁' : i.kind === 'unassigned' ? '⚠️' : '🟠'}
+                </span>
+                <span>{i.text}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <MetricCard label="Planeado" value={fmtEUR(report.plannedTotal)} hint="despesas do planeamento" />
         <MetricCard
-          label="Sem reposições de poupança"
-          value={fmtEUR(currentSemReposto)}
-          hint="exclui gastos com a tag Reposto"
+          label="Gasto no plano"
+          value={fmtEUR(report.spentInPlan)}
+          hint={report.plannedTotal > 0 ? `${Math.round((report.spentInPlan / report.plannedTotal) * 100)}% do planeado` : undefined}
+        />
+        <MetricCard
+          label={diff >= 0 ? 'Ainda disponível' : 'Acima do plano'}
+          value={fmtEUR(Math.abs(diff))}
+          tone={report.plannedTotal === 0 ? 'default' : diff >= 0 ? 'positive' : 'negative'}
+          hint={isCurrent && report.plannedTotal > 0 ? `dia ${new Date().getDate()} de ${daysInMonth(month)}` : undefined}
+        />
+        <MetricCard
+          label="Fora do plano"
+          value={fmtEUR(report.offPlanTotal + report.unassignedTotal)}
+          hint="pago pela poupança ou sem categoria"
+          info="Gastos cuja categoria é um balde de poupança (ex.: reparação do carro paga pela poupança) e gastos ainda sem categoria do plano. Não contam contra o orçamento do mês."
         />
       </div>
 
+      <MacroTitle>Despesas</MacroTitle>
+
       <section>
-        <SectionTitle>Total por mês</SectionTitle>
+        <SectionTitle>Plano vs. real</SectionTitle>
+        <Card className="p-0">
+          {rows.length === 0 ? (
+            <div className="p-4">
+              <EmptyState title="Sem despesas planeadas nem gastos neste mês" hint="Define as despesas em Planeamento e regista gastos em Gastos." />
+            </div>
+          ) : (
+            <ul className="divide-y divide-border">
+              {rows.map((r) => (
+                <CategoryLine
+                  key={r.group.id}
+                  row={r}
+                  open={expanded === r.group.id}
+                  onToggle={() => setExpanded((cur) => (cur === r.group.id ? null : r.group.id))}
+                  isCurrent={isCurrent}
+                  onIgnoreAlerts={() => {
+                    const cat = data.expenseCategories.find((c) => c.id === r.group.id)
+                    if (cat) void put('expenseCategories', { ...cat, fixed: true })
+                  }}
+                />
+              ))}
+              <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+                <span>Total</span>
+                <span className="tnum">{fmtEUR(report.spentInPlan)} / {fmtEUR(report.plannedTotal)}</span>
+              </li>
+            </ul>
+          )}
+        </Card>
+      </section>
+
+      {(report.offPlan.length > 0 || report.unassigned.length > 0) && (
+        <section>
+          <SectionTitle>Fora do plano</SectionTitle>
+          <Card className="p-0">
+            <ul className="divide-y divide-border">
+              {report.offPlan.map((o) => (
+                <OffPlanLine key={o.group.id} name={o.group.name} badge="Pago pela poupança" total={o.spent} subs={o.subs} txs={o.txs} />
+              ))}
+              {report.unassigned.length > 0 && (
+                <OffPlanLine
+                  name="Sem categoria do plano"
+                  badge="Por classificar"
+                  tone="warn"
+                  total={report.unassignedTotal}
+                  subs={[]}
+                  txs={[...report.unassigned].sort((a, b) => b.amount - a.amount)}
+                  action={<Button size="sm" variant="soft" onClick={() => setScreen('gastos')}>Classificar em Gastos</Button>}
+                />
+              )}
+              <li className="flex items-center justify-between gap-3 px-4 py-3 text-sm font-semibold">
+                <span>Total fora do plano</span>
+                <span className="tnum">{fmtEUR(report.offPlanTotal + report.unassignedTotal)}</span>
+              </li>
+            </ul>
+          </Card>
+          <p className="mt-2 text-xs text-muted">
+            Estes gastos não contam contra o orçamento do mês — são pagos pela poupança ou ainda não têm categoria.
+          </p>
+        </section>
+      )}
+
+      <section>
+        <SectionTitle>Planeado vs. gasto por mês</SectionTitle>
         <Card>
-          <ResponsiveContainer height={280}>
-            <BarChart data={chartData}>
+          <ResponsiveContainer height={260}>
+            <ComposedChart data={chartData} margin={{ top: 26, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
               <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <Tooltip
-                contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)' }}
-                formatter={(value: number) => fmtEUR(value)}
-              />
-              <Legend />
-              <Bar dataKey="total" name="Total" fill="var(--accent-strong)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="semReposto" name="Sem poupanças" fill="var(--goal)" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="semRepostoSemCasa" name="Sem poupanças e sem casa" fill="var(--warn)" radius={[6, 6, 0, 0]} />
-            </BarChart>
+              <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
+              <Tooltip content={<ChartTooltip />} cursor={cursorStyle} isAnimationActive={false} />
+              <Legend content={<ChartLegend />} />
+              <Bar dataKey="gasto" name="Gasto (do orçamento)" fill="var(--accent-strong)" radius={[6, 6, 0, 0]}>
+                <LabelList dataKey="gasto" content={diffLabelRenderer(chartData)} />
+              </Bar>
+              <Line type="monotone" dataKey="planeado" name="Planeado" stroke="var(--warn)" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
+            </ComposedChart>
           </ResponsiveContainer>
-        </Card>
-      </section>
-
-      <section>
-        <SectionTitle>Por categoria</SectionTitle>
-        <Card className="overflow-x-auto thin-scroll">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="text-left text-xs font-medium text-muted">
-                <th className="py-1.5 pr-3">Categoria</th>
-                {months.map((m) => (
-                  <th key={m} className={cx('px-2 py-1.5 text-right', m === currentMonth && 'font-semibold text-text')}>
-                    {monthShort(m)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {categoriesWithData.map((c) => (
-                <tr key={c.id}>
-                  <td className="py-2 pr-3 font-medium">{c.name}</td>
-                  {months.map((m) => {
-                    const spent = spend.get(c.id)?.get(m) ?? 0
-                    return (
-                      <td
-                        key={m}
-                        className={cx('tnum px-2 py-2 text-right', m === currentMonth && 'bg-surface-2')}
-                      >
-                        {spent ? fmtEUR(spent) : '—'}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border font-semibold">
-                <td className="py-2 pr-3">Total</td>
-                {months.map((m) => (
-                  <td key={m} className={cx('tnum px-2 py-2 text-right', m === currentMonth && 'bg-surface-2')}>
-                    {fmtEUR(totals.get(m)?.total ?? 0)}
-                  </td>
-                ))}
-              </tr>
-            </tfoot>
-          </table>
-        </Card>
-      </section>
-
-      <section>
-        <SectionTitle right={<Button variant="ghost" size="sm" onClick={() => setScreen('definicoes')}>Editar tetos</Button>}>
-          Tetos
-        </SectionTitle>
-        <Card className="overflow-x-auto thin-scroll">
-          {tetoCategories.length === 0 ? (
-            <p className="text-sm text-muted">
-              Ainda sem tetos definidos. Define tetos por categoria nas Definições.
-            </p>
-          ) : (
-            <table className="w-full min-w-[720px] border-separate border-spacing-1 text-xs">
-              <thead>
-                <tr className="text-left font-medium text-muted">
-                  <th className="pr-3">Categoria</th>
-                  {months.map((m) => (
-                    <th key={m} className={cx('px-1 text-center', m === currentMonth && 'font-semibold text-text')}>
-                      {monthShort(m)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tetoCategories.map(({ category: c, cap }) => (
-                  <tr key={c.id}>
-                    <td className="whitespace-nowrap pr-3 font-medium text-text">
-                      {c.name} <span className="text-muted">({fmtEUR(cap)})</span>
-                    </td>
-                    {months.map((m) => {
-                      const spent = discretionarySpend.get(c.id)?.get(m) ?? 0
-                      const total = spend.get(c.id)?.get(m) ?? 0
-                      const reposto = round2(total - spent)
-                      const cell = tetoHeatCell(spent, cap)
-                      const title = reposto > 0
-                        ? `${c.name} • ${monthShort(m)}: ${fmtEUR(spent)} de ${fmtEUR(cap)} (+ ${fmtEUR(reposto)} repostos da poupança, não contam para o teto)`
-                        : `${c.name} • ${monthShort(m)}: ${fmtEUR(spent)} de ${fmtEUR(cap)}`
-                      return (
-                        <td
-                          key={m}
-                          className="h-8 rounded text-center align-middle tnum"
-                          style={{ backgroundColor: cell.bg, color: cell.fg }}
-                          title={title}
-                        >
-                          {spent > 0 ? fmtEUR(spent, true) : ''}
-                          {reposto > 0 && <span className="ml-0.5 align-top text-[9px]">*</span>}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-          {tetoCategories.length > 0 && (
-            <p className="mt-2 text-[11px] text-muted">
-              * há gastos "repor da poupança" nesse mês, não contados aqui (contam para o teto só as despesas do cash-flow normal). Passa o rato/toca na célula para ver o valor total.
-            </p>
-          )}
+          <p className="mt-2 text-[11px] text-muted">Valor sobre a barra = gasto face ao planeado (+ gastaste a mais, − gastaste a menos).</p>
         </Card>
       </section>
 
       <section>
         <SectionTitle
           right={
-            <CategoryMultiSelect
-              categories={categoriesWithSpend}
-              selectedIds={effectiveIds}
-              onToggle={toggleSelected}
-            />
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted">
+              <input type="checkbox" checked={showSubs} onChange={(e) => setShowSubs(e.target.checked)} />
+              Mostrar subcategorias
+            </label>
           }
+        >
+          Histórico por categoria
+        </SectionTitle>
+        <Card className="overflow-x-auto thin-scroll">
+          {historyGroups.length === 0 ? (
+            <p className="text-sm text-muted">Ainda sem gastos nem plano nesta janela.</p>
+          ) : (
+            <>
+              <table className="w-full min-w-[720px] border-separate border-spacing-1 text-xs">
+                <thead>
+                  <tr className="text-left font-medium text-muted">
+                    <th className="pr-3">Categoria</th>
+                    {months.map((m) => (
+                      <th key={m} className={cx('px-1 text-center', m === month && 'font-semibold text-text')}>{monthShort(m)}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyGroups.map((g) => (
+                    <Fragment key={g.id}>
+                    <tr>
+                      <td className="whitespace-nowrap pr-3 font-medium text-text">{g.name}</td>
+                      {months.map((m) => {
+                        const row = reports.get(m)!.rows.find((x) => x.group.id === g.id)
+                        const spent = row?.spent ?? 0
+                        const planned = reports.get(m)!.hasPlan ? (row?.planned ?? 0) : 0
+                        const cell = reports.get(m)!.hasPlan ? heatCell(spent, planned) : { bg: 'var(--surface-2)', fg: 'var(--muted)' }
+                        return (
+                          <td
+                            key={m}
+                            className="tnum h-10 rounded text-center align-middle leading-tight"
+                            style={{ backgroundColor: cell.bg, color: cell.fg }}
+                            title={`${g.name} • ${monthShort(m)}: ${fmtEUR(spent)}${planned > 0 ? ` de ${fmtEUR(planned)} planeados` : ''}`}
+                          >
+                            {spent > 0 ? fmtEUR(spent, true) : ''}
+                            {planned > 0 && (spent > 0 || planned > 0) && Math.abs(spent - planned) >= 0.5 && (
+                              <div className="text-[9px] font-normal opacity-55">
+                                {spent - planned > 0 ? '+' : '−'}{fmtEUR(Math.abs(spent - planned), true)}
+                              </div>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                    {showSubs && subRowsOf(g.id).map((sub) => {
+                      const vals = months.map((m) => reports.get(m)!.rows.find((x) => x.group.id === g.id)?.subs.find((x) => x.id === sub.id)?.spent ?? 0)
+                      const max = Math.max(...vals, 1)
+                      return (
+                        <tr key={`${g.id}|${sub.id}`}>
+                          <td className="whitespace-nowrap py-0.5 pl-4 pr-3 text-muted">↳ {sub.name}</td>
+                          {months.map((m, mi) => {
+                            const v = vals[mi]
+                            return (
+                              <td
+                                key={m}
+                                className="tnum h-6 rounded text-center align-middle text-[11px]"
+                                style={{
+                                  backgroundColor: v > 0 ? `rgba(99, 102, 241, ${(0.1 + 0.4 * (v / max)).toFixed(2)})` : 'transparent',
+                                  color: v > 0 ? 'var(--text)' : 'var(--muted)',
+                                }}
+                                title={`${g.name} › ${sub.name} • ${monthShort(m)}: ${fmtEUR(v)}`}
+                              >
+                                {v > 0 ? fmtEUR(v, true) : ''}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[11px] text-muted">
+                Verde = dentro do plano, vermelho = acima do plano (mais escuro = mais acima), laranja = gasto sem plano.
+                Meses sem plano gravado aparecem sem cor. Por baixo do valor: diferença face ao planeado (+ a mais, − a menos).
+              </p>
+            </>
+          )}
+        </Card>
+      </section>
+
+      <section>
+        <SectionTitle
+          right={<CategoryMultiSelect categories={spendGroups} selectedIds={effectiveIds} onToggle={toggleSelected} />}
         >
           Evolução por categoria
         </SectionTitle>
         <Card>
-          {selectedCategories.length > 0 ? (
+          {selectedGroups.length > 0 ? (
             <>
-              {selectedCategories.length > 1 && (
-                <p className="mb-2 text-xs text-muted">
-                  Soma de: {selectedCategories.map((c) => c.name).join(', ')}
-                </p>
+              {selectedGroups.length > 1 && (
+                <p className="mb-2 text-xs text-muted">Soma de: {selectedGroups.map((g) => g.name).join(', ')}</p>
               )}
-              <ResponsiveContainer height={280}>
-                <BarChart data={selectedChartData}>
+              <ResponsiveContainer height={260}>
+                <ComposedChart data={evolutionData} margin={{ top: 26, right: 4, left: 0, bottom: 0 }}>
                   <CartesianGrid vertical={false} stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)' }}
-                    formatter={(value: number) => fmtEUR(value)}
-                  />
-                  {selectedCap !== undefined && (
-                    <ReferenceLine y={selectedCap} stroke="var(--warn)" strokeDasharray="4 4" />
-                  )}
-                  <Bar dataKey="gasto" name="Gasto" fill="var(--accent-strong)" radius={[6, 6, 0, 0]} />
-                </BarChart>
+                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={compactEUR} width={44} />
+                  <Tooltip content={<ChartTooltip />} cursor={cursorStyle} isAnimationActive={false} />
+                  <Legend content={<ChartLegend />} />
+                  <Bar dataKey="gasto" name="Gasto" fill="var(--accent-strong)" radius={[6, 6, 0, 0]}>
+                    <LabelList dataKey="gasto" content={diffLabelRenderer(evolutionData)} />
+                  </Bar>
+                  <Line type="monotone" dataKey="planeado" name="Planeado" stroke="var(--warn)" strokeWidth={2.5} dot={{ r: 3 }} connectNulls />
+                </ComposedChart>
               </ResponsiveContainer>
+              <p className="mt-2 text-[11px] text-muted">Valor sobre a barra = gasto face ao planeado (+ a mais, − a menos).</p>
             </>
           ) : (
             <p className="text-sm text-muted">Sem categorias com gastos nesta janela.</p>
           )}
         </Card>
       </section>
+
+      <SubcategoryAnalytics month={month} months={months} reports={reports} />
+
+      <SavingsAnalytics month={month} months={months} reports={reports} />
     </div>
+  )
+}
+
+function TxList({ txs }: { txs: Transaction[] }) {
+  const shown = txs.slice(0, 10)
+  return (
+    <ul className="mt-2 flex flex-col gap-1">
+      {shown.map((t) => (
+        <li key={t.id} className="flex items-center justify-between gap-3 text-xs">
+          <span className="min-w-0 truncate text-muted">
+            <span className="tnum mr-2">{fmtDate(t.date)}</span>
+            <span className="text-text">{t.nome || t.description || '—'}</span>
+          </span>
+          <span className="tnum shrink-0 font-medium">{fmtEUR(t.amount)}</span>
+        </li>
+      ))}
+      {txs.length > shown.length && (
+        <li className="text-xs text-muted">+ {txs.length - shown.length} gastos mais pequenos</li>
+      )}
+    </ul>
+  )
+}
+
+function SubBreakdown({ subs }: { subs: SubRow[] }) {
+  if (subs.length === 0 || (subs.length === 1 && subs[0].id === '')) return null
+  const total = subs.reduce((s, x) => s + x.spent, 0)
+  return (
+    <ul className="mt-2 flex flex-col gap-1.5">
+      {subs.map((s) => (
+        <li key={s.id || 'none'} className="text-xs">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted">{s.name}</span>
+            <span className="tnum font-medium">
+              {fmtEUR(s.spent)}
+              <span className="ml-1.5 text-muted">{total > 0 ? `${Math.round((s.spent / total) * 100)}%` : ''}</span>
+            </span>
+          </div>
+          <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-accent-strong" style={{ width: `${total > 0 ? (s.spent / total) * 100 : 0}%` }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function CategoryLine({
+  row, open, onToggle, isCurrent, onIgnoreAlerts,
+}: { row: CategoryRow; open: boolean; onToggle: () => void; isCurrent: boolean; onIgnoreAlerts: () => void }) {
+  const barTone = row.level === 'over' || row.level === 'unplanned' ? 'negative' : row.level === 'warn' || row.aheadOfPace ? 'warn' : 'accent'
+  // "Quase no limite" / "Ritmo alto": o utilizador pode dizer que não interessa
+  // (a categoria passa a ser tratada como fixa: só fica vermelha se passar do plano).
+  const canIgnore = !row.fixed && (row.level === 'warn' || row.aheadOfPace)
+  return (
+    <li>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle() } }}
+        className="flex w-full cursor-pointer flex-col gap-1.5 px-4 py-3 text-left hover:bg-surface-2/60"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+            {row.group.name}
+            {row.fixed && (
+              <span title="Despesa fixa: sem alertas de 'quase no limite' nem projeção, só fica vermelha se passar do plano. Podes mudar isto em Definições → Despesas do planeamento.">
+                <Badge>Fixa</Badge>
+              </span>
+            )}
+            {row.level === 'over' && <Badge tone="negative">{`Acima +${fmtEUR(-row.remaining)}`}</Badge>}
+            {row.level === 'unplanned' && <Badge tone="warn">Sem plano</Badge>}
+            {row.level === 'warn' && !row.aheadOfPace && <Badge tone="warn">Quase no limite</Badge>}
+            {row.aheadOfPace && <Badge tone="warn">Ritmo alto</Badge>}
+            {canIgnore && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onIgnoreAlerts() }}
+                title="Deixa de avisar 'quase no limite' nesta despesa: passa a contar como fixa e só fica vermelha se ultrapassar o plano. Podes reverter em Definições."
+                className="text-[11px] font-medium text-muted underline decoration-dotted underline-offset-2 hover:text-text"
+              >
+                não me interessa
+              </button>
+            )}
+          </span>
+          <span className="tnum text-sm">
+            <span className="font-semibold">{fmtEUR(row.spent)}</span>
+            <span className="text-muted"> / {fmtEUR(row.planned)}</span>
+          </span>
+        </div>
+        <ProgressBar pct={row.planned > 0 ? row.pct * 100 : row.spent > 0 ? 100 : 0} tone={barTone} />
+        <div className="flex justify-between text-xs text-muted">
+          <span>
+            {row.planned > 0
+              ? row.remaining >= 0 ? `Resta ${fmtEUR(row.remaining)}` : `Passaste ${fmtEUR(-row.remaining)}`
+              : 'Nada planeado'}
+          </span>
+          {isCurrent && row.projected !== undefined && row.planned > 0 && (
+            <span>{`Ao ritmo atual: ~${fmtEUR(row.projected, true)}`}</span>
+          )}
+        </div>
+      </div>
+      {open && (
+        <div className="border-t border-border bg-surface-2/40 px-4 pb-3 pt-1">
+          <SubBreakdown subs={row.subs} />
+          {row.txs.length > 0 ? <TxList txs={row.txs} /> : <p className="mt-2 text-xs text-muted">Sem gastos neste mês.</p>}
+        </div>
+      )}
+    </li>
+  )
+}
+
+function OffPlanLine({
+  name, badge, tone, total, subs, txs, action,
+}: {
+  name: string
+  badge: string
+  tone?: 'warn'
+  total: number
+  subs: SubRow[]
+  txs: Transaction[]
+  action?: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <li>
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-2/60">
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          {name}
+          <Badge tone={tone ?? 'goal'}>{badge}</Badge>
+        </span>
+        <span className="tnum text-sm font-semibold">{fmtEUR(total)}</span>
+      </button>
+      {open && (
+        <div className="border-t border-border bg-surface-2/40 px-4 pb-3 pt-1">
+          <SubBreakdown subs={subs} />
+          <TxList txs={txs} />
+          {action && <div className="mt-3">{action}</div>}
+        </div>
+      )}
+    </li>
   )
 }

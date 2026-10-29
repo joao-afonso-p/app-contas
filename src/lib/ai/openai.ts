@@ -39,10 +39,13 @@ export interface HistoryEntry {
 // LLM inferir categorias/nomes de transações semelhantes já vistas.
 export function buildStatementHistory(
   transactions: Transaction[],
-  categories: TransactionCategory[],
+  // Ou a lista de categorias antigas, ou uma função que devolve o rótulo
+  // ("Categoria" / "Categoria / Subcategoria") de cada gasto.
+  categories: TransactionCategory[] | ((t: Transaction) => string),
   todayISODate: string,
 ): HistoryEntry[] {
-  const catName = new Map(categories.map((c) => [c.id, c.name]))
+  const catName = Array.isArray(categories) ? new Map(categories.map((c) => [c.id, c.name])) : null
+  const labelOf = (t: Transaction) => (typeof categories === 'function' ? categories(t) : (catName!.get(t.categoryId) ?? ''))
   const cutoffMonth = monthOfDate(addMonthsISO(todayISODate, -2))
   const sorted = [...transactions]
     .filter((t) => monthOfDate(t.date) >= cutoffMonth)
@@ -58,7 +61,7 @@ export function buildStatementHistory(
     out.push({
       descritivo: desc,
       nome: (t.nome || '').trim(),
-      categoria: catName.get(t.categoryId) ?? '',
+      categoria: labelOf(t),
     })
     if (out.length >= MAX_HISTORY) break
   }
@@ -76,7 +79,7 @@ Recebes texto extraído de um PDF ou Excel de um banco. Responde SEMPRE em JSON 
 
 PASSO 1 — VIABILIDADE (poupa tokens): decide primeiro se o texto é mesmo um extrato/lista de movimentos com, no mínimo, data + descrição + valor por linha. Se NÃO for (ex.: outro tipo de documento, texto sem movimentos, PDF sem dados legíveis), devolve exatamente {"viable": false, "reason": "<motivo curto>", "rows": []} e PARA. Não inventes movimentos.
 
-PASSO 2 — EXTRAÇÃO (só se viável): extrai TODAS as linhas de movimento. Para cada uma devolve um objeto com:
+PASSO 2 — EXTRAÇÃO (só se viável): extrai TODAS as linhas de movimento, EXCETO transferências do próprio utilizador para a sua conta poupança (ex.: "Reforço Poupança", "Reforço poupança BPI", "Transferência para poupança", constituição/aplicação de poupança). Isso é dinheiro a passar da conta à ordem para a poupança, NÃO é um gasto: não incluas essas linhas na resposta, nem sequer com categoria vazia. Para cada uma devolve um objeto com:
 - "date": data do movimento em formato "YYYY-MM-DD".
 - "valor": número com o SINAL do extrato (saídas/débitos negativos, entradas/créditos positivos). Usa ponto como separador decimal.
 - "descricao": o descritivo CRU do banco, tal como aparece.
@@ -210,6 +213,14 @@ async function consumeStream(body: ReadableStream<Uint8Array>, onProgress?: (lat
   return content
 }
 
+// Transferências da conta à ordem para a poupança (ex.: "REFORCO POUPANCA BPI").
+// Rede de segurança caso o modelo as devolva na mesma.
+export function isSavingsTransfer(...texts: string[]): boolean {
+  const t = normalizeDesc(texts.join(' '))
+  if (!t.includes('poupanca')) return false
+  return t.includes('reforco') || /(transf\w*|aplicacao|constituicao|deposito|entrega)\b.{0,25}poupanca/.test(t) || t.includes('poupanca bpi')
+}
+
 function normalizeResult(parsed: unknown, categoryNames: string[]): ExtractResult {
   const obj = (parsed ?? {}) as Record<string, unknown>
   if (obj.viable === false) {
@@ -224,6 +235,7 @@ function normalizeResult(parsed: unknown, categoryNames: string[]): ExtractResul
     const valor = typeof row.valor === 'number' ? row.valor : Number(String(row.valor ?? '').replace(',', '.'))
     const descricao = String(row.descricao ?? '').trim()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(valor) || !descricao) continue
+    if (isSavingsTransfer(descricao, String(row.nome ?? ''))) continue // reforço de poupança não é gasto
     let categoria = String(row.categoria ?? '').trim()
     if (categoria && !validNames.has(normalizeDesc(categoria))) categoria = '' // descarta categorias inventadas
     rows.push({ date, nome: String(row.nome ?? '').trim(), categoria, valor, descricao })

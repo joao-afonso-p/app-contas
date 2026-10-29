@@ -1,17 +1,22 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
 import { BackupSettings } from '../components/Backup'
 import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
-import { capFor } from '../lib/calc/budgets'
-import { currentMonthKey, fmtEUR, monthLabel, uid } from '../lib/format'
-import { firstPlanMonth, useStore } from '../store/useStore'
+import {
+  activeGroups, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
+} from '../lib/calc/categories'
+import { normalizeDesc } from '../lib/calc/budgets'
+import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
+import { currentMonthKey, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
+import { allocationBlock, firstPlanMonth, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
-import type { BucketKind, CollectionName, SavingsBucket } from '../types'
+import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
 
 type EditableList = {
   title: string
@@ -21,8 +26,11 @@ type EditableList = {
 
 const LISTS: EditableList[] = [
   { title: 'Fontes de income', collection: 'incomeSources', hint: 'Marca como renda o que chega a meio do mês' },
-  { title: 'Despesas do planeamento', collection: 'expenseCategories' },
-  { title: 'Categorias de gastos', collection: 'transactionCategories' },
+  {
+    title: 'Despesas do planeamento',
+    collection: 'expenseCategories',
+    hint: 'São as categorias principais dos Gastos e do Analytics: o que planeias aqui compara-se com o que gastas. Os detalhes (ex.: eletricidade, água) são subcategorias — ver abaixo.',
+  },
   {
     title: 'Veículos de investimento',
     collection: 'investmentVehicles',
@@ -167,8 +175,14 @@ export function Definicoes() {
       <SavingsSection />
 
       {LISTS.map((list) => (
-        <ListEditor key={list.collection} {...list} />
+        <Fragment key={list.collection}>
+          <ListEditor {...list} />
+          {list.collection === 'expenseCategories' && <SubcategoriesSection />}
+          {list.collection === 'expenseCategories' && <OrphanExpensesSection />}
+        </Fragment>
       ))}
+
+      <LegacyCategoriesSection />
 
       <OpenAiSection />
 
@@ -269,10 +283,20 @@ function OpenAiSection() {
   )
 }
 
+type Blocked = { name: string; action: 'arquivar' | 'apagar'; planeamento: MonthKey[]; projecoes: MonthKey[] }
+
 function SavingsSection() {
   const data = useStore((s) => s.data)
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
+  const setScreen = useStore((s) => s.setScreen)
+  const [blocked, setBlocked] = useState<Blocked | null>(null)
+  const guard = (bucket: SavingsBucket, action: Blocked['action']): boolean => {
+    const block = allocationBlock(data, 'savingsBuckets', bucket.id)
+    if (!block) return false
+    setBlocked({ name: bucket.name, action, ...block })
+    return true
+  }
 
   const [newName, setNewName] = useState('')
   const [newKind, setNewKind] = useState<BucketKind>('fixed')
@@ -345,6 +369,7 @@ function SavingsSection() {
 
     const doDelete = () => {
       if (!canDelete) return
+      if (guard(bucket, 'apagar')) return
       if (
         window.confirm(
           `Tens a certeza que queres apagar definitivamente o balde "${bucket.name}"? Esta ação não pode ser desfeita.`,
@@ -372,7 +397,10 @@ function SavingsSection() {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => void put('savingsBuckets', { ...bucket, archived: !bucket.archived })}
+            onClick={() => {
+              if (!bucket.archived && guard(bucket, 'arquivar')) return
+              void put('savingsBuckets', { ...bucket, archived: !bucket.archived })
+            }}
           >
             {bucket.archived ? 'Reativar' : 'Arquivar'}
           </Button>
@@ -465,6 +493,13 @@ function SavingsSection() {
           </details>
         )}
       </Card>
+      {blocked && (
+        <ArchiveBlockedModal
+          {...blocked}
+          onClose={() => setBlocked(null)}
+          onGo={(screen) => { setBlocked(null); setScreen(screen) }}
+        />
+      )}
     </section>
   )
 }
@@ -510,19 +545,59 @@ interface ListDoc {
   order: number
   isRent?: boolean
   initialBalance?: number
+  fixed?: boolean
 }
 
 function ListEditor({ title, collection, hint }: EditableList) {
   const data = useStore((s) => s.data)
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
+  const setScreen = useStore((s) => s.setScreen)
   const [newName, setNewName] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<ListDoc | null>(null)
+  const [blocked, setBlocked] = useState<Blocked | null>(null)
 
   const docs = (data[collection] as unknown as ListDoc[]).slice().sort((a, b) => a.order - b.order)
   const isIncome = collection === 'incomeSources'
   const isVehicle = collection === 'investmentVehicles'
-  const isTxCategory = collection === 'transactionCategories'
+  const isExpense = collection === 'expenseCategories'
+  const singular = isIncome ? 'a fonte de income' : isVehicle ? 'o veículo' : 'a despesa'
+
+  // Arquivar/apagar só é possível sem valor alocado no mês atual e seguintes.
+  const guard = (doc: ListDoc, action: Blocked['action']): boolean => {
+    const block = allocationBlock(data, collection, doc.id)
+    if (!block) return false
+    setBlocked({ name: doc.name, action, ...block })
+    return true
+  }
+  const toggleArchive = (doc: ListDoc) => {
+    if (!doc.archived && guard(doc, 'arquivar')) return
+    void put(collection, { ...doc, archived: !doc.archived } as never)
+  }
+  const askDelete = (doc: ListDoc) => {
+    if (guard(doc, 'apagar')) return
+    if (isVehicle && (data.investmentAssets.some((a) => a.vehicleId === doc.id)
+      || data.assetEntries.some((e) => e.vehicleId === doc.id)
+      || data.valueCheckpoints.some((c) => c.vehicleId === doc.id))) {
+      window.alert(`"${doc.name}" tem ativos, entradas ou checkpoints na página Investimento. Para não perderes esses dados, não é possível apagá-lo — arquiva-o.`)
+      return
+    }
+    setDeleteTarget(doc)
+  }
+  // Gastos já classificados nesta despesa — não são apagados, ficam sem categoria do plano.
+  const affectedTransactions = useMemo(() => {
+    if (!deleteTarget || !isExpense) return 0
+    const resolve = makeResolver(data)
+    return data.transactions.filter((t) => resolve(t).groupId === deleteTarget.id).length
+  }, [deleteTarget, isExpense, data])
+  const doDelete = () => {
+    if (!deleteTarget) return
+    if (isExpense) {
+      for (const sc of data.subcategories.filter((x) => x.parentId === deleteTarget.id)) void remove('subcategories', sc.id)
+    }
+    void remove(collection, deleteTarget.id)
+    setDeleteTarget(null)
+  }
 
   const add = () => {
     const name = newName.trim()
@@ -567,30 +642,34 @@ function ListEditor({ title, collection, hint }: EditableList) {
                     />
                   </div>
                 )}
-                {isTxCategory && !doc.archived && (
-                  <div className="flex items-center gap-1 text-xs text-muted">
-                    Teto/mês
-                    <MoneyCell
-                      value={capFor(data.budgets, doc.id)}
-                      onChange={(v) => {
-                        if (v <= 0) void remove('budgets', doc.id)
-                        else void put('budgets', { id: doc.id, cap: v } as never)
+                {isExpense && !doc.archived && (
+                  <label className="flex items-center gap-1 text-xs text-muted" title="Fixa: sem 'quase no limite' nem projeção ao ritmo atual (só fica vermelha se passar do plano). Automático: deteta-se pelo histórico.">
+                    <Select
+                      value={doc.fixed === undefined ? 'auto' : doc.fixed ? 'fixed' : 'variable'}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        void put(collection, { ...doc, fixed: v === 'auto' ? undefined : v === 'fixed' } as never)
                       }}
-                    />
-                  </div>
+                      className="py-1 text-xs"
+                    >
+                      <option value="auto">Auto</option>
+                      <option value="fixed">Fixa</option>
+                      <option value="variable">Variável</option>
+                    </Select>
+                  </label>
                 )}
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => void put(collection, { ...doc, archived: !doc.archived } as never)}
+                  onClick={() => toggleArchive(doc)}
                 >
                   {doc.archived ? 'Reativar' : 'Arquivar'}
                 </Button>
-                {isVehicle && (
+                {(isVehicle || isIncome || isExpense) && (
                   <Button
                     size="sm"
                     variant="danger"
-                    onClick={() => setDeleteTarget(doc)}
+                    onClick={() => askDelete(doc)}
                     aria-label={`Apagar ${doc.name}`}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
@@ -617,37 +696,387 @@ function ListEditor({ title, collection, hint }: EditableList) {
         </div>
       </Card>
 
-      {isVehicle && (
-        <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title="Apagar veículo">
-          {deleteTarget && (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted">
-                Tens a certeza que queres apagar definitivamente o veículo{' '}
-                <strong className="text-text">{deleteTarget.name}</strong>?
-                {Boolean(deleteTarget.initialBalance) && (
-                  <>
-                    {' '}Tem um saldo inicial de <strong className="text-text">{fmtEUR(deleteTarget.initialBalance ?? 0)}</strong> registado.
-                  </>
-                )}
-                {' '}Esta ação não pode ser desfeita — os movimentos de poupança que já o referenciam mantêm-se, mas deixa de aparecer nas listas.
-              </p>
-              <div className="flex justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    void remove(collection, deleteTarget.id)
-                    setDeleteTarget(null)
-                  }}
-                >
-                  Apagar definitivamente
-                </Button>
-              </div>
+      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} title={`Apagar ${singular.replace(/^a |^o /, '')}`}>
+        {deleteTarget && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">
+              Tens a certeza que queres apagar definitivamente {singular}{' '}
+              <strong className="text-text">{deleteTarget.name}</strong>?
+              {isVehicle && Boolean(deleteTarget.initialBalance) && (
+                <>
+                  {' '}Tem um saldo inicial de <strong className="text-text">{fmtEUR(deleteTarget.initialBalance ?? 0)}</strong> registado.
+                </>
+              )}
+              {isVehicle
+                ? ' Esta ação não pode ser desfeita — os movimentos de poupança que já o referenciam mantêm-se, mas deixa de aparecer nas listas.'
+                : ' Esta ação não pode ser desfeita. Os planos de meses anteriores mantêm os valores que lá estavam.'}
+              {isExpense && affectedTransactions > 0 && (
+                <>
+                  {' '}Os <strong className="text-text">{affectedTransactions} gastos</strong> classificados nela não são apagados,
+                  mas ficam sem categoria do plano. Se só queres deixar de a usar, arquiva-a em vez de apagar.
+                </>
+              )}
+              {isExpense && ' As subcategorias desta despesa também são apagadas.'}
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+              <Button variant="danger" size="sm" onClick={doDelete}>Apagar definitivamente</Button>
             </div>
-          )}
-        </Modal>
+          </div>
+        )}
+      </Modal>
+      {blocked && (
+        <ArchiveBlockedModal
+          {...blocked}
+          onClose={() => setBlocked(null)}
+          onGo={(screen) => { setBlocked(null); setScreen(screen) }}
+        />
       )}
+    </section>
+  )
+}
+
+// ---------- Subcategorias (opcionais) ----------
+
+function SubcategoriesSection() {
+  const data = useStore((s) => s.data)
+  const put = useStore((s) => s.put)
+  const remove = useStore((s) => s.remove)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+
+  const groups = activeGroups(data)
+  const usage = useMemo(() => {
+    const resolve = makeResolver(data)
+    const counts = new Map<string, number>()
+    for (const t of data.transactions) {
+      const sid = resolve(t).subcategoryId
+      if (sid) counts.set(sid, (counts.get(sid) ?? 0) + 1)
+    }
+    return counts
+  }, [data])
+
+  const add = (g: Group) => {
+    const name = (drafts[g.id] ?? '').trim()
+    if (!name) return
+    const exists = subcategoriesOf(data.subcategories, g.id, true).some((s) => normalizeDesc(s.name) === normalizeDesc(name))
+    if (!exists) void put('subcategories', newSubcategory(data.subcategories, g.id, name, uid()))
+    setDrafts((d) => ({ ...d, [g.id]: '' }))
+  }
+
+  return (
+    <section>
+      <SectionTitle>Subcategorias</SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          Opcionais: detalham uma categoria principal (ex.: Utilities → Eletricidade, Água, Gás,
+          Comunicações). Podes criar a qualquer momento — os gastos já registados mantêm-se onde estão e
+          podes movê-los para uma subcategoria na lista de Gastos. Também podes detalhar baldes de poupança.
+        </p>
+        {groups.length === 0 ? (
+          <p className="text-sm text-muted">Ainda sem despesas do planeamento nem baldes.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {groups.map((g) => {
+              const subs = subcategoriesOf(data.subcategories, g.id, true)
+              return (
+                <li key={g.id} className="py-3">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+                    {g.name}
+                    {g.kind === 'bucket' && <Badge tone="goal">Poupança</Badge>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {subs.map((sc) => {
+                      const used = usage.get(sc.id) ?? 0
+                      return (
+                        <span
+                          key={sc.id}
+                          className={cx(
+                            'inline-flex items-center gap-1.5 rounded-full bg-surface-2 py-0.5 pl-2.5 pr-1.5 text-xs font-medium',
+                            sc.archived && 'text-muted line-through',
+                          )}
+                        >
+                          {sc.name}
+                          {used > 0 && <span className="text-[10px] text-muted">{used}</span>}
+                          <button
+                            title={sc.archived ? 'Reativar' : 'Arquivar'}
+                            onClick={() => void put('subcategories', { ...sc, archived: !sc.archived })}
+                            className="text-muted hover:text-text"
+                          >
+                            {sc.archived ? '↺' : '▣'}
+                          </button>
+                          {used === 0 && (
+                            <button
+                              title="Apagar (sem gastos associados)"
+                              onClick={() => void remove('subcategories', sc.id)}
+                              className="text-muted hover:text-negative"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </span>
+                      )
+                    })}
+                    <input
+                      value={drafts[g.id] ?? ''}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [g.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && add(g)}
+                      onBlur={() => add(g)}
+                      placeholder="+ subcategoria"
+                      className="w-36 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none"
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
+    </section>
+  )
+}
+
+// ---------- Categorias antigas de gastos → categorias do plano ----------
+
+// Antes, os gastos tinham uma lista de categorias própria. Esta secção deixa
+// associar cada categoria antiga a uma categoria do plano (+ subcategoria).
+// Não move nem apaga nada: a associação fica guardada na categoria antiga e
+// todos os gastos dela passam a ser lidos pela nova categoria.
+function LegacyCategoriesSection() {
+  const data = useStore((s) => s.data)
+  const put = useStore((s) => s.put)
+
+  const pending = legacyNeedingMapping(data)
+  const groups = activeGroups(data)
+  const mapped = data.transactionCategories.filter((c) => c.planCategoryId)
+
+  type Choice = { parentId: string; sub: string } // sub: 'none' | 'new' | subcategoryId
+  const defaultChoice = (c: TransactionCategory): Choice => {
+    const g = suggestGroupForLegacy(c, data)
+    if (!g) return { parentId: '', sub: 'none' }
+    return { parentId: g.id, sub: normalizeDesc(g.name) === normalizeDesc(c.name) ? 'none' : 'new' }
+  }
+  const [choices, setChoices] = useState<Record<string, Choice>>({})
+  const choiceOf = (c: TransactionCategory): Choice => choices[c.id] ?? defaultChoice(c)
+  const setChoice = (id: string, patch: Partial<Choice>, c: TransactionCategory) =>
+    setChoices((prev) => ({ ...prev, [id]: { ...choiceOf(c), ...patch } }))
+
+  const apply = (c: TransactionCategory) => {
+    const ch = choiceOf(c)
+    if (!ch.parentId) return
+    let subId: string | undefined
+    if (ch.sub === 'new') {
+      const existing = subcategoriesOf(data.subcategories, ch.parentId, true).find(
+        (x) => normalizeDesc(x.name) === normalizeDesc(c.name),
+      )
+      if (existing) subId = existing.id
+      else {
+        subId = uid()
+        void put('subcategories', newSubcategory(data.subcategories, ch.parentId, c.name, subId))
+      }
+    } else if (ch.sub !== 'none') subId = ch.sub
+    void put('transactionCategories', { ...c, planCategoryId: ch.parentId, subcategoryId: subId })
+  }
+
+  const applyAll = () => {
+    for (const { category } of pending) if (choiceOf(category).parentId) apply(category)
+  }
+
+  if (pending.length === 0 && mapped.length === 0) return null
+
+  const groupName = (id?: string) => groups.find((g) => g.id === id)?.name ?? data.expenseCategories.find((x) => x.id === id)?.name ?? data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
+
+  return (
+    <section>
+      <SectionTitle
+        right={pending.length > 1 ? (
+          <Button size="sm" variant="soft" onClick={applyAll}>Aplicar todas as sugestões</Button>
+        ) : undefined}
+      >
+        Categorias antigas de gastos
+      </SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          Os gastos agora usam as categorias do plano. Associa cada categoria antiga a uma categoria do plano
+          (e, se quiseres, cria uma subcategoria com o mesmo nome): todos os gastos antigos passam a contar
+          no Analytics. Nada é apagado ou alterado nos teus gastos.
+        </p>
+        {pending.length === 0 ? (
+          <p className="text-sm text-muted">Todas as categorias antigas com gastos estão associadas. ✓</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border">
+            {pending.map(({ category: c, count, total }) => {
+              const ch = choiceOf(c)
+              return (
+                <li key={c.id} className="flex flex-col gap-2 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{c.name}</span>
+                    <span className="text-xs text-muted">{count} gasto{count === 1 ? '' : 's'} · {fmtEUR(total)}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Select
+                      value={ch.parentId}
+                      onChange={(e) => setChoice(c.id, { parentId: e.target.value, sub: 'new' }, c)}
+                      className="min-w-0 flex-1"
+                    >
+                      <option value="">— categoria do plano —</option>
+                      {groups.map((g) => (
+                        <option key={g.id} value={g.id}>{g.kind === 'bucket' ? `${g.name} (poupança)` : g.name}</option>
+                      ))}
+                    </Select>
+                    <Select
+                      value={ch.sub}
+                      onChange={(e) => setChoice(c.id, { sub: e.target.value }, c)}
+                      disabled={!ch.parentId}
+                      className="min-w-0 flex-1"
+                    >
+                      <option value="none">Sem subcategoria</option>
+                      <option value="new">{`Nova subcategoria «${c.name}»`}</option>
+                      {ch.parentId && subcategoriesOf(data.subcategories, ch.parentId).map((sc) => (
+                        <option key={sc.id} value={sc.id}>{sc.name}</option>
+                      ))}
+                    </Select>
+                    <Button size="sm" variant="soft" disabled={!ch.parentId} onClick={() => apply(c)}>Associar</Button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {mapped.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-semibold text-muted">
+              Já associadas ({mapped.length})
+            </summary>
+            <ul className="mt-2 divide-y divide-border">
+              {mapped.map((c) => {
+                const sub = data.subcategories.find((x) => x.id === c.subcategoryId)
+                return (
+                  <li key={c.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                    <span>
+                      {c.name} <span className="text-muted">→ {groupName(c.planCategoryId)}{sub ? ` › ${sub.name}` : ''}</span>
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void put('transactionCategories', { ...c, planCategoryId: undefined, subcategoryId: undefined })}
+                    >
+                      Desassociar
+                    </Button>
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
+        )}
+      </Card>
+    </section>
+  )
+}
+
+// ---------- Despesas apagadas/arquivadas que ainda têm valor planeado ----------
+
+// Quando se apaga/arquiva uma despesa, os meses passados (e projeções) onde ela
+// tinha valor mantêm-no — a soma dos 100% inclui-o, mas ninguém o vê nem as
+// análises o conseguem atribuir. Aqui juntas esses valores numa despesa ativa.
+function OrphanExpensesSection() {
+  const data = useStore((s) => s.data)
+  const mergeExpensesInto = useStore((s) => s.mergeExpensesInto)
+
+  const orphans = useMemo(() => findOrphanExpenses(data), [data])
+  const targets = data.expenseCategories.filter((c) => !c.archived).sort((a, b) => a.order - b.order)
+  const suggested = targets.find((c) => normalizeDesc(c.name).includes('casa'))?.id ?? ''
+
+  const [target, setTarget] = useState('')
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
+  const [moveTx, setMoveTx] = useState(true)
+  const targetId = targets.some((c) => c.id === target) ? target : suggested
+
+  const chosen = orphans.filter((o) => !excluded.has(o.id))
+  const preview = useMemo(() => {
+    if (!targetId || chosen.length === 0) return null
+    const res = planMerge(data, chosen.map((o) => o.id), targetId, moveTx)
+    const before = (month: string, plans: { id: string; expenses: Record<string, number> }[]) =>
+      plans.find((p) => p.id === month)?.expenses[targetId] ?? 0
+    const rows = new Map<string, { month: string; before: number; after: number; projection: boolean }>()
+    for (const p of res.monthlyPlans) rows.set(`m${p.id}`, { month: p.id, before: before(p.id, data.monthlyPlans), after: p.expenses[targetId] ?? 0, projection: false })
+    for (const p of res.projectionPlans) rows.set(`p${p.id}`, { month: p.id, before: before(p.id, data.projectionPlans), after: p.expenses[targetId] ?? 0, projection: true })
+    return { rows: [...rows.values()].sort((a, b) => a.month.localeCompare(b.month)), transactions: res.transactions.length }
+  }, [data, chosen, targetId, moveTx])
+
+  if (orphans.length === 0) return null
+
+  const targetName = targets.find((c) => c.id === targetId)?.name ?? ''
+  const apply = () => {
+    if (!targetId || chosen.length === 0) return
+    if (!window.confirm(`Juntar ${chosen.length} ${chosen.length === 1 ? 'despesa' : 'despesas'} em "${targetName}"? Os valores planeados desses meses passam para "${targetName}" (o total de despesas de cada mês não muda).`)) return
+    void mergeExpensesInto(chosen.map((o) => o.id), targetId, moveTx)
+  }
+
+  return (
+    <section>
+      <SectionTitle>Despesas antigas com valores</SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          Estas despesas foram apagadas ou arquivadas mas ainda têm valor planeado em meses passados ou projeções.
+          Esse valor conta nos totais mas não aparece em lado nenhum, e as análises não o conseguem atribuir.
+          Junta-o numa despesa ativa (ex.: duas casas → "Casas"): o total de cada mês fica igual, só muda de linha.
+        </p>
+        <ul className="flex flex-col divide-y divide-border">
+          {orphans.map((o) => (
+            <li key={o.id} className="flex flex-col gap-1 py-2.5">
+              <label className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                <input
+                  type="checkbox"
+                  checked={!excluded.has(o.id)}
+                  onChange={(e) => setExcluded((prev) => {
+                    const next = new Set(prev)
+                    if (e.target.checked) next.delete(o.id); else next.add(o.id)
+                    return next
+                  })}
+                />
+                {o.name ?? 'Despesa apagada'}
+                <Badge tone={o.deleted ? 'negative' : 'warn'}>{o.deleted ? 'Apagada' : 'Arquivada'}</Badge>
+                <span className="ml-auto tnum text-xs font-normal text-muted">
+                  {o.months.length} {o.months.length === 1 ? 'mês' : 'meses'} · {fmtEUR(o.total)}
+                  {o.transactions > 0 && ` · ${o.transactions} gastos`}
+                </span>
+              </label>
+              <div className="pl-6 text-xs text-muted">
+                {o.months.map((m) => `${monthShort(m.month)}: ${fmtEUR(m.value, true)}`).join(' · ')}
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span className="text-sm text-muted">Juntar em</span>
+          <Select value={targetId} onChange={(e) => setTarget(e.target.value)}>
+            <option value="">— escolher despesa —</option>
+            {targets.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            <input type="checkbox" checked={moveTx} onChange={(e) => setMoveTx(e.target.checked)} />
+            Mover também os gastos classificados nestas despesas
+          </label>
+          <Button size="sm" disabled={!targetId || chosen.length === 0} onClick={apply}>Juntar</Button>
+        </div>
+
+        {preview && preview.rows.length > 0 && (
+          <div className="mt-3 rounded-xl bg-surface-2 p-3 text-xs">
+            <div className="mb-1.5 font-semibold text-text">Pré-visualização — "{targetName}"</div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted">
+              {preview.rows.map((r) => (
+                <span key={`${r.projection}${r.month}`} className="tnum">
+                  {monthShort(r.month)}{r.projection ? ' (proj.)' : ''}: {fmtEUR(r.before, true)} → <strong className="text-text">{fmtEUR(r.after, true)}</strong>
+                </span>
+              ))}
+            </div>
+            {moveTx && preview.transactions > 0 && (
+              <div className="mt-1.5 text-muted">+ {preview.transactions} gastos passam para "{targetName}" (ficam sem subcategoria).</div>
+            )}
+          </div>
+        )}
+      </Card>
     </section>
   )
 }

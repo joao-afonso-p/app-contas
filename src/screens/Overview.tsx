@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
   Legend,
   Line,
@@ -22,9 +24,12 @@ import {
   Select,
   cx,
 } from '../components/ui'
+import { ChartLegend, ChartTooltip } from '../components/ChartParts'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
+import { allGroups, makeResolver } from '../lib/calc/categories'
+import { buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, type MonthReport } from '../lib/calc/planVsActual'
 import {
   addMonths,
   currentMonthKey,
@@ -37,7 +42,7 @@ import {
   parseAmount,
   todayISO,
 } from '../lib/format'
-import { activeBuckets, autoInvestmentTotals, firstPlanMonth, useStore, vehicleAllocations } from '../store/useStore'
+import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, useStore, vehicleAllocations } from '../store/useStore'
 
 const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6']
 
@@ -172,6 +177,16 @@ export function Overview() {
   for (const v of vehiclesWithInitialBalance) addToVehicleTotal(v.id, v.initialBalance ?? 0)
   const vehicleTotals = vehicleTotalOrder.map((id) => vehicleTotalMap.get(id)!)
 
+  // Vista empilhada: mostra como o total se reparte pelos baldes (se só estiver
+  // "Total" selecionado, usa todos os baldes).
+  const [stacked, setStacked] = useState(false)
+  const stackedBuckets = selectedBuckets.length > 0 ? selectedBuckets : buckets
+  const stackedData = months.map((m) => {
+    const row: Record<string, number | string> = { mes: monthShort(m) }
+    for (const b of stackedBuckets) row[b.name] = bucketBalance(table, b.id, m)
+    return row
+  })
+
   const chartData = months.map((m) => {
     const row: Record<string, number | string> = { mes: monthShort(m) }
     if (selected.has('total')) row.Total = totalBalance(table, m)
@@ -179,9 +194,31 @@ export function Overview() {
     return row
   })
 
-  // ---------- Comparação mensal ----------
+  // ---------- Plano vs. real (últimos 6 meses até ao mês de calendário) ----------
 
-  const last6 = months.slice(-6)
+  const reportMonths = useMemo(() => monthRange(addMonths(calendarMonth, -5), calendarMonth), [calendarMonth])
+  const reports = useMemo(() => {
+    const resolve = makeResolver(data)
+    const groups = allGroups(data)
+    const totals = groupMonthTotals(data.transactions, resolve)
+    const today = new Date()
+    const dim = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    return reportMonths.map((m): { report: MonthReport; income: number; savingsPlanned: number } => {
+      const saved = data.monthlyPlans.find((p) => p.id === m)
+      const plan = saved ?? (m === calendarMonth ? effectivePlan(data, m) : undefined)
+      const summary = allocationSummary(plan, data.incomeSources)
+      return {
+        report: buildMonthReport({
+          month: m, transactions: data.transactions, resolve, groups, subcategories: data.subcategories,
+          planExpenses: plan?.expenses, elapsed: m === calendarMonth ? today.getDate() / dim : undefined,
+          fixedIds: detectFixedGroups(groups, totals, m),
+        }),
+        income: summary.totalIncome,
+        savingsPlanned: summary.totalSavings,
+      }
+    })
+  }, [data, reportMonths, calendarMonth])
+  const insights = useMemo(() => computeInsights(reports.map((r) => r.report)), [reports])
 
   return (
     <div className="fade-up flex flex-col gap-6">
@@ -200,6 +237,29 @@ export function Overview() {
             </div>
             <Button size="sm" onClick={() => setScreen('planeamento')}>Ir para Planeamento</Button>
           </div>
+        </Card>
+      )}
+
+      {insights.length > 0 && (
+        <Card>
+          <SectionTitle
+            right={<Button variant="ghost" size="sm" onClick={() => setScreen('budgets')}>Ver Analytics</Button>}
+          >
+            Atenção este mês
+          </SectionTitle>
+          <ul className="flex flex-col gap-2">
+            {insights.slice(0, 4).map((i, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm">
+                <span className="mt-0.5">
+                  {i.kind === 'over' ? '🔴' : i.kind === 'recurring' ? '🔁' : i.kind === 'unassigned' ? '⚠️' : '🟠'}
+                </span>
+                <span>{i.text}</span>
+              </li>
+            ))}
+            {insights.length > 4 && (
+              <li className="text-xs text-muted">+ {insights.length - 4} alertas em Analytics</li>
+            )}
+          </ul>
         </Card>
       )}
 
@@ -277,6 +337,18 @@ export function Overview() {
             >
               Total
             </button>
+            <button
+              onClick={() => setStacked((v) => !v)}
+              className={cx(
+                'ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                stacked
+                  ? 'border-accent-strong bg-accent-strong text-white'
+                  : 'border-border bg-surface text-muted hover:bg-surface-2',
+              )}
+              title="Mostra como o total se reparte pelos baldes"
+            >
+              Empilhado
+            </button>
             {buckets.map((b) => (
               <button
                 key={b.id}
@@ -292,7 +364,28 @@ export function Overview() {
               </button>
             ))}
           </div>
-          {selected.size === 0 ? (
+          {stacked ? (
+            <ResponsiveContainer height={300}>
+              <AreaChart data={stackedData}>
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip total />} isAnimationActive={false} />
+                <Legend content={<ChartLegend />} />
+                {stackedBuckets.map((b, i) => (
+                  <Area
+                    key={b.id}
+                    type="monotone"
+                    dataKey={b.name}
+                    stackId="s"
+                    stroke={PALETTE[i % PALETTE.length]}
+                    fill={PALETTE[i % PALETTE.length]}
+                    fillOpacity={0.35}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : selected.size === 0 ? (
             <p className="text-sm text-muted">Seleciona pelo menos uma série para ver o gráfico.</p>
           ) : (
             <ResponsiveContainer height={300}>
@@ -300,11 +393,8 @@ export function Overview() {
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)' }}
-                  formatter={(value: number) => fmtEUR(value)}
-                />
-                <Legend />
+                <Tooltip content={<ChartTooltip total={false} />} isAnimationActive={false} />
+                <Legend content={<ChartLegend />} />
                 {selected.has('total') && (
                   <Line type="monotone" dataKey="Total" stroke="var(--accent-strong)" strokeWidth={2.5} dot={false} />
                 )}
@@ -325,40 +415,49 @@ export function Overview() {
       </section>
 
       <section>
-        <SectionTitle>Comparação mensal</SectionTitle>
+        <SectionTitle>Mês a mês: plano vs. real</SectionTitle>
         <Card className="overflow-x-auto thin-scroll">
-          <table className="w-full min-w-[560px] text-sm">
+          <table className="w-full min-w-[640px] text-sm">
             <thead>
               <tr className="text-left text-xs font-medium text-muted">
                 <th className="py-1.5 pr-3">Mês</th>
                 <th className="px-2 py-1.5 text-right">Income</th>
-                <th className="px-2 py-1.5 text-right">Poupado</th>
-                <th className="px-2 py-1.5 text-right">Taxa</th>
-                <th className="px-2 py-1.5 text-right">Variação saldo</th>
+                <th className="px-2 py-1.5 text-right">Gasto planeado</th>
+                <th className="px-2 py-1.5 text-right">Gasto real</th>
+                <th className="px-2 py-1.5 text-right">vs. plano</th>
+                <th className="px-2 py-1.5 text-right">Poupança plano</th>
+                <th className="px-2 py-1.5 text-right">Poupança real</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {last6.map((m) => {
-                const plan = data.monthlyPlans.find((p) => p.id === m)
-                const summary = allocationSummary(plan, data.incomeSources)
-                const rate = savingsRate(summary.totalIncome, summary.totalSavings)
-                const delta = totalBalance(table, m) - totalBalance(table, addMonths(m, -1))
+              {reports.map(({ report, income, savingsPlanned }) => {
+                const m = report.month
+                const planRate = savingsRate(income, savingsPlanned)
+                const realRate = income > 0 ? ((income - report.spentCash) / income) * 100 : 0
+                const diff = report.plannedTotal - report.spentCash
                 return (
                   <tr key={m}>
-                    <td className={cx('py-2 pr-3 font-medium', m === accountingMonth && 'text-accent-strong')}>
-                      {monthShort(m)}
+                    <td className={cx('py-2 pr-3 font-medium', m === calendarMonth && 'text-accent-strong')}>
+                      {monthShort(m)}{m === calendarMonth && <span className="ml-1 text-[10px] font-normal text-muted">em curso</span>}
                     </td>
-                    <td className="tnum px-2 py-2 text-right">{fmtEUR(summary.totalIncome)}</td>
-                    <td className="tnum px-2 py-2 text-right">{fmtEUR(summary.totalSavings)}</td>
-                    <td className="tnum px-2 py-2 text-right">{fmtPct(rate)}</td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtEUR(income) : '—'}</td>
+                    <td className="tnum px-2 py-2 text-right">{report.hasPlan ? fmtEUR(report.plannedTotal) : '—'}</td>
+                    <td className="tnum px-2 py-2 text-right">{fmtEUR(report.spentCash)}</td>
                     <td className="px-2 py-2 text-right">
-                      <Money value={delta} />
+                      {report.hasPlan ? <Money value={diff} /> : <span className="text-muted">—</span>}
                     </td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(planRate) : '—'}</td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(realRate) : '—'}</td>
                   </tr>
                 )
               })}
             </tbody>
           </table>
+          <p className="mt-3 text-xs text-muted">
+            "Gasto real" conta o que saiu do orçamento mensal (despesas do plano + gastos ainda sem categoria);
+            gastos pagos pela poupança ficam de fora. "vs. plano" positivo = gastaste menos do que planeaste.
+            "Poupança real" = (income − gasto real) ÷ income.
+          </p>
         </Card>
       </section>
 

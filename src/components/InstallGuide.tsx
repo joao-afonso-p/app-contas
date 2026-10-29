@@ -63,7 +63,7 @@ export function InstallGuideContent({ compact, initialPlatform }: { compact?: bo
       {!compact && (
         <p className="text-sm text-muted">
           A app funciona no telemóvel e no computador. Recomendamos usar as duas: o telemóvel para o dia a dia
-          (registar gastos, ver o essencial) e o computador para planear (Budgets, Projeções e tudo o resto).
+          (registar gastos, ver o essencial) e o computador para planear (Analytics, Investimento, Projeções e tudo o resto).
         </p>
       )}
 
@@ -137,7 +137,7 @@ export function InstallGuideContent({ compact, initialPlatform }: { compact?: bo
               {mac ? <><Kbd>⌘</Kbd> + <Kbd>⇧</Kbd> + <Kbd>B</Kbd></> : <><Kbd>Ctrl</Kbd> + <Kbd>Shift</Kbd> + <Kbd>B</Kbd></>}.
             </li>
           </Steps>
-          <Note>O computador tem todas as funcionalidades (Budgets, Projeções…); o telemóvel tem o essencial do dia a dia.</Note>
+          <Note>O computador tem todas as funcionalidades (Analytics, Investimento, Projeções…); o telemóvel tem o essencial do dia a dia.</Note>
           {canPrompt && (
             <div className="flex items-center justify-between gap-2 text-sm">
               <span className="text-muted">Ou instalar como app:</span>

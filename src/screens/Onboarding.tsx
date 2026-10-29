@@ -16,6 +16,7 @@ interface DraftIncomeSource {
 interface DraftCategory {
   id: string
   name: string
+  subs: string[]
 }
 interface DraftBucket {
   id: string
@@ -54,8 +55,8 @@ export function Onboarding() {
   const [expenseCategories, setExpenseCategories] = useState<DraftCategory[]>([])
   const [expenseName, setExpenseName] = useState('')
 
-  const [transactionCategories, setTransactionCategories] = useState<DraftCategory[]>([])
-  const [transactionName, setTransactionName] = useState('')
+  // Rascunho de nova subcategoria por despesa (id da despesa -> texto).
+  const [subDrafts, setSubDrafts] = useState<Record<string, string>>({})
 
   const [buckets, setBuckets] = useState<DraftBucket[]>([])
   const [bucketName, setBucketName] = useState('')
@@ -79,16 +80,21 @@ export function Onboarding() {
   const addExpenseCategory = () => {
     const name = expenseName.trim()
     if (!name) return
-    setExpenseCategories((d) => [...d, { id: uid(), name }])
+    setExpenseCategories((d) => [...d, { id: uid(), name, subs: [] }])
     setExpenseName('')
   }
 
-  const addTransactionCategory = () => {
-    const name = transactionName.trim()
+  const addSub = (categoryId: string) => {
+    const name = (subDrafts[categoryId] ?? '').trim()
     if (!name) return
-    setTransactionCategories((d) => [...d, { id: uid(), name }])
-    setTransactionName('')
+    setExpenseCategories((d) =>
+      d.map((c) => (c.id === categoryId && !c.subs.includes(name) ? { ...c, subs: [...c.subs, name] } : c)),
+    )
+    setSubDrafts((d) => ({ ...d, [categoryId]: '' }))
   }
+
+  const removeSub = (categoryId: string, name: string) =>
+    setExpenseCategories((d) => d.map((c) => (c.id === categoryId ? { ...c, subs: c.subs.filter((x) => x !== name) } : c)))
 
   const addBucket = () => {
     const name = bucketName.trim()
@@ -116,8 +122,7 @@ export function Onboarding() {
     setBusy(true)
     await completeOnboarding({
       incomeSources: incomeSources.map((s) => ({ name: s.name, isRent: s.isRent })),
-      expenseCategories: expenseCategories.map((c) => ({ name: c.name })),
-      transactionCategories: transactionCategories.map((c) => ({ name: c.name })),
+      expenseCategories: expenseCategories.map((c) => ({ name: c.name, subcategories: c.subs })),
       buckets: buckets.map((b) => ({
         name: b.name,
         kind: b.kind,
@@ -186,18 +191,44 @@ export function Onboarding() {
         <Card className="mb-4">
           <SectionTitle>Despesas do planeamento</SectionTitle>
           <p className="mb-2 text-xs text-muted">
-            Categorias amplas para dividires o orçamento mensal (ex.: casa, carro, lazer) — não precisas de
-            detalhar, isso fica para os Gastos.
+            As categorias do teu orçamento mensal (ex.: Casa, Carro, Lazer). São também as categorias
+            principais dos Gastos — assim consegues comparar o que planeaste com o que realmente gastaste.
+            Podes (opcionalmente) detalhar cada uma em subcategorias, por exemplo Casa → Eletricidade, Água,
+            Gás. Isto também se faz mais tarde, em Definições.
           </p>
           {expenseCategories.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {expenseCategories.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 py-2">
-                  <span className="text-sm">{c.name}</span>
-                  <RemoveButton
-                    label={`Remover ${c.name}`}
-                    onClick={() => setExpenseCategories((d) => d.filter((x) => x.id !== c.id))}
-                  />
+                <li key={c.id} className="py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium">{c.name}</span>
+                    <RemoveButton
+                      label={`Remover ${c.name}`}
+                      onClick={() => setExpenseCategories((d) => d.filter((x) => x.id !== c.id))}
+                    />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {c.subs.map((name) => (
+                      <span key={name} className="inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-muted">
+                        {name}
+                        <button
+                          onClick={() => removeSub(c.id, name)}
+                          aria-label={`Remover subcategoria ${name}`}
+                          className="hover:text-negative"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                    <input
+                      value={subDrafts[c.id] ?? ''}
+                      onChange={(e) => setSubDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && addSub(c.id)}
+                      onBlur={() => addSub(c.id)}
+                      placeholder="+ subcategoria"
+                      className="w-32 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] text-text placeholder:text-muted focus:border-accent focus:outline-none"
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -215,42 +246,11 @@ export function Onboarding() {
         </Card>
 
         <Card className="mb-4">
-          <SectionTitle>Categorias de gastos</SectionTitle>
-          <p className="mb-2 text-xs text-muted">
-            Para classificares cada gasto real que registares em Gastos — podes ser mais granular
-            (supermercado, combustível, subscrições, eletricidade…). Podes começar só com o essencial e
-            acrescentar mais depois de analisares o histórico do banco.
-          </p>
-          {transactionCategories.length > 0 && (
-            <ul className="mb-3 divide-y divide-border">
-              {transactionCategories.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2 py-2">
-                  <span className="text-sm">{c.name}</span>
-                  <RemoveButton
-                    label={`Remover ${c.name}`}
-                    onClick={() => setTransactionCategories((d) => d.filter((x) => x.id !== c.id))}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <Input
-              placeholder="Nova categoria…"
-              value={transactionName}
-              onChange={(e) => setTransactionName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addTransactionCategory()}
-              className="min-w-0 flex-1"
-            />
-            <Button variant="soft" onClick={addTransactionCategory} disabled={!transactionName.trim()}>Adicionar</Button>
-          </div>
-        </Card>
-
-        <Card className="mb-4">
           <SectionTitle>Baldes de poupança e objetivos</SectionTitle>
           <p className="mb-2 text-xs text-muted">
             Onde guardas o dinheiro poupado — "Fixo" para poupança contínua, "Objetivo" para uma meta com
-            valor e data (ex.: carro novo).
+            valor e data (ex.: carro novo). Nos Gastos também podes escolher um balde como categoria, para
+            registar despesas pagas pela poupança (ficam fora do orçamento do mês).
           </p>
           {buckets.length > 0 && (
             <ul className="mb-3 divide-y divide-border">

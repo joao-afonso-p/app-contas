@@ -6,6 +6,9 @@ import { addMonths, currentMonthKey, generateSpaceCode, monthOfDate, nowISO, tod
 import { plannedMovementGroup, syncedProjectionPlans } from '../lib/calc/projections'
 import { activeAccountingMonth, bucketBalance, computeBalances } from '../lib/calc/balances'
 import { allocationSummary, cumulativeAutoInvestmentTotals, round2 } from '../lib/calc/allocation'
+import { activeOnly, allocatedMonths, SECTION_OF } from '../lib/calc/archive'
+import { txCategoryFields } from '../lib/calc/categories'
+import { planMerge } from '../lib/calc/mergeExpenses'
 import type {
   AnyDoc,
   AppMeta,
@@ -21,8 +24,8 @@ import type {
   ProjectionPlan,
   SavingsBucket,
   SavingsMovement,
+  Subcategory,
   Transaction,
-  TransactionCategory,
 } from '../types'
 import { COLLECTIONS, emptyDataSet } from '../types'
 
@@ -31,6 +34,7 @@ export type Screen =
   | 'movimentos'
   | 'gastos'
   | 'budgets'
+  | 'investimentos'
   | 'projecoes'
   | 'overview'
   | 'definicoes'
@@ -60,8 +64,7 @@ interface Store {
   importBackup(data: DataSet): Promise<void>
   completeOnboarding(input: {
     incomeSources: { name: string; isRent: boolean }[]
-    expenseCategories: { name: string }[]
-    transactionCategories: { name: string }[]
+    expenseCategories: { name: string; subcategories?: string[] }[]
     buckets: { name: string; kind: BucketKind; targetAmount?: number; targetDate?: MonthKey; initialValue: number }[]
     vehicles: { name: string; initialValue: number }[]
   }): Promise<void>
@@ -79,6 +82,9 @@ interface Store {
   setPlanValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
   setProjectionValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
   setProjectionRange(section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, months: MonthKey[], value: number): Promise<void>
+  // Edição em lote de células soltas (grelha das Projeções: colar, preencher,
+  // desfazer…). Uma só escrita; só toca em `projectionPlans`.
+  setProjectionCells(changes: { month: MonthKey; section: 'income' | 'expenses' | 'savings' | 'autoInvestments'; id: string; value: number }[]): Promise<void>
   applyPlan(month: MonthKey): Promise<void>
   reopenPlan(month: MonthKey): Promise<void>
 
@@ -90,6 +96,22 @@ interface Store {
   setPlannedMovementDone(m: PlannedMovement, done: boolean): Promise<void>
   removePlannedMovement(m: PlannedMovement): Promise<void>
   addTransactions(ts: Omit<Transaction, 'id'>[]): Promise<void>
+  // Grava um gasto (novo ou existente) com categoria principal (despesa do plano
+  // ou balde de poupança) + subcategoria opcional. Se a categoria for um balde,
+  // cria/atualiza a saída correspondente na poupança; se deixar de ser, remove-a.
+  saveTransaction(
+    fields: { date: string; amount: number; nome?: string; description: string; groupId: string; subcategoryId?: string },
+    existingId?: string,
+  ): Promise<void>
+  setTransactionCategory(transactionId: string, groupId: string, subcategoryId?: string): Promise<void>
+  deleteTransaction(transactionId: string): Promise<void>
+  // Edição em massa: muda a data e/ou a categoria (+subcategoria) de vários gastos.
+  // Campos omitidos ficam como estão. Mantém as saídas da poupança em sincronia.
+  bulkUpdateTransactions(ids: string[], changes: { date?: string; groupId?: string; subcategoryId?: string }): Promise<void>
+  // Junta o valor planeado de despesas apagadas/arquivadas (planos reais e
+  // projeções, todos os meses) numa despesa ativa. Opcionalmente reclassifica
+  // também os gastos que estavam nessas despesas.
+  mergeExpensesInto(fromIds: string[], targetId: string, moveTransactions: boolean): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
 
   // Objetivos extraordinários
@@ -184,7 +206,7 @@ export const useStore = create<Store>((set, get) => ({
   // 0€ para haver sempre um registo. Termina marcando `onboardingDone` na
   // meta, para a conta não voltar a cair em onboarding mesmo que o
   // utilizador não crie nenhum balde (ver needsOnboarding).
-  async completeOnboarding({ incomeSources, expenseCategories, transactionCategories, buckets, vehicles }) {
+  async completeOnboarding({ incomeSources, expenseCategories, buckets, vehicles }) {
     const month = addMonths(currentMonthKey(), -1)
 
     const incomeSourceDocs: IncomeSource[] = incomeSources.map((s, i) => ({
@@ -193,9 +215,11 @@ export const useStore = create<Store>((set, get) => ({
     const expenseCategoryDocs: ExpenseCategory[] = expenseCategories.map((c, i) => ({
       id: uid(), name: c.name, archived: false, order: i,
     }))
-    const transactionCategoryDocs: TransactionCategory[] = transactionCategories.map((c, i) => ({
-      id: uid(), name: c.name, archived: false, order: i,
-    }))
+    const subcategoryDocs: Subcategory[] = expenseCategories.flatMap((c, i) =>
+      (c.subcategories ?? []).map((name, j) => ({
+        id: uid(), parentId: expenseCategoryDocs[i].id, name, archived: false, order: j,
+      })),
+    )
     const bucketDocs: SavingsBucket[] = buckets.map((b, i) => ({
       id: uid(),
       name: b.name,
@@ -215,7 +239,7 @@ export const useStore = create<Store>((set, get) => ({
 
     if (incomeSourceDocs.length) await adapter!.putMany('incomeSources', incomeSourceDocs)
     if (expenseCategoryDocs.length) await adapter!.putMany('expenseCategories', expenseCategoryDocs)
-    if (transactionCategoryDocs.length) await adapter!.putMany('transactionCategories', transactionCategoryDocs)
+    if (subcategoryDocs.length) await adapter!.putMany('subcategories', subcategoryDocs)
     if (bucketDocs.length) await adapter!.putMany('savingsBuckets', bucketDocs)
     if (vehicleDocs.length) await adapter!.putMany('investmentVehicles', vehicleDocs)
 
@@ -328,6 +352,22 @@ export const useStore = create<Store>((set, get) => ({
     }
   },
 
+  async setProjectionCells(changes) {
+    const valid = changes.filter((c) => Number.isFinite(c.value))
+    if (valid.length === 0) return
+    const { data } = get()
+    const existing = new Map(data.projectionPlans.map((p) => [p.id, p]))
+    const touched = new Map<MonthKey, ProjectionPlan>()
+    for (const ch of valid) {
+      const base: ProjectionPlan = touched.get(ch.month) ?? existing.get(ch.month) ?? { id: ch.month, income: {}, expenses: {}, savings: {} }
+      touched.set(ch.month, { ...base, [ch.section]: { ...(base[ch.section] ?? {}), [ch.id]: ch.value } })
+    }
+    await adapter!.putMany('projectionPlans', [...touched.values()])
+    if (!data.meta[0]?.projectionsInitialized) {
+      await get().setMeta({ projectionsInitialized: true })
+    }
+  },
+
   // Confirma o plano do mês (rascunho ou não) — a partir daqui conta para os saldos.
   async applyPlan(month) {
     const base = effectivePlan(get().data, month)
@@ -382,7 +422,58 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   async addTransactions(ts) {
-    await adapter!.putMany('transactions', ts.map((t) => ({ ...t, id: uid(), createdAt: nowISO() })))
+    const docs: Transaction[] = ts.map((t) => ({ ...t, id: uid(), createdAt: nowISO() }))
+    await adapter!.putMany('transactions', docs)
+    const movements = docs.filter(hasBucketMovement).map((t) => movementFor(t))
+    if (movements.length) await adapter!.putMany('savingsMovements', movements)
+  },
+
+  async saveTransaction(fields, existingId) {
+    const { data } = get()
+    const existing = existingId ? data.transactions.find((t) => t.id === existingId) : undefined
+    if (existingId && !existing) return
+    const base = { date: fields.date, amount: fields.amount, nome: fields.nome, description: fields.description }
+    await writeTransaction(data, existing, base, fields.groupId, fields.subcategoryId)
+  },
+
+  async setTransactionCategory(transactionId, groupId, subcategoryId) {
+    const { data } = get()
+    const existing = data.transactions.find((t) => t.id === transactionId)
+    if (!existing) return
+    await writeTransaction(data, existing, {}, groupId, subcategoryId)
+  },
+
+  async bulkUpdateTransactions(ids, changes) {
+    const { date, groupId, subcategoryId } = changes
+    if (!date && !groupId) return
+    for (const id of ids) {
+      const data = get().data
+      const existing = data.transactions.find((t) => t.id === id)
+      if (!existing) continue
+      if (groupId) {
+        await writeTransaction(data, existing, date ? { date } : {}, groupId, subcategoryId)
+      } else if (date) {
+        await adapter!.put('transactions', { ...existing, date })
+        for (const m of data.savingsMovements.filter((x) => x.transactionId === id)) {
+          await adapter!.put('savingsMovements', { ...m, date })
+        }
+      }
+    }
+  },
+
+  async mergeExpensesInto(fromIds, targetId, moveTransactions) {
+    const { data } = get()
+    if (!data.expenseCategories.some((c) => c.id === targetId && !c.archived)) return
+    const res = planMerge(data, fromIds, targetId, moveTransactions)
+    if (res.monthlyPlans.length) await adapter!.putMany('monthlyPlans', res.monthlyPlans)
+    if (res.projectionPlans.length) await adapter!.putMany('projectionPlans', res.projectionPlans)
+    if (res.transactions.length) await adapter!.putMany('transactions', res.transactions)
+  },
+
+  async deleteTransaction(transactionId) {
+    const linked = get().data.savingsMovements.filter((m) => m.transactionId === transactionId)
+    await adapter!.remove('transactions', transactionId)
+    for (const m of linked) await adapter!.remove('savingsMovements', m.id)
   },
 
   // Confirmar reposição cria automaticamente a saída do balde de origem;
@@ -449,8 +540,10 @@ export const useStore = create<Store>((set, get) => ({
   async syncProjectionToReality() {
     const { data } = get()
     const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
-    const basePlan = data.monthlyPlans.find((p) => p.id === baseMonth)
-    if (!basePlan) return
+    const savedBase = data.monthlyPlans.find((p) => p.id === baseMonth)
+    if (!savedBase) return
+    // Sem valores de itens arquivados/apagados na cópia para o horizonte.
+    const basePlan = { ...savedBase, ...activeOnly(savedBase, data) }
     const projectionsInitialized = data.meta[0]?.projectionsInitialized ?? false
     const horizon = data.meta[0]?.projectionHorizon ?? 18
     const plans = syncedProjectionPlans({ baseMonth, basePlan, projectionsInitialized, horizon })
@@ -458,6 +551,52 @@ export const useStore = create<Store>((set, get) => ({
     if (!projectionsInitialized) await get().setMeta({ projectionsInitialized: true })
   },
 }))
+
+// ---------- Gastos pagos pela poupança ----------
+
+const hasBucketMovement = (t: Transaction): boolean =>
+  Boolean(t.repoePoupanca && t.reposto && t.fonteBucketId)
+
+const movementFor = (t: Transaction, existing?: SavingsMovement): SavingsMovement => ({
+  ...(existing ?? { id: uid(), createdAt: nowISO() }),
+  date: t.date,
+  bucketId: t.fonteBucketId as string,
+  amount: -Math.abs(t.amount),
+  description: `Gasto: ${t.nome || t.description || 'sem descrição'}`,
+  transactionId: t.id,
+})
+
+// Grava um gasto e mantém a saída da poupança em sincronia (só para gastos
+// cuja categoria principal é um balde).
+async function writeTransaction(
+  data: DataSet,
+  existing: Transaction | undefined,
+  base: Partial<Pick<Transaction, 'date' | 'amount' | 'nome' | 'description'>>,
+  groupId: string,
+  subcategoryId: string | undefined,
+): Promise<void> {
+  const linked = existing ? data.savingsMovements.filter((m) => m.transactionId === existing.id) : []
+  // Reposição antiga lançada à mão (sem movimento ligado): nunca criar outro.
+  const manualReposto = Boolean(existing?.reposto && linked.length === 0)
+  let cat = txCategoryFields(data, groupId, subcategoryId)
+  // Gasto antigo "repor da poupança" ainda pendente, sem mudar de balde: mantém
+  // o estado (a confirmação continua a ser feita na lista).
+  if (existing && !existing.planCategoryId && existing.repoePoupanca && existing.fonteBucketId === groupId) {
+    cat = { ...cat, reposto: existing.reposto }
+  }
+  const tx: Transaction = existing
+    ? { ...existing, ...base, ...cat }
+    : { id: uid(), createdAt: nowISO(), categoryId: '', date: '', amount: 0, description: '', ...base, ...cat }
+  await adapter!.put('transactions', tx)
+
+  if (!hasBucketMovement(tx)) {
+    for (const m of linked) await adapter!.remove('savingsMovements', m.id)
+    return
+  }
+  if (manualReposto) return
+  await adapter!.put('savingsMovements', movementFor(tx, linked[0]))
+  for (const m of linked.slice(1)) await adapter!.remove('savingsMovements', m.id)
+}
 
 // ---------- Selectors auxiliares ----------
 
@@ -525,29 +664,31 @@ export function effectivePlan(d: DataSet, month: MonthKey): MonthlyPlan {
   const existing = d.monthlyPlans.find((p) => p.id === month)
   if (existing) return existing
 
+  // Ao copiar de outro mês só vêm itens ativos: valores de itens arquivados ou
+  // apagados não passam para o mês novo (ficariam alocados sem ninguém os ver).
   const projection = d.projectionPlans.find((p) => p.id === month)
   if (projection) {
     const s = allocationSummary(projection, [])
     if (s.totalIncome > 0 || s.totalAllocated > 0) {
-      return {
+      return activeOnly({
         id: month,
         income: { ...projection.income },
         expenses: { ...projection.expenses },
         savings: { ...projection.savings },
         autoInvestments: { ...projection.autoInvestments },
-      }
+      }, d)
     }
   }
 
   const prior = [...d.monthlyPlans].filter((p) => p.id < month).sort((a, b) => (a.id < b.id ? 1 : -1))[0]
   return prior
-    ? {
+    ? activeOnly({
         id: month,
         income: { ...prior.income },
         expenses: { ...prior.expenses },
         savings: { ...prior.savings },
         autoInvestments: { ...prior.autoInvestments },
-      }
+      }, d)
     : { id: month, income: {}, expenses: {}, savings: {}, autoInvestments: {} }
 }
 
@@ -589,3 +730,23 @@ export const autoInvestmentTotals = (
   d: DataSet,
   throughMonth: MonthKey = currentMonthKey(),
 ): Map<string, number> => cumulativeAutoInvestmentTotals(d.monthlyPlans, throughMonth)
+
+// Se um item do planeamento (income, despesa, balde, veículo) ainda tem valor
+// alocado no mês atual ou em meses futuros, devolve esses meses — nesse caso
+// não pode ser arquivado nem apagado. `null` = pode.
+export function allocationBlock(
+  d: DataSet,
+  collection: CollectionName,
+  id: string,
+): { planeamento: MonthKey[]; projecoes: MonthKey[] } | null {
+  const section = SECTION_OF[collection]
+  if (!section) return null
+  const from = currentMonthKey()
+  const r = allocatedMonths(d, section, id, from)
+  // Mês atual ainda sem registo gravado: o plano mostrado é o herdado.
+  if (!d.monthlyPlans.some((p) => p.id === from)) {
+    const eff = effectivePlan(d, from)
+    if (Math.abs(eff[section]?.[id] ?? 0) > 0.004) r.planeamento = [from, ...r.planeamento]
+  }
+  return r.planeamento.length + r.projecoes.length > 0 ? r : null
+}

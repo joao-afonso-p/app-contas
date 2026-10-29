@@ -15,14 +15,16 @@ import {
   ProgressBar,
   SectionTitle,
 } from '../components/ui'
+import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
 import { allocationSummary } from '../lib/calc/allocation'
+import { withResidual } from '../lib/calc/archive'
 import { bucketBalance, computeBalances, goalProgress, type BalanceTable } from '../lib/calc/balances'
-import { addMonths, currentMonthKey, dayOfMonth, fmtEUR, fmtPct, monthDiff, monthLabel, parseAmount, uid } from '../lib/format'
+import { allGroups, makeResolver } from '../lib/calc/categories'
+import { buildMonthReport, detectFixedGroups, groupMonthTotals, recurringOverruns, type Overrun } from '../lib/calc/planVsActual'
+import { addMonths, currentMonthKey, dayOfMonth, fmtEUR, fmtPct, monthDiff, monthLabel, monthRange, parseAmount, uid } from '../lib/format'
 import {
   activeBuckets,
-  activeExpenseCategories,
-  activeIncomeSources,
-  activeVehicles,
+  allocationBlock,
   effectivePlan,
   firstPlanMonth,
   useStore,
@@ -37,6 +39,24 @@ export function Planeamento() {
   const setPlanValue = useStore((s) => s.setPlanValue)
   const applyPlan = useStore((s) => s.applyPlan)
   const reopenPlan = useStore((s) => s.reopenPlan)
+
+  // Despesas acima do plano nos 3 últimos meses (até ao mês atual, sem contar o mês planeado).
+  const overruns = useMemo(() => {
+    const cur = currentMonthKey()
+    const end = month > cur ? cur : addMonths(month, -1)
+    const resolve = makeResolver(data)
+    const groups = allGroups(data)
+    const totals = groupMonthTotals(data.transactions, resolve)
+    const reports = monthRange(addMonths(end, -2), end).map((m) => {
+      const saved = data.monthlyPlans.find((p) => p.id === m)
+      const planExpenses = saved ? saved.expenses : m >= cur ? effectivePlan(data, m).expenses : undefined
+      return buildMonthReport({
+        month: m, transactions: data.transactions, resolve, groups, subcategories: data.subcategories,
+        planExpenses, fixedIds: detectFixedGroups(groups, totals, m),
+      })
+    })
+    return recurringOverruns(reports, 3)
+  }, [data, month])
 
   const plan = effectivePlan(data, month)
   const isClosed = plan.closed === true
@@ -150,7 +170,7 @@ export function Planeamento() {
         title="Income"
         section="income"
         collection="incomeSources"
-        docs={activeIncomeSources(data)}
+        docs={withResidual(data.incomeSources, [plan], 'income')}
         month={month}
         plan={plan}
         locked={isClosed}
@@ -163,12 +183,13 @@ export function Planeamento() {
         title="Despesas"
         section="expenses"
         collection="expenseCategories"
-        docs={activeExpenseCategories(data)}
+        docs={withResidual(data.expenseCategories, [plan], 'expenses')}
         month={month}
         plan={plan}
         locked={isClosed}
         footerLabel="Deixar na conta corrente"
         newPlaceholder="Nova despesa…"
+        overruns={overruns}
       />
 
       <SavingsSection month={month} plan={plan} balanceTable={balanceTable} locked={isClosed} />
@@ -186,6 +207,8 @@ interface SimpleDoc {
   archived: boolean
   order: number
   isRent?: boolean
+  // Arquivado mas ainda com valor neste mês: mostrado para poder ser corrigido.
+  residual?: boolean
 }
 
 function LineSection({
@@ -199,6 +222,7 @@ function LineSection({
   footerLabel,
   newPlaceholder,
   showRentBadge,
+  overruns,
 }: {
   title: string
   section: 'income' | 'expenses'
@@ -210,11 +234,25 @@ function LineSection({
   footerLabel: string
   newPlaceholder: string
   showRentBadge?: boolean
+  overruns?: Map<string, Overrun>
 }) {
   const put = useStore((s) => s.put)
+  const data = useStore((s) => s.data)
   const setPlanValue = useStore((s) => s.setPlanValue)
+  const setScreen = useStore((s) => s.setScreen)
   const [newName, setNewName] = useState('')
   const [newIsRent, setNewIsRent] = useState(false)
+  const [openWarn, setOpenWarn] = useState<string | null>(null)
+  const [blocked, setBlocked] = useState<{ name: string; planeamento: MonthKey[]; projecoes: MonthKey[] } | null>(null)
+
+  const archive = (doc: SimpleDoc) => {
+    const block = allocationBlock(data, collection, doc.id)
+    if (block) {
+      setBlocked({ name: doc.name, ...block })
+      return
+    }
+    if (window.confirm(`Arquivar "${doc.name}"?`)) void put(collection, { ...doc, archived: true } as never)
+  }
 
   const values = plan?.[section] ?? {}
   const total = docs.reduce((acc, d) => acc + (values[d.id] || 0), 0)
@@ -237,9 +275,27 @@ function LineSection({
       ) : (
         <ul className="divide-y divide-border">
           {docs.map((doc) => (
-            <li key={doc.id} className="flex items-center justify-between gap-2 py-2">
+            <li key={doc.id} className="py-2">
+             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-sm">{doc.name}</span>
+                {overruns?.has(doc.id) && (
+                  <button
+                    type="button"
+                    onClick={() => setOpenWarn(openWarn === doc.id ? null : doc.id)}
+                    aria-expanded={openWarn === doc.id}
+                    aria-label={`${doc.name}: acima do plano há 3 meses — ver detalhes`}
+                    title="Acima do plano há 3 meses — toca para ver"
+                    className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn"
+                  >
+                    ⚠ 3 meses acima ▾
+                  </button>
+                )}
+                {doc.residual && (
+                  <span title="Arquivada, mas ainda com valor neste mês — põe a 0 (ou passa para outra linha). Podes reativá-la em Definições.">
+                    <Badge tone="warn">Arquivada</Badge>
+                  </span>
+                )}
                 {showRentBadge && doc.isRent && (
                   <span title="Chega a meio do mês — é descontada do valor a transferir para a poupança">
                     <Badge>Renda</Badge>
@@ -252,17 +308,51 @@ function LineSection({
                   onChange={(v) => void setPlanValue(month, section, doc.id, v)}
                   disabled={locked}
                 />
-                <button
-                  onClick={() => {
-                    if (window.confirm(`Arquivar "${doc.name}"?`)) void put(collection, { ...doc, archived: true } as never)
-                  }}
-                  className="rounded-lg px-2 py-1 text-sm text-muted hover:bg-surface-2 hover:text-negative"
-                  aria-label={`Arquivar ${doc.name}`}
-                  title="Arquivar"
-                >
-                  ×
-                </button>
+                {doc.residual ? (
+                  <button
+                    onClick={() => void put(collection, { ...doc, residual: undefined, archived: false } as never)}
+                    className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+                    title="Reativar"
+                  >
+                    ↺
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => archive(doc)}
+                    className="rounded-lg px-2 py-1 text-sm text-muted hover:bg-surface-2 hover:text-negative"
+                    aria-label={`Arquivar ${doc.name}`}
+                    title="Arquivar"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
+             </div>
+             {overruns?.has(doc.id) && openWarn === doc.id && (() => {
+               const o = overruns.get(doc.id)!
+               return (
+                 <div className="mt-2 rounded-xl bg-warn-soft/60 p-3 text-xs text-text">
+                   <p className="mb-1.5 font-semibold">Acima do plano há 3 meses seguidos</p>
+                   <ul className="mb-2 flex flex-col gap-0.5 text-muted">
+                     {o.months.map((m) => (
+                       <li key={m.month} className="tnum">
+                         {monthLabel(m.month)}: {fmtEUR(m.spent)} gastos de {fmtEUR(m.planned)} planeados
+                         {' '}(<span className="text-negative">+{fmtEUR(m.spent - m.planned)}</span>)
+                       </li>
+                     ))}
+                   </ul>
+                   <p className="mb-2 text-muted">
+                     Em média {fmtEUR(o.avgExcess)} acima por mês. Pode justificar subir o valor, mas não
+                     subas tudo de uma vez: vê primeiro no Analytics se há gastos que podes cortar e ajusta
+                     só o que fizer sentido.
+                   </p>
+                   {/* O Analytics só existe no computador */}
+                   <span className="hidden md:inline-block">
+                     <Button size="sm" variant="soft" onClick={() => setScreen('budgets')}>Ver no Analytics</Button>
+                   </span>
+                 </div>
+               )
+             })()}
             </li>
           ))}
         </ul>
@@ -294,6 +384,16 @@ function LineSection({
           Adicionar
         </Button>
       </div>
+      {blocked && (
+        <ArchiveBlockedModal
+          name={blocked.name}
+          action="arquivar"
+          planeamento={blocked.planeamento}
+          projecoes={blocked.projecoes}
+          onClose={() => setBlocked(null)}
+          onGo={(screen) => { setBlocked(null); setScreen(screen) }}
+        />
+      )}
     </Card>
   )
 }
@@ -321,7 +421,7 @@ function SavingsSection({
 
   const setScreen = useStore((s) => s.setScreen)
 
-  const active = activeBuckets(data)
+  const active = withResidual(data.savingsBuckets, plan ? [plan] : [], 'savings')
   const total = active.reduce((acc, b) => acc + (plan?.savings[b.id] || 0), 0)
 
   const [actionBucket, setActionBucket] = useState<SavingsBucket | null>(null)
@@ -381,7 +481,7 @@ function SavingsSection({
       ) : (
         <ul className="divide-y divide-border">
           {active.map((bucket) => {
-            const isGoal = bucket.kind === 'goal'
+            const isGoal = bucket.kind === 'goal' && !bucket.residual
             const saldo = isGoal ? bucketBalance(balanceTable, bucket.id, month) : 0
             const pct = isGoal ? goalProgress(saldo, bucket.targetAmount ?? 0) : 0
             return (
@@ -390,6 +490,11 @@ function SavingsSection({
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm">{bucket.name}</span>
                     {isGoal && <Badge tone="goal">Objetivo</Badge>}
+                    {bucket.residual && (
+                      <span title="Balde arquivado/concluído, mas ainda com valor neste mês — põe a 0 para deixar de contar.">
+                        <Badge tone="warn">Arquivado</Badge>
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <MoneyCell
@@ -498,7 +603,7 @@ function AutoInvestmentSection({
   const setPlanValue = useStore((s) => s.setPlanValue)
   const setScreen = useStore((s) => s.setScreen)
 
-  const vehicles = activeVehicles(data)
+  const vehicles = withResidual(data.investmentVehicles, plan ? [plan] : [], 'autoInvestments')
   const values = plan?.autoInvestments ?? {}
   const total = vehicles.reduce((acc, v) => acc + (values[v.id] || 0), 0)
 
@@ -521,7 +626,10 @@ function AutoInvestmentSection({
       <ul className="divide-y divide-border">
         {vehicles.map((vehicle) => (
           <li key={vehicle.id} className="flex items-center justify-between gap-2 py-2">
-            <span className="truncate text-sm">{vehicle.name}</span>
+            <span className="flex items-center gap-2 truncate text-sm">
+              {vehicle.name}
+              {vehicle.residual && <Badge tone="warn">Arquivado</Badge>}
+            </span>
             <MoneyCell
               value={values[vehicle.id]}
               onChange={(v) => void setPlanValue(month, 'autoInvestments', vehicle.id, v)}

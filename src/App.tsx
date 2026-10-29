@@ -7,6 +7,7 @@ import { Onboarding } from './screens/Onboarding'
 import { Planeamento } from './screens/Planeamento'
 import { Movimentos } from './screens/Movimentos'
 import { Gastos } from './screens/Gastos'
+import { Investimentos } from './screens/Investimentos'
 import { Budgets } from './screens/Budgets'
 import { Projecoes } from './screens/Projecoes'
 import { Overview } from './screens/Overview'
@@ -19,7 +20,8 @@ const NAV: { id: Screen; label: string; icon: string; mobile: boolean }[] = [
   { id: 'planeamento', label: 'Planeamento', icon: '📅', mobile: true },
   { id: 'movimentos', label: 'Movimentos', icon: '↔️', mobile: true },
   { id: 'gastos', label: 'Gastos', icon: '🧾', mobile: true },
-  { id: 'budgets', label: 'Budgets', icon: '🎯', mobile: false },
+  { id: 'budgets', label: 'Analytics', icon: '🔎', mobile: false },
+  { id: 'investimentos', label: 'Investimento', icon: '🌱', mobile: false },
   { id: 'projecoes', label: 'Projeções', icon: '📈', mobile: false },
   { id: 'definicoes', label: 'Definições', icon: '⚙️', mobile: true },
 ]
@@ -29,6 +31,7 @@ const SCREENS: Record<Screen, () => React.JSX.Element> = {
   movimentos: Movimentos,
   gastos: Gastos,
   budgets: Budgets,
+  investimentos: Investimentos,
   projecoes: Projecoes,
   overview: Overview,
   definicoes: Definicoes,
