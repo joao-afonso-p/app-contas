@@ -396,3 +396,32 @@ describe('gastos e budgets', () => {
     expect(matchCategoryByName('Lazer', categories)).toBeUndefined()
   })
 })
+
+describe('CSV exportado (6 campos) volta a ser importável', () => {
+  it('lê subcategoria como "Categoria / Subcategoria" e mantém o formato de 5 campos', () => {
+    const rows = parseBankStatement(
+      'data;nome;categoria;subcategoria;valor;descrição\n2026-07-03;Compras;Alimentação;Supermercado;-42,10;PINGO; DOCE\n2026-07-04;Farmácia;Saúde;;-12,50;FARMACIA\n2026-07-05;X;Saúde;-3,00;COM ; EXTRA',
+    )
+    expect(rows.map((r) => [r.categoriaText, r.amount, r.description])).toEqual([
+      ['Alimentação / Supermercado', 42.1, 'PINGO; DOCE'],
+      ['Saúde', 12.5, 'FARMACIA'],
+      ['Saúde', 3, 'COM ; EXTRA'],
+    ])
+  })
+})
+
+import { fmtEURWhole } from '../format'
+describe('fmtEURWhole', () => {
+  const clean = (s: string) => s.replace(/\s/g, ' ').replace(/ /g, ' ')
+  it('arredonda sempre para baixo', () => {
+    expect(clean(fmtEURWhole(7.8))).toBe('7 €')
+    expect(clean(fmtEURWhole(7.99))).toBe('7 €')
+    expect(clean(fmtEURWhole(-7.8))).toContain('7')
+    expect(fmtEURWhole(-7.8)).toMatch(/^-|−/)
+    expect(clean(fmtEURWhole(0))).toBe('0 €')
+    expect(fmtEURWhole(0.4)).toBe('<1 €')
+    expect(clean(fmtEURWhole(2999.5))).toBe('2999 €')
+    expect(clean(fmtEURWhole(8.0000001))).toBe('8 €')
+    expect(clean(fmtEURWhole(7.9999999))).toBe('8 €') // erro de vírgula flutuante não faz perder 1 €
+  })
+})

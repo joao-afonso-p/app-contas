@@ -17,6 +17,16 @@ export function fmtEUR(value: number, compact = false): string {
   return compact ? eur0.format(value) : eur.format(value)
 }
 
+// Euros inteiros, arredondados sempre para baixo (7,8 → 7 €; −7,8 → −7 €). Valores entre
+// 0 e 1 aparecem como "<1 €" para não parecerem zero. Usa-se nas páginas de análise
+// (Analytics, Investimento); onde se registam valores reais mantêm-se os cêntimos.
+export function fmtEURWhole(value: number, _compact?: boolean): string {
+  const abs = Math.abs(value)
+  if (abs > 0.0049 && abs < 1) return '<1 €'
+  const t = Math.trunc(value + Math.sign(value) * 1e-6)
+  return eur0.format(t === 0 ? 0 : t)
+}
+
 export function fmtPct(value: number): string {
   return `${new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 1 }).format(value)}%`
 }

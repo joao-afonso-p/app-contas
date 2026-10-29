@@ -2,7 +2,7 @@
 
 App privada de gestão de finanças pessoais para 2 pessoas — uma reimaginação moderna da folha de Excel "Contas Inês e João". Sem logins: a partilha faz-se por um **código de espaço** secreto.
 
-- **Desktop**: versão completa (Planeamento, Movimentos, Gastos, Budgets, Projeções, Overview).
+- **Desktop**: versão completa (Planeamento, Movimentos, Gastos, Analytics, Investimento, Projeções, Overview).
 - **Mobile (PWA)**: o essencial do dia-a-dia — registar gastos e movimentos, ver saldos e os números-chave do mês.
 - **Offline-first**: funciona sem rede e sincroniza quando voltar a haver ligação.
 

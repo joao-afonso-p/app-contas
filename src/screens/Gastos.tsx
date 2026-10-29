@@ -3,15 +3,21 @@ import {
   Badge, Button, Card, EmptyState, Input, MetricCard, Modal, Money, SectionTitle, Select, Spinner, cx,
 } from '../components/ui'
 import { CategoryPicker } from '../components/CategoryPicker'
-import { isUncategorized, matchCategoryByName, normalizeDesc, parseBankStatement, suggestCategory } from '../lib/calc/budgets'
+import { normalizeDesc, parseBankStatement } from '../lib/calc/budgets'
+import {
+  activeGroups, allGroups, categoryOptions, isUnassigned, labelFor, legacyNeedingMapping, makeResolver, matchOptionByText,
+  newSubcategory, subcategoriesOf, suggestOption, txCategoryFields,
+} from '../lib/calc/categories'
 import { fileToText, isSupportedFile } from '../lib/ai/extractText'
 import { buildStatementHistory, extractStatement, rowsToStatementText } from '../lib/ai/openai'
 import { getOpenAiKey } from '../lib/apiKey'
+import { deliverFile } from '../lib/download'
+import { transactionsToCsv } from '../lib/exportTransactions'
 import {
-  addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, nowISO, parseAmount, todayISO, uid,
+  addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO, uid,
 } from '../lib/format'
 import { activeBuckets, useStore } from '../store/useStore'
-import type { CategoryRule, Transaction, TransactionCategory } from '../types'
+import type { CategoryRule, Transaction } from '../types'
 
 interface PreviewRow {
   date: string
@@ -19,9 +25,15 @@ interface PreviewRow {
   description: string
   amount: number
   included: boolean
-  categoryId: string
+  optionKey: string // `${groupId}|${subcategoryId}` ('' = sem categoria)
   suggested: string
   duplicate: boolean
+}
+
+const keyOf = (groupId?: string, subId?: string) => (groupId ? `${groupId}|${subId ?? ''}` : '')
+const splitKey = (key: string) => {
+  const [groupId, subId] = key.split('|')
+  return { groupId: groupId || undefined, subId: subId || undefined }
 }
 
 export function Gastos() {
@@ -30,31 +42,97 @@ export function Gastos() {
   const remove = useStore((s) => s.remove)
   const addTransactions = useStore((s) => s.addTransactions)
   const setTransactionReposto = useStore((s) => s.setTransactionReposto)
+  const saveTransaction = useStore((s) => s.saveTransaction)
+  const setTransactionCategory = useStore((s) => s.setTransactionCategory)
+  const deleteTransaction = useStore((s) => s.deleteTransaction)
+  const bulkUpdateTransactions = useStore((s) => s.bulkUpdateTransactions)
+  const setScreen = useStore((s) => s.setScreen)
 
-  const categories = data.transactionCategories.filter((c) => !c.archived).sort((a, b) => a.order - b.order)
+  const groups = activeGroups(data)
   const buckets = activeBuckets(data)
+  const resolve = makeResolver(data)
+  const legacyName = (t: Transaction) => data.transactionCategories.find((c) => c.id === t.categoryId)?.name
+  const pendingLegacy = legacyNeedingMapping(data)
+  const createSubcategory = (parentId: string, name: string): string => {
+    const id = uid()
+    void put('subcategories', newSubcategory(data.subcategories, parentId, name, id))
+    return id
+  }
 
   // ---------- Filtros ----------
   // Default (sem mês escolhido): mês atual + anterior. Escolher um mês no
   // picker restringe a esse mês só; "Limpar" volta ao default.
   const defaultMonths = [currentMonthKey(), addMonths(currentMonthKey(), -1)]
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkDate, setBulkDate] = useState('')
+  const [bulkGroup, setBulkGroup] = useState('')
+  const [bulkSub, setBulkSub] = useState('')
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportFrom, setExportFrom] = useState('')
+  const [exportTo, setExportTo] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [subFilter, setSubFilter] = useState<string>('all') // 'all' | 'none' | subcategoryId
+  const filterSubs = categoryFilter !== 'all' && categoryFilter !== 'none'
+    ? subcategoriesOf(data.subcategories, categoryFilter)
+    : []
 
   const filtered = data.transactions
-    .filter((t) => (selectedMonth ? monthOfDate(t.date) === selectedMonth : defaultMonths.includes(monthOfDate(t.date))))
+    // "Sem categoria" ignora a janela por defeito: o aviso conta todos os meses.
+    .filter((t) => (selectedMonth
+      ? monthOfDate(t.date) === selectedMonth
+      : categoryFilter === 'none' || defaultMonths.includes(monthOfDate(t.date))))
     .filter((t) => {
       if (categoryFilter === 'all') return true
-      if (categoryFilter === 'none') return isUncategorized(t, categories)
-      return t.categoryId === categoryFilter
+      if (categoryFilter === 'none') return isUnassigned(resolve(t))
+      const r = resolve(t)
+      if (r.groupId !== categoryFilter) return false
+      if (subFilter === 'all') return true
+      if (subFilter === 'none') return !r.subcategoryId
+      return r.subcategoryId === subFilter
     })
     .sort((a, b) => {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1
       return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
     })
 
+  // Seleção só conta gastos ainda visíveis/existentes.
+  const selectedIds = filtered.filter((t) => selected.has(t.id)).map((t) => t.id)
+  const allSelected = filtered.length > 0 && selectedIds.length === filtered.length
+  const toggleOne = (id: string) => setSelected((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map((t) => t.id)))
+  const openBulk = () => { setBulkDate(''); setBulkGroup(''); setBulkSub(''); setBulkOpen(true) }
+  const applyBulk = () => {
+    if (!bulkDate && !bulkGroup) return
+    if (bulkGroup && !data.savingsBuckets.some((b) => b.id === bulkGroup)) {
+      const hadLinked = data.savingsMovements.some((m) => selectedIds.includes(m.transactionId ?? ''))
+      if (hadLinked && !window.confirm('Alguns gastos estavam pagos pela poupança. Ao mudar de categoria, a saída do balde é removida. Continuar?')) return
+    }
+    void bulkUpdateTransactions(selectedIds, {
+      date: bulkDate || undefined, groupId: bulkGroup || undefined, subcategoryId: bulkSub || undefined,
+    })
+    setBulkOpen(false)
+    setSelected(new Set())
+  }
+  const exportData = transactionsToCsv(
+    data.transactions,
+    (t) => {
+      const r = resolve(t)
+      const g = allGroups(data).find((x) => x.id === r.groupId)
+      const sub = r.subcategoryId ? data.subcategories.find((s) => s.id === r.subcategoryId) : undefined
+      return { categoria: g?.name ?? '', subcategoria: sub?.name ?? '' }
+    },
+    exportFrom || undefined,
+    exportTo || undefined,
+  )
+  const exportCount = exportOpen ? exportData.count : 0
   const total = filtered.reduce((sum, t) => sum + t.amount, 0)
-  const uncategorizedCount = data.transactions.filter((t) => isUncategorized(t, categories)).length
+  const uncategorizedCount = data.transactions.filter((t) => isUnassigned(resolve(t))).length
 
   const bucketName = (id: string | undefined) => buckets.find((b) => b.id === id)?.name ?? '—'
 
@@ -62,25 +140,23 @@ export function Gastos() {
   const [addOpen, setAddOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [date, setDate] = useState(todayISO())
-  const [categoryId, setCategoryId] = useState('')
+  const [groupId, setGroupId] = useState('')
+  const [subId, setSubId] = useState('')
+  const [newSubName, setNewSubName] = useState('')
   const [amountStr, setAmountStr] = useState('')
   const [nome, setNome] = useState('')
   const [description, setDescription] = useState('')
-  const [repoePoupanca, setRepoePoupanca] = useState(false)
-  const [fonteBucketId, setFonteBucketId] = useState('')
-  const [jaReposto, setJaReposto] = useState(false)
   const [addError, setAddError] = useState('')
 
   const openAdd = () => {
     setEditingId(null)
     setDate(todayISO())
-    setCategoryId('')
+    setGroupId('')
+    setSubId('')
+    setNewSubName('')
     setAmountStr('')
     setNome('')
     setDescription('')
-    setRepoePoupanca(false)
-    setFonteBucketId('')
-    setJaReposto(false)
     setAddError('')
     setAddOpen(true)
   }
@@ -88,13 +164,13 @@ export function Gastos() {
   const openEdit = (t: Transaction) => {
     setEditingId(t.id)
     setDate(t.date)
-    setCategoryId(t.categoryId)
+    const r = resolve(t)
+    setGroupId(r.groupId ?? '')
+    setSubId(r.subcategoryId ?? '')
+    setNewSubName('')
     setAmountStr(String(t.amount).replace('.', ','))
     setNome(t.nome ?? '')
     setDescription(t.description)
-    setRepoePoupanca(t.repoePoupanca)
-    setFonteBucketId(t.fonteBucketId ?? '')
-    setJaReposto(t.reposto)
     setAddError('')
     setAddOpen(true)
   }
@@ -106,44 +182,30 @@ export function Gastos() {
       return
     }
     // Categoria é opcional: podes deixar vazio e atribuir depois (fica marcado
-    // como "sem categoria").
-    if (repoePoupanca && !fonteBucketId) {
-      setAddError('Escolhe o balde fonte.')
-      return
-    }
-    // "Já reposto" marca o estado sem criar movimento (o utilizador já lançou o
-    // dele manualmente). A criação automática do movimento só acontece ao clicar
-    // na tag amarela "Repor de X" na lista (setTransactionReposto).
-    const targetReposto = repoePoupanca ? jaReposto : false
-    const fields = {
-      date,
-      categoryId,
-      amount,
-      nome: nome.trim() || undefined,
-      description: description.trim(),
-      repoePoupanca,
-      fonteBucketId: repoePoupanca ? fonteBucketId : undefined,
-      reposto: targetReposto,
-    }
-    if (editingId) {
+    // como "sem categoria do plano").
+    let finalSub = subId
+    if (groupId && newSubName.trim()) finalSub = createSubcategory(groupId, newSubName)
+    if (editingId && !groupId) {
+      // Sem categoria: só atualiza os campos simples (mantém a categoria antiga intacta).
       const existing = data.transactions.find((t) => t.id === editingId)
       if (!existing) return
-      void put('transactions', { ...existing, ...fields })
-      // Reconcilia o movimento ligado (criado antes via clique na tag amarela).
       const linked = data.savingsMovements.filter((m) => m.transactionId === editingId)
-      if (!targetReposto) {
-        // Desmarcou → desfaz a reposição automática, se existia.
-        for (const m of linked) void remove('savingsMovements', m.id)
-      } else if (linked.length) {
-        // Continua reposto → mantém o movimento sincronizado com valor/balde.
-        void put('savingsMovements', { ...linked[0], amount: -Math.abs(amount), bucketId: fonteBucketId })
-      }
-      // targetReposto && sem movimento ligado → não cria nada (o movimento é manual).
-    } else if (targetReposto) {
-      // Gasto novo já reposto: id pré-gerado, sem criar movimento.
-      void put('transactions', { id: uid(), createdAt: nowISO(), ...fields })
+      if (linked.length && !window.confirm('Este gasto estava pago pela poupança. Ao tirar a categoria, a saída do balde é removida. Continuar?')) return
+      void put('transactions', {
+        ...existing, date, amount, nome: nome.trim() || undefined, description: description.trim(),
+        planCategoryId: undefined, subcategoryId: undefined, repoePoupanca: false, fonteBucketId: undefined, reposto: false,
+      })
+      for (const m of linked) void remove('savingsMovements', m.id)
+    } else if (!groupId) {
+      void addTransactions([{
+        date, categoryId: '', amount, nome: nome.trim() || undefined, description: description.trim(),
+        repoePoupanca: false, reposto: false,
+      }])
     } else {
-      void addTransactions([fields])
+      void saveTransaction(
+        { date, amount, nome: nome.trim() || undefined, description: description.trim(), groupId, subcategoryId: finalSub || undefined },
+        editingId ?? undefined,
+      )
     }
     setAddOpen(false)
   }
@@ -206,11 +268,11 @@ export function Gastos() {
       }
       setProcessing('A analisar o extrato…')
       setLiveLine('')
-      const history = buildStatementHistory(data.transactions, categories, todayISO())
+      const history = buildStatementHistory(data.transactions, (t) => labelFor(resolve(t), data), todayISO())
       const result = await extractStatement({
         text,
         apiKey,
-        categoryNames: categories.map((c) => c.name),
+        categoryNames: categoryOptions(data).map((o) => o.label),
         history,
         onProgress: (latest) => setLiveLine(latest),
       })
@@ -248,13 +310,14 @@ export function Gastos() {
     const seen = new Set(data.transactions.map((t) => key(t.date, t.amount, t.description)))
 
     setRows(parsed.map((r) => {
-      const suggested = matchCategoryByName(r.categoriaText, categories) ?? suggestCategory(r.description, data.categoryRules) ?? ''
+      const opt = matchOptionByText(r.categoriaText, data) ?? suggestOption(r.description, data.categoryRules, data)
+      const suggested = keyOf(opt?.groupId, opt?.subcategoryId)
       const k = key(r.date, r.amount, r.description)
       const duplicate = seen.has(k)
       if (!duplicate) seen.add(k)
       return {
         date: r.date, nome: r.nome, description: r.description, amount: r.amount,
-        included: !duplicate, categoryId: suggested, suggested, duplicate,
+        included: !duplicate, optionKey: suggested, suggested, duplicate,
       }
     }))
     setStep(2)
@@ -264,7 +327,7 @@ export function Gastos() {
   // Categoria já não é obrigatória: linhas sem categoria são importadas e
   // podem ser atribuídas depois (ficam marcadas como "sem categoria").
   const canImport = includedCount > 0
-  const includedSemCategoria = rows.filter((r) => r.included && !r.categoryId).length
+  const includedSemCategoria = rows.filter((r) => r.included && !r.optionKey).length
 
   const updateRow = (index: number, patch: Partial<PreviewRow>) => {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -273,24 +336,27 @@ export function Gastos() {
   const doImport = () => {
     const included = rows.filter((r) => r.included)
     if (included.length === 0) return
-    void addTransactions(included.map((r) => ({
-      date: r.date,
-      categoryId: r.categoryId,
-      amount: r.amount,
-      nome: r.nome || undefined,
-      description: r.description,
-      repoePoupanca: false,
-      reposto: false,
-    })))
+    void addTransactions(included.map((r) => {
+      const { groupId: g, subId: sub } = splitKey(r.optionKey)
+      return {
+        date: r.date,
+        categoryId: '',
+        amount: r.amount,
+        nome: r.nome || undefined,
+        description: r.description,
+        ...txCategoryFields(data, g, sub),
+      }
+    }))
 
     // Aprendizagem: cria regras para linhas cuja categoria escolhida difere da sugestão.
     const existingKeywords = new Set(data.categoryRules.map((rule) => normalizeDesc(rule.keyword)))
     for (const r of included) {
-      if (r.categoryId && r.categoryId !== r.suggested) {
+      if (r.optionKey && r.optionKey !== r.suggested) {
         const words = normalizeDesc(r.description).split(' ').filter((w) => w.length > 2)
         const keyword = words.slice(0, 2).join(' ')
         if (keyword && !existingKeywords.has(keyword)) {
-          const rule: CategoryRule = { id: uid(), keyword, categoryId: r.categoryId }
+          const { groupId: g, subId: sub } = splitKey(r.optionKey)
+          const rule: CategoryRule = { id: uid(), keyword, categoryId: '', planCategoryId: g, subcategoryId: sub }
           void put('categoryRules', rule)
           existingKeywords.add(keyword)
         }
@@ -306,6 +372,7 @@ export function Gastos() {
         <div className="flex gap-2">
           <Button variant="soft" onClick={openAdd}>+ Gasto</Button>
           <Button variant="ghost" onClick={openImport}>Importar extrato</Button>
+          <Button variant="ghost" onClick={() => setExportOpen(true)}>Exportar CSV</Button>
         </div>
       </div>
 
@@ -326,32 +393,74 @@ export function Gastos() {
           </div>
           <div>
             <label className="mb-1 block text-xs text-muted">Categoria</label>
-            <Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+            <Select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setSubFilter('all') }}>
               <option value="all">Todas</option>
               <option value="none">Sem categoria</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.kind === 'bucket' ? `${g.name} (poupança)` : g.name}</option>
               ))}
             </Select>
           </div>
+          {filterSubs.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Subcategoria</label>
+              <Select value={subFilter} onChange={(e) => setSubFilter(e.target.value)}>
+                <option value="all">Todas</option>
+                <option value="none">Sem subcategoria</option>
+                {filterSubs.map((sc) => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
+                ))}
+              </Select>
+            </div>
+          )}
         </Card>
         <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={`${filtered.length} gasto(s)`} />
       </div>
+
+      {pendingLegacy.length > 0 && (
+        <Card className="flex flex-wrap items-center justify-between gap-2 border-warn/40 bg-warn-soft/40">
+          <span className="flex items-center gap-2 text-sm text-text">
+            <span>🔗</span>
+            {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} por associar às categorias do plano — até lá, esses gastos não contam no Analytics.`}
+          </span>
+          <Button size="sm" variant="soft" onClick={() => setScreen('definicoes')}>Associar</Button>
+        </Card>
+      )}
 
       {uncategorizedCount > 0 && categoryFilter !== 'none' && (
         <Card className="flex flex-wrap items-center justify-between gap-2 border-warn/40 bg-warn-soft/40">
           <span className="flex items-center gap-2 text-sm text-text">
             <span>⚠️</span>
-            {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria — atribui-${uncategorizedCount === 1 ? 'o' : 'os'} para os budgets ficarem certos.`}
+            {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria — atribui-${uncategorizedCount === 1 ? 'o' : 'os'} a uma categoria do plano para o Analytics ficar certo.`}
           </span>
-          <Button size="sm" variant="soft" onClick={() => { setSelectedMonth(null); setCategoryFilter('none') }}>
+          <Button size="sm" variant="soft" onClick={() => { setSelectedMonth(null); setCategoryFilter('none'); setSubFilter('all') }}>
             Ver
           </Button>
         </Card>
       )}
 
       <Card>
-        <SectionTitle>Transações</SectionTitle>
+        <SectionTitle
+          right={filtered.length > 0 ? (
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+              Selecionar todos
+            </label>
+          ) : undefined}
+        >
+          Transações
+        </SectionTitle>
+        {selectedIds.length > 0 && (
+          <div className="sticky top-2 z-10 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/40 bg-surface px-3 py-2 shadow-lg">
+            <span className="text-sm font-semibold text-text">
+              {selectedIds.length} {selectedIds.length === 1 ? 'selecionado' : 'selecionados'}
+            </span>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={openBulk}>Editar…</Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Limpar</Button>
+            </div>
+          </div>
+        )}
         {filtered.length === 0 ? (
           <EmptyState title="Sem gastos neste filtro" hint="Regista um gasto manualmente ou importa o extrato do banco." />
         ) : (
@@ -359,11 +468,27 @@ export function Gastos() {
             {filtered.map((t) => (
               <div key={t.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(t.id)}
+                    onChange={() => toggleOne(t.id)}
+                    aria-label="Selecionar gasto"
+                    className="h-4 w-4 shrink-0"
+                  />
                   <span className="tnum w-20 shrink-0 text-xs text-muted">{fmtDate(t.date)}</span>
                   <CategoryPicker
-                    categories={categories}
-                    value={t.categoryId}
-                    onSelect={(id) => void put('transactions', { ...t, categoryId: id })}
+                    groups={groups}
+                    subcategories={data.subcategories}
+                    value={resolve(t)}
+                    fallbackLabel={legacyName(t)}
+                    onSelect={(gid, sid) => {
+                      const hasLinked = data.savingsMovements.some((m) => m.transactionId === t.id)
+                      const goingToBucket = data.savingsBuckets.some((b) => b.id === gid)
+                      if (hasLinked && !goingToBucket
+                        && !window.confirm('Este gasto estava pago pela poupança. Ao mudar de categoria, a saída do balde é removida. Continuar?')) return
+                      void setTransactionCategory(t.id, gid, sid)
+                    }}
+                    onCreateSubcategory={createSubcategory}
                   />
                   <div className="min-w-0">
                     <InlineName
@@ -377,7 +502,7 @@ export function Gastos() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                  {t.repoePoupanca && (
+                  {t.repoePoupanca && !t.planCategoryId && (
                     t.reposto ? (
                       // Estado (verde) — não clicável; desfazer faz-se no editar.
                       <span className="shrink-0">
@@ -404,7 +529,9 @@ export function Gastos() {
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm('Apagar este gasto?')) void remove('transactions', t.id)
+                      const linked = data.savingsMovements.some((m) => m.transactionId === t.id)
+                      const msg = linked ? 'Apagar este gasto? A saída correspondente na poupança também é removida.' : 'Apagar este gasto?'
+                      if (window.confirm(msg)) void deleteTransaction(t.id)
                     }}
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-negative"
                     aria-label="Apagar gasto"
@@ -419,8 +546,8 @@ export function Gastos() {
       </Card>
 
       <p className="text-xs text-muted">
-        Dica: marca "repor da poupança" em despesas como Saúde que se vão buscar ao balde Geral —
-        assim consegues acompanhar o que ainda falta repor.
+        Dica: escolhe como categoria um balde de poupança (ex.: Geral) quando o gasto é pago pela poupança —
+        sai do balde e não conta contra o orçamento do mês.
       </p>
 
       {/* Modal +Gasto / Editar gasto */}
@@ -431,16 +558,57 @@ export function Gastos() {
               <label className="mb-1 block text-xs text-muted">Data</label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted">Categoria</label>
-              <Select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full">
+              <Select
+                value={groupId}
+                onChange={(e) => { setGroupId(e.target.value); setSubId(''); setNewSubName('') }}
+                className="w-full"
+              >
                 <option value="">— escolher —</option>
-                {categories.map((c: TransactionCategory) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                <optgroup label="Orçamento do mês">
+                  {groups.filter((g) => g.kind === 'expense').map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </optgroup>
+                {groups.some((g) => g.kind === 'bucket') && (
+                  <optgroup label="Pago pela poupança">
+                    {groups.filter((g) => g.kind === 'bucket').map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">Subcategoria (opcional)</label>
+              <Select
+                value={subId}
+                onChange={(e) => { setSubId(e.target.value); setNewSubName('') }}
+                disabled={!groupId}
+                className="w-full"
+              >
+                <option value="">— nenhuma —</option>
+                {groupId && subcategoriesOf(data.subcategories, groupId).map((sc) => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
                 ))}
               </Select>
             </div>
           </div>
+          {groupId && (
+            <Input
+              value={newSubName}
+              onChange={(e) => { setNewSubName(e.target.value); if (e.target.value) setSubId('') }}
+              placeholder="…ou cria uma subcategoria nova"
+            />
+          )}
+          {data.savingsBuckets.some((b) => b.id === groupId) && (
+            <p className="text-xs text-muted">
+              Pago pela poupança: cria uma saída deste valor no balde e não conta contra o orçamento do mês.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted">Valor (€)</label>
@@ -461,49 +629,96 @@ export function Gastos() {
             <label className="mb-1 block text-xs text-muted">Descrição</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input
-                type="checkbox"
-                checked={repoePoupanca}
-                onChange={(e) => {
-                  setRepoePoupanca(e.target.checked)
-                  if (!e.target.checked) setJaReposto(false)
-                }}
-              />
-              Repor da poupança
-            </label>
-            {repoePoupanca && (
-              <label className="flex items-center gap-2 text-sm text-text">
-                <input
-                  type="checkbox"
-                  checked={jaReposto}
-                  onChange={(e) => setJaReposto(e.target.checked)}
-                />
-                Já reposto (movimento já lançado)
-              </label>
-            )}
-          </div>
-          {repoePoupanca && (
-            <div>
-              <label className="mb-1 block text-xs text-muted">Balde fonte</label>
-              <Select value={fonteBucketId} onChange={(e) => setFonteBucketId(e.target.value)} className="w-full">
-                <option value="">— escolher —</option>
-                {buckets.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </Select>
-              {jaReposto && (
-                <p className="mt-1 text-xs text-muted">
-                  Fica marcado como reposto sem criar movimento (assume-se que já lançaste o movimento manualmente).
-                </p>
-              )}
-            </div>
-          )}
           {addError && <p className="text-sm text-negative">{addError}</p>}
           <div className="mt-1 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setAddOpen(false)}>Cancelar</Button>
             <Button onClick={submitAdd}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal edição em massa */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title={`Editar ${selectedIds.length} gastos`}>
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-muted">Só os campos que preencheres são alterados; os restantes ficam como estão.</p>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Data</label>
+            <Input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted">Categoria</label>
+              <Select value={bulkGroup} onChange={(e) => { setBulkGroup(e.target.value); setBulkSub('') }} className="w-full">
+                <option value="">— não alterar —</option>
+                <optgroup label="Orçamento do mês">
+                  {groups.filter((g) => g.kind === 'expense').map((g) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </optgroup>
+                {groups.some((g) => g.kind === 'bucket') && (
+                  <optgroup label="Pago pela poupança">
+                    {groups.filter((g) => g.kind === 'bucket').map((g) => (
+                      <option key={g.id} value={g.id}>{g.name}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">Subcategoria</label>
+              <Select value={bulkSub} onChange={(e) => setBulkSub(e.target.value)} disabled={!bulkGroup} className="w-full">
+                <option value="">— nenhuma —</option>
+                {bulkGroup && subcategoriesOf(data.subcategories, bulkGroup).map((sc) => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
+                ))}
+              </Select>
+            </div>
+          </div>
+          {bulkGroup && (
+            <p className="text-xs text-muted">Os gastos passam todos para esta categoria; sem subcategoria escolhida, ficam sem subcategoria.</p>
+          )}
+          <div className="mt-1 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setBulkOpen(false)}>Cancelar</Button>
+            <Button disabled={!bulkDate && !bulkGroup} onClick={applyBulk}>Aplicar</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal Exportar CSV */}
+      <Modal open={exportOpen} onClose={() => setExportOpen(false)} title="Exportar gastos (CSV)">
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted">
+            Exporta todos os gastos, ou só os de um intervalo de datas (deixa vazio para "desde sempre").
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted">De</label>
+              <Input type="date" value={exportFrom} onChange={(e) => setExportFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">Até</label>
+              <Input type="date" value={exportTo} onChange={(e) => setExportTo(e.target.value)} />
+            </div>
+          </div>
+          <code className="block rounded-lg bg-surface-2 p-2 text-xs text-text">
+            data;nome;categoria;subcategoria;valor;descrição
+          </code>
+          <p className="text-xs text-muted">
+            {`${exportCount} gasto${exportCount === 1 ? '' : 's'} no intervalo. O ficheiro pode ser importado de volta em "Importar extrato".`}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setExportOpen(false)}>Cancelar</Button>
+            <Button
+              disabled={exportCount === 0}
+              onClick={() => {
+                const { csv } = exportData
+                const tag = `${exportFrom || 'inicio'}_${exportTo || todayISO()}`
+                void deliverFile(`gastos_${tag}.csv`, csv, 'text/csv', 'Gastos Contas')
+                setExportOpen(false)
+              }}
+            >
+              Descarregar
+            </Button>
           </div>
         </div>
       </Modal>
@@ -633,14 +848,14 @@ export function Gastos() {
                     <Money value={-r.amount} className="w-20 shrink-0 text-right font-semibold" />
                   </div>
                   <Select
-                    value={r.categoryId}
-                    onChange={(e) => updateRow(i, { categoryId: e.target.value })}
+                    value={r.optionKey}
+                    onChange={(e) => updateRow(i, { optionKey: e.target.value })}
                     disabled={!r.included}
                     className="w-full sm:w-48"
                   >
                     <option value="">— escolher —</option>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                    {categoryOptions(data).map((o) => (
+                      <option key={keyOf(o.groupId, o.subcategoryId)} value={keyOf(o.groupId, o.subcategoryId)}>{o.label}</option>
                     ))}
                   </Select>
                 </div>

@@ -21,6 +21,9 @@ export interface ExpenseCategory {
   name: string
   archived: boolean
   order: number
+  // Despesa fixa (renda, colégio…): sem alertas de "quase no limite" nem
+  // projeção ao ritmo atual. `undefined` = automático (deteta-se pelo histórico).
+  fixed?: boolean
 }
 
 export type BucketKind = 'fixed' | 'goal'
@@ -71,6 +74,8 @@ export interface SavingsMovement {
   transferGroupId?: string
   // Gerado automaticamente ao confirmar a reposição de um gasto (Transaction.id).
   transactionId?: string
+  // Entrada criada ao resgatar dinheiro de um veículo/ativo para este balde (AssetEntry.id).
+  assetEntryId?: string
   // Timestamp de criação (ISO datetime) — não mostrado na UI, só para desempate de sort.
   createdAt?: string
 }
@@ -89,10 +94,32 @@ export interface Transaction {
   reposto: boolean
   // Timestamp de criação (ISO datetime) — não mostrado na UI, só para desempate de sort.
   createdAt?: string
+  // ---- Categorização "nova" (liga os gastos ao planeamento) ----
+  // Categoria principal = uma despesa do planeamento (ExpenseCategory) OU um
+  // balde de poupança (gasto pago pela poupança, fora do orçamento mensal).
+  // `categoryId` (categoria antiga) nunca é alterado nem apagado: gastos que
+  // ainda não têm `planCategoryId` são resolvidos pela associação feita na
+  // categoria antiga (ver lib/calc/categories.ts).
+  planCategoryId?: string
+  subcategoryId?: string
 }
 
+// Categoria "antiga" de gastos. Mantém-se guardada (nada é apagado), mas deixou
+// de ser editável como lista principal: serve só para ler gastos históricos e,
+// opcionalmente, ser associada a uma categoria do plano (+ subcategoria).
 export interface TransactionCategory {
   id: string
+  name: string
+  archived: boolean
+  order: number
+  planCategoryId?: string
+  subcategoryId?: string
+}
+
+// Subcategoria opcional, filha de uma despesa do planeamento ou de um balde.
+export interface Subcategory {
+  id: string
+  parentId: string // ExpenseCategory.id ou SavingsBucket.id
   name: string
   archived: boolean
   order: number
@@ -102,7 +129,9 @@ export interface TransactionCategory {
 export interface CategoryRule {
   id: string
   keyword: string // texto normalizado contido na descrição
-  categoryId: string
+  categoryId: string // categoria antiga (legado)
+  planCategoryId?: string
+  subcategoryId?: string
 }
 
 export interface Budget {
@@ -154,6 +183,53 @@ export interface InvestmentVehicle {
   order: number
   // Saldo que já lá estava antes de começar a ser seguido nesta app.
   initialBalance?: number
+  // Rendimento anual esperado (%), só para projeções (ex.: 3 = 3%/ano).
+  expectedRate?: number
+  // Entrada mensal assumida na projeção (€); sem valor = mediana dos últimos 6 meses.
+  monthlyContribution?: number
+  contributionGrowth?: number // aumento anual da entrada mensal (%), só na projeção
+}
+
+// Ativo dentro de um veículo (ex.: um ETF na Degiro, a conta poupança da Amélia).
+// Veículos sem ativos funcionam como um único "ativo" implícito.
+export interface InvestmentAsset {
+  id: string
+  vehicleId: string
+  name: string
+  kind?: string // ETF, Ação, Conta poupança, Certificado de Aforro, …
+  archived: boolean
+  order: number
+  expectedRate?: number // % anual esperada (projeções)
+  monthlyContribution?: number
+  contributionGrowth?: number // aumento anual da entrada mensal (%), só na projeção
+}
+
+// Movimento de dinheiro ao nível dos ativos:
+// - 'distribute': parte do dinheiro que entrou no veículo (plano/movimentos) atribuída a este ativo;
+// - 'external': dinheiro que entra (+) ou sai (−) fora do que a app já acompanha (ex.: depósito direto na corretora);
+// - 'transfer': perna de uma transferência entre ativos (mesmo transferGroupId nas duas pernas).
+// `assetId` vazio = "saldo livre" do veículo.
+export interface AssetEntry {
+  id: string
+  date: string // YYYY-MM-DD
+  vehicleId: string
+  assetId?: string
+  amount: number
+  source: 'distribute' | 'external' | 'transfer'
+  transferGroupId?: string
+  note?: string
+  createdAt?: string
+}
+
+// Valor real de um ativo (ou do "saldo livre" de um veículo) numa data,
+// registado à mão quando o utilizador quiser.
+export interface ValueCheckpoint {
+  id: string
+  date: string // YYYY-MM-DD
+  vehicleId: string
+  assetId?: string
+  value: number
+  note?: string
 }
 
 // ---------- Notas / meta ----------
@@ -180,12 +256,16 @@ export interface DataSet {
   savingsMovements: SavingsMovement[]
   transactions: Transaction[]
   transactionCategories: TransactionCategory[]
+  subcategories: Subcategory[]
   categoryRules: CategoryRule[]
   budgets: Budget[]
   projectionPlans: ProjectionPlan[]
   balanceOverrides: BalanceOverride[]
   plannedMovements: PlannedMovement[]
   investmentVehicles: InvestmentVehicle[]
+  investmentAssets: InvestmentAsset[]
+  assetEntries: AssetEntry[]
+  valueCheckpoints: ValueCheckpoint[]
   meta: AppMeta[]
 }
 
@@ -200,12 +280,16 @@ export const COLLECTIONS: CollectionName[] = [
   'savingsMovements',
   'transactions',
   'transactionCategories',
+  'subcategories',
   'categoryRules',
   'budgets',
   'projectionPlans',
   'balanceOverrides',
   'plannedMovements',
   'investmentVehicles',
+  'investmentAssets',
+  'assetEntries',
+  'valueCheckpoints',
   'meta',
 ]
 
@@ -218,12 +302,16 @@ export function emptyDataSet(): DataSet {
     savingsMovements: [],
     transactions: [],
     transactionCategories: [],
+    subcategories: [],
     categoryRules: [],
     budgets: [],
     projectionPlans: [],
     balanceOverrides: [],
     plannedMovements: [],
     investmentVehicles: [],
+    investmentAssets: [],
+    assetEntries: [],
+    valueCheckpoints: [],
     meta: [],
   }
 }

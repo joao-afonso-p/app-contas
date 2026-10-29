@@ -1,11 +1,11 @@
 // Entrega de ficheiros ao utilizador (DOM). Em telemóveis/tablets usa o menu de
 // partilha nativo (descarregar em PWAs iOS é pouco fiável); no computador, descarrega.
-export async function deliverFile(name: string, content: string): Promise<void> {
-  const file = new File([content], name, { type: 'application/json' })
+export async function deliverFile(name: string, content: string, type = 'application/json', title = 'Backup Contas'): Promise<void> {
+  const file = new File([content], name, { type })
   const isTouch = navigator.maxTouchPoints > 0
   if (isTouch && navigator.canShare?.({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: 'Backup Contas' })
+      await navigator.share({ files: [file], title })
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return // cancelou
       throw e

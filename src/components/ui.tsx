@@ -23,6 +23,15 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   )
 }
 
+// Título de macro-secção (Despesas, Poupanças): acima das SectionTitle.
+export function MacroTitle({ children }: { children: ReactNode }) {
+  return (
+    <div className="mb-1 mt-2 border-b border-border pb-2">
+      <h2 className="text-lg font-black text-text">{children}</h2>
+    </div>
+  )
+}
+
 export function MetricCard({
   label, value, hint, tone = 'default', title, info,
 }: {
@@ -54,8 +63,9 @@ export function MetricCard({
 }
 
 export function Button({
-  children, onClick, variant = 'primary', size = 'md', disabled, type = 'button', className, 'aria-label': ariaLabel,
+  children, onClick, variant = 'primary', size = 'md', disabled, type = 'button', className, title, 'aria-label': ariaLabel,
 }: {
+  title?: string
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'ghost' | 'danger' | 'soft'
@@ -78,6 +88,7 @@ export function Button({
       disabled={disabled}
       onClick={onClick}
       aria-label={ariaLabel}
+      title={title}
       className={cx(
         'rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-40',
         variants[variant], sizes[size], className,
@@ -88,12 +99,16 @@ export function Button({
   )
 }
 
+// O padding vertical por defeito (py-2) só se aplica se o className não definir o seu
+// (em Tailwind 4 duas classes py-* em conflito resolvem-se pela ordem do CSS, não da string).
+const hasPy = (c?: string) => /(^|\s)py-/.test(c ?? '')
+
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
       className={cx(
-        'w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text',
+        'w-full rounded-xl border border-border bg-surface px-3 text-sm text-text', !hasPy(props.className) && 'py-2',
         'placeholder:text-muted focus:border-accent focus:outline-none',
         props.className,
       )}
@@ -106,7 +121,8 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     <select
       {...props}
       className={cx(
-        'rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none',
+        'app-select rounded-xl border border-border bg-surface px-3 text-sm text-text focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+        !hasPy(props.className) && 'py-2',
         props.className,
       )}
     />

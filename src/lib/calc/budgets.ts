@@ -86,7 +86,7 @@ export function matchCategoryByName(text: string, categories: TransactionCategor
 }
 
 // Parse de extrato bancário colado (formato fixo de 5 campos:
-// data;nome;categoria;valor;descrição, separados por ; ou tab).
+// data;nome;categoria;valor;descrição — ou, no CSV exportado, com subcategoria — separados por ; ou tab).
 // Devolve linhas candidatas — o utilizador confirma/ajusta antes de importar.
 export interface ParsedRow {
   date: string // YYYY-MM-DD
@@ -106,15 +106,26 @@ export function parseBankStatement(text: string): ParsedRow[] {
     // preservando literalmente qualquer separador extra aí dentro.
     const separators = [...trimmed.matchAll(/\t|;/g)]
     if (separators.length < 4) continue
-    const idx = separators.slice(0, 4).map((m) => m.index)
-    const parts = [
-      trimmed.slice(0, idx[0]),
-      trimmed.slice(idx[0] + 1, idx[1]),
-      trimmed.slice(idx[1] + 1, idx[2]),
-      trimmed.slice(idx[2] + 1, idx[3]),
-      trimmed.slice(idx[3] + 1),
-    ].map((p) => p.trim())
-    const [rawDate, rawNome, rawCategoria, rawValor, rawDescricao] = parts
+    const split = (n: number) => {
+      const idx = separators.slice(0, n).map((m) => m.index)
+      const out: string[] = []
+      let prev = 0
+      for (const i of idx) { out.push(trimmed.slice(prev, i)); prev = i + 1 }
+      out.push(trimmed.slice(prev))
+      return out.map((p) => p.trim())
+    }
+    // Formato exportado: data;nome;categoria;subcategoria;valor;descrição (6 campos).
+    // Distingue-se do de 5 porque o 4.º campo não é um número e o 5.º é.
+    const six = separators.length >= 5 ? split(5) : null
+    const isSix = six !== null && parseEuroNumber(six[3]) === null && parseEuroNumber(six[4]) !== null
+    let rawDate: string, rawNome: string, rawCategoria: string, rawValor: string, rawDescricao: string
+    if (isSix) {
+      rawDate = six![0]; rawNome = six![1]
+      rawCategoria = six![3] ? `${six![2]} / ${six![3]}` : six![2]
+      rawValor = six![4]; rawDescricao = six![5]
+    } else {
+      ;[rawDate, rawNome, rawCategoria, rawValor, rawDescricao] = split(4)
+    }
     const date = parseDate(rawDate)
     if (!date) continue
     const amount = parseEuroNumber(rawValor)
