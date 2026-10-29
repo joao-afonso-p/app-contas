@@ -3,9 +3,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,7 +21,7 @@ import {
   Select,
   cx,
 } from '../components/ui'
-import { ChartLegend, ChartTooltip } from '../components/ChartParts'
+import { ChartTooltip } from '../components/ChartParts'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
@@ -34,7 +31,8 @@ import {
   addMonths,
   currentMonthKey,
   dayOfMonth,
-  fmtEUR,
+  fmtEUR as fmtEURExact,
+  fmtEURWhole as fmtEUR,
   fmtPct,
   monthLabel,
   monthRange,
@@ -105,23 +103,18 @@ export function Overview() {
 
   // ---------- Evolução de saldos ----------
 
-  const geralBucket = buckets.find((b) => b.name.toLowerCase() === 'geral')
-  const [selected, setSelected] = useState<Set<string>>(() => {
-    const initial = new Set<string>(['total'])
-    if (geralBucket) initial.add(geralBucket.id)
-    return initial
-  })
-
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
+  // Baldes escondidos na legenda (a cor de cada balde fica sempre a mesma).
+  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const toggleHidden = (id: string) => {
+    setHidden((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
   }
-
-  const selectedBuckets = buckets.filter((b) => selected.has(b.id))
+  const bucketColor = (id: string) => PALETTE[Math.max(0, buckets.findIndex((b) => b.id === id)) % PALETTE.length]
+  const shownBuckets = buckets.filter((b) => !hidden.has(b.id))
 
   // ---------- Forçar saldo de um balde ----------
   const [forceModal, setForceModal] = useState<{ step: 'form' | 'confirm'; bucketId: string; value: string } | null>(null)
@@ -177,20 +170,9 @@ export function Overview() {
   for (const v of vehiclesWithInitialBalance) addToVehicleTotal(v.id, v.initialBalance ?? 0)
   const vehicleTotals = vehicleTotalOrder.map((id) => vehicleTotalMap.get(id)!)
 
-  // Vista empilhada: mostra como o total se reparte pelos baldes (se só estiver
-  // "Total" selecionado, usa todos os baldes).
-  const [stacked, setStacked] = useState(false)
-  const stackedBuckets = selectedBuckets.length > 0 ? selectedBuckets : buckets
   const stackedData = months.map((m) => {
     const row: Record<string, number | string> = { mes: monthShort(m) }
-    for (const b of stackedBuckets) row[b.name] = bucketBalance(table, b.id, m)
-    return row
-  })
-
-  const chartData = months.map((m) => {
-    const row: Record<string, number | string> = { mes: monthShort(m) }
-    if (selected.has('total')) row.Total = totalBalance(table, m)
-    for (const b of selectedBuckets) row[b.name] = bucketBalance(table, b.id, m)
+    for (const b of shownBuckets) row[b.name] = bucketBalance(table, b.id, m)
     return row
   })
 
@@ -306,7 +288,7 @@ export function Overview() {
                   {b.kind === 'goal' && <Badge tone="goal">Objetivo</Badge>}
                 </div>
                 <div className="mt-1">
-                  <Money value={bucketBalance(table, b.id, accountingMonth)} className="text-lg font-bold" />
+                  <Money whole value={bucketBalance(table, b.id, accountingMonth)} className="text-lg font-bold" />
                 </div>
               </div>
             ))}
@@ -325,90 +307,43 @@ export function Overview() {
           Evolução de saldos
         </SectionTitle>
         <Card>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <button
-              onClick={() => toggleSelect('total')}
-              className={cx(
-                'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                selected.has('total')
-                  ? 'border-accent-strong bg-accent-soft text-accent-strong'
-                  : 'border-border bg-surface text-muted hover:bg-surface-2',
-              )}
-            >
-              Total
-            </button>
-            <button
-              onClick={() => setStacked((v) => !v)}
-              className={cx(
-                'ml-auto rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                stacked
-                  ? 'border-accent-strong bg-accent-strong text-white'
-                  : 'border-border bg-surface text-muted hover:bg-surface-2',
-              )}
-              title="Mostra como o total se reparte pelos baldes"
-            >
-              Empilhado
-            </button>
+          <div className="mb-3 flex flex-wrap gap-2">
             {buckets.map((b) => (
               <button
                 key={b.id}
-                onClick={() => toggleSelect(b.id)}
+                onClick={() => toggleHidden(b.id)}
+                title={hidden.has(b.id) ? 'Mostrar no gráfico' : 'Esconder do gráfico'}
                 className={cx(
-                  'rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
-                  selected.has(b.id)
-                    ? 'border-accent-strong bg-accent-soft text-accent-strong'
-                    : 'border-border bg-surface text-muted hover:bg-surface-2',
+                  'flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold transition-colors hover:bg-surface-2',
+                  hidden.has(b.id) ? 'text-muted opacity-50' : 'text-text',
                 )}
               >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: bucketColor(b.id) }} />
                 {b.name}
               </button>
             ))}
           </div>
-          {stacked ? (
+          {shownBuckets.length === 0 ? (
+            <p className="text-sm text-muted">Mostra pelo menos um balde para ver o gráfico.</p>
+          ) : (
             <ResponsiveContainer height={300}>
               <AreaChart data={stackedData}>
                 <CartesianGrid vertical={false} stroke="var(--border)" />
                 <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip total />} isAnimationActive={false} />
-                <Legend content={<ChartLegend />} />
-                {stackedBuckets.map((b, i) => (
+                <Tooltip content={<ChartTooltip total format={fmtEUR} />} isAnimationActive={false} />
+                {shownBuckets.map((b) => (
                   <Area
                     key={b.id}
                     type="monotone"
                     dataKey={b.name}
                     stackId="s"
-                    stroke={PALETTE[i % PALETTE.length]}
-                    fill={PALETTE[i % PALETTE.length]}
+                    stroke={bucketColor(b.id)}
+                    fill={bucketColor(b.id)}
                     fillOpacity={0.35}
                   />
                 ))}
               </AreaChart>
-            </ResponsiveContainer>
-          ) : selected.size === 0 ? (
-            <p className="text-sm text-muted">Seleciona pelo menos uma série para ver o gráfico.</p>
-          ) : (
-            <ResponsiveContainer height={300}>
-              <LineChart data={chartData}>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip total={false} />} isAnimationActive={false} />
-                <Legend content={<ChartLegend />} />
-                {selected.has('total') && (
-                  <Line type="monotone" dataKey="Total" stroke="var(--accent-strong)" strokeWidth={2.5} dot={false} />
-                )}
-                {selectedBuckets.map((b, i) => (
-                  <Line
-                    key={b.id}
-                    type="monotone"
-                    dataKey={b.name}
-                    stroke={PALETTE[i % PALETTE.length]}
-                    strokeWidth={2.5}
-                    dot={false}
-                  />
-                ))}
-              </LineChart>
             </ResponsiveContainer>
           )}
         </Card>
@@ -434,7 +369,7 @@ export function Overview() {
                 const m = report.month
                 const planRate = savingsRate(income, savingsPlanned)
                 const realRate = income > 0 ? ((income - report.spentCash) / income) * 100 : 0
-                const diff = report.plannedTotal - report.spentCash
+                const diff = report.spentCash - report.plannedTotal
                 return (
                   <tr key={m}>
                     <td className={cx('py-2 pr-3 font-medium', m === calendarMonth && 'text-accent-strong')}>
@@ -444,7 +379,11 @@ export function Overview() {
                     <td className="tnum px-2 py-2 text-right">{report.hasPlan ? fmtEUR(report.plannedTotal) : '—'}</td>
                     <td className="tnum px-2 py-2 text-right">{fmtEUR(report.spentCash)}</td>
                     <td className="px-2 py-2 text-right">
-                      {report.hasPlan ? <Money value={diff} /> : <span className="text-muted">—</span>}
+                      {report.hasPlan ? (
+                        <span className={cx('tnum', diff > 0.5 ? 'text-negative' : diff < -0.5 ? 'text-positive' : '')}>
+                          {diff > 0.5 ? '+' : ''}{fmtEUR(diff)}
+                        </span>
+                      ) : <span className="text-muted">—</span>}
                     </td>
                     <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(planRate) : '—'}</td>
                     <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(realRate) : '—'}</td>
@@ -455,7 +394,7 @@ export function Overview() {
           </table>
           <p className="mt-3 text-xs text-muted">
             "Gasto real" conta o que saiu do orçamento mensal (despesas do plano + gastos ainda sem categoria);
-            gastos pagos pela poupança ficam de fora. "vs. plano" positivo = gastaste menos do que planeaste.
+            gastos pagos pela poupança ficam de fora. "vs. plano" = real − planeado: positivo (vermelho) = gastaste mais do que planeaste; negativo (verde) = gastaste menos.
             "Poupança real" = (income − gasto real) ÷ income.
           </p>
         </Card>
@@ -482,7 +421,7 @@ export function Overview() {
                   <tr key={v.vehicleId}>
                     <td className="py-2 pr-3 font-medium">{v.vehicleName}</td>
                     <td className="px-2 py-2 text-right">
-                      <Money value={v.invested} />
+                      <Money whole value={v.invested} />
                     </td>
                   </tr>
                 ))}
@@ -539,7 +478,7 @@ export function Overview() {
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted">
               Tens a certeza que queres mudar o saldo da <strong>{forceBucket?.name}</strong> de{' '}
-              <strong>{fmtEUR(forceOldValue)}</strong> para <strong>{fmtEUR(forceNewValue)}</strong>?
+              <strong>{fmtEURExact(forceOldValue)}</strong> para <strong>{fmtEURExact(forceNewValue)}</strong>?
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setForceModal({ ...forceModal, step: 'form' })}>

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { fmtEUR, parseAmount } from '../lib/format'
+import { fmtEUR, fmtEURWhole, parseAmount } from '../lib/format'
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
@@ -297,10 +297,10 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 }
 
 // Valor monetário com sinal/cor
-export function Money({ value, className, compact }: { value: number; className?: string; compact?: boolean }) {
+export function Money({ value, className, compact, whole }: { value: number; className?: string; compact?: boolean; whole?: boolean }) {
   return (
     <span className={cx('tnum', value < 0 ? 'text-negative' : '', className)}>
-      {fmtEUR(value, compact)}
+      {(whole ? fmtEURWhole : fmtEUR)(value, compact)}
     </span>
   )
 }
