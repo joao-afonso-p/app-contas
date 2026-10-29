@@ -16,7 +16,7 @@ import { transactionsToCsv } from '../lib/exportTransactions'
 import {
   addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO, uid,
 } from '../lib/format'
-import { activeBuckets, useStore } from '../store/useStore'
+import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
 
 interface PreviewRow {
@@ -41,7 +41,6 @@ export function Gastos() {
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
   const addTransactions = useStore((s) => s.addTransactions)
-  const setTransactionReposto = useStore((s) => s.setTransactionReposto)
   const saveTransaction = useStore((s) => s.saveTransaction)
   const setTransactionCategory = useStore((s) => s.setTransactionCategory)
   const deleteTransaction = useStore((s) => s.deleteTransaction)
@@ -49,7 +48,6 @@ export function Gastos() {
   const setScreen = useStore((s) => s.setScreen)
 
   const groups = activeGroups(data)
-  const buckets = activeBuckets(data)
   const resolve = makeResolver(data)
   const legacyName = (t: Transaction) => data.transactionCategories.find((c) => c.id === t.categoryId)?.name
   const pendingLegacy = legacyNeedingMapping(data)
@@ -134,7 +132,6 @@ export function Gastos() {
   const total = filtered.reduce((sum, t) => sum + t.amount, 0)
   const uncategorizedCount = data.transactions.filter((t) => isUnassigned(resolve(t))).length
 
-  const bucketName = (id: string | undefined) => buckets.find((b) => b.id === id)?.name ?? '—'
 
   // ---------- Modal "+ Gasto" / "Editar gasto" ----------
   const [addOpen, setAddOpen] = useState(false)
@@ -189,8 +186,8 @@ export function Gastos() {
       // Sem categoria: só atualiza os campos simples (mantém a categoria antiga intacta).
       const existing = data.transactions.find((t) => t.id === editingId)
       if (!existing) return
-      const linked = data.savingsMovements.filter((m) => m.transactionId === editingId)
-      if (linked.length && !window.confirm('Este gasto estava pago pela poupança. Ao tirar a categoria, a saída do balde é removida. Continuar?')) return
+      const linked = data.savingsMovements.filter((m) => m.transactionId === editingId && isAutoBucketMovement(m))
+      if (linked.length && !window.confirm('Este gasto tem uma saída automática do balde (de uma versão anterior). Ao tirar a categoria, essa saída é removida. Continuar?')) return
       void put('transactions', {
         ...existing, date, amount, nome: nome.trim() || undefined, description: description.trim(),
         planCategoryId: undefined, subcategoryId: undefined, repoePoupanca: false, fonteBucketId: undefined, reposto: false,
@@ -482,10 +479,10 @@ export function Gastos() {
                     value={resolve(t)}
                     fallbackLabel={legacyName(t)}
                     onSelect={(gid, sid) => {
-                      const hasLinked = data.savingsMovements.some((m) => m.transactionId === t.id)
+                      const hasLinked = data.savingsMovements.some((m) => m.transactionId === t.id && isAutoBucketMovement(m))
                       const goingToBucket = data.savingsBuckets.some((b) => b.id === gid)
                       if (hasLinked && !goingToBucket
-                        && !window.confirm('Este gasto estava pago pela poupança. Ao mudar de categoria, a saída do balde é removida. Continuar?')) return
+                        && !window.confirm('Este gasto tem uma saída automática do balde (de uma versão anterior). Ao mudar de categoria, essa saída é removida. Continuar?')) return
                       void setTransactionCategory(t.id, gid, sid)
                     }}
                     onCreateSubcategory={createSubcategory}
@@ -502,23 +499,6 @@ export function Gastos() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                  {t.repoePoupanca && !t.planCategoryId && (
-                    t.reposto ? (
-                      // Estado (verde) — não clicável; desfazer faz-se no editar.
-                      <span className="shrink-0">
-                        <Badge tone="accent">Reposto ✓</Badge>
-                      </span>
-                    ) : (
-                      // Ação (amarelo) — confirmar reposição cria o movimento.
-                      <button
-                        onClick={() => void setTransactionReposto(t.id, true)}
-                        className="shrink-0"
-                        title="Confirmar reposição (cria o movimento na poupança)"
-                      >
-                        <Badge tone="warn">{`Repor de ${bucketName(t.fonteBucketId)}`}</Badge>
-                      </button>
-                    )
-                  )}
                   <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
                   <button
                     onClick={() => openEdit(t)}
@@ -547,7 +527,7 @@ export function Gastos() {
 
       <p className="text-xs text-muted">
         Dica: escolhe como categoria um balde de poupança (ex.: Geral) quando o gasto é pago pela poupança —
-        sai do balde e não conta contra o orçamento do mês.
+        não conta contra o orçamento do mês. Não mexe no saldo do balde: se quiseres, regista a saída em Movimentos.
       </p>
 
       {/* Modal +Gasto / Editar gasto */}
@@ -606,7 +586,7 @@ export function Gastos() {
           )}
           {data.savingsBuckets.some((b) => b.id === groupId) && (
             <p className="text-xs text-muted">
-              Pago pela poupança: cria uma saída deste valor no balde e não conta contra o orçamento do mês.
+              Pago pela poupança: não conta contra o orçamento do mês e não altera o saldo do balde (regista a saída em Movimentos, se quiseres).
             </p>
           )}
           <div className="grid grid-cols-2 gap-3">

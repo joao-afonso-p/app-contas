@@ -5,7 +5,7 @@ import { allocationSummary } from '../lib/calc/allocation'
 import {
   activeAccountingMonth, bucketBalance, computeBalances, totalBalance, type BalanceTable,
 } from '../lib/calc/balances'
-import { currentMonthKey, fmtEUR, monthRange, monthShort } from '../lib/format'
+import { currentMonthKey, fmtEURWhole as fmtEUR, monthRange, monthShort } from '../lib/format'
 import {
   activeBuckets, activeExpenseCategories, activeIncomeSources, activeVehicles, firstPlanMonth, useStore,
 } from '../store/useStore'
