@@ -28,6 +28,7 @@ import type {
   Transaction,
 } from '../types'
 import { COLLECTIONS, emptyDataSet } from '../types'
+import { initialScreen, pushScreen } from '../lib/route'
 
 export type Screen =
   | 'planeamento'
@@ -63,7 +64,7 @@ interface Store {
   resetAccount(): Promise<void>
   importBackup(data: DataSet): Promise<void>
   completeOnboarding(input: {
-    incomeSources: { name: string; isRent: boolean }[]
+    incomeSources: { name: string; isRent: boolean; expectedDay?: number }[]
     expenseCategories: { name: string; subcategories?: string[] }[]
     buckets: { name: string; kind: BucketKind; targetAmount?: number; targetDate?: MonthKey; initialValue: number }[]
     vehicles: { name: string; initialValue: number }[]
@@ -79,6 +80,7 @@ interface Store {
   remove(c: CollectionName, id: string): Promise<void>
 
   // Planeamento
+  setLateTransferred(month: MonthKey, incomeId: string, done: boolean): Promise<void>
   setPlanValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
   setProjectionValue(month: MonthKey, section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, value: number): Promise<void>
   setProjectionRange(section: 'income' | 'expenses' | 'savings' | 'autoInvestments', id: string, months: MonthKey[], value: number): Promise<void>
@@ -138,7 +140,7 @@ export const useStore = create<Store>((set, get) => ({
   mode: 'local',
   spaceCode: null,
   data: emptyDataSet(),
-  screen: 'overview',
+  screen: initialScreen(),
   month: currentMonthKey(),
   theme: (localStorage.getItem(LS_THEME) as 'light' | 'dark') ||
     (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
@@ -211,7 +213,7 @@ export const useStore = create<Store>((set, get) => ({
     const month = addMonths(currentMonthKey(), -1)
 
     const incomeSourceDocs: IncomeSource[] = incomeSources.map((s, i) => ({
-      id: uid(), name: s.name, isRent: s.isRent, archived: false, order: i,
+      id: uid(), name: s.name, isRent: s.isRent, ...(s.expectedDay ? { expectedDay: s.expectedDay } : {}), archived: false, order: i,
     }))
     const expenseCategoryDocs: ExpenseCategory[] = expenseCategories.map((c, i) => ({
       id: uid(), name: c.name, archived: false, order: i,
@@ -298,7 +300,10 @@ export const useStore = create<Store>((set, get) => ({
     set({ mode: 'local', spaceCode: null })
   },
 
-  setScreen: (screen) => set({ screen }),
+  setScreen: (screen) => {
+    pushScreen(screen)
+    set({ screen })
+  },
   setMonth: (month) => set({ month }),
   toggleTheme: () => {
     const theme = get().theme === 'dark' ? 'light' : 'dark'
@@ -311,6 +316,17 @@ export const useStore = create<Store>((set, get) => ({
 
   // Editar um campo cria/atualiza sempre um rascunho (closed: false) — só passa
   // a contar para os saldos quando o utilizador aplicar o plano (`applyPlan`).
+  // Marca/desmarca o lembrete "já transferi" de um income que chega depois.
+  // Só grava no plano já existente e não mexe no estado aplicado (closed).
+  async setLateTransferred(month, incomeId, done) {
+    const existing = get().data.monthlyPlans.find((p) => p.id === month)
+    if (!existing) return
+    await adapter!.put('monthlyPlans', {
+      ...existing,
+      lateTransferred: { ...existing.lateTransferred, [incomeId]: done },
+    })
+  },
+
   async setPlanValue(month, section, id, value) {
     const existing = get().data.monthlyPlans.find((p) => p.id === month)
     const base = existing ?? effectivePlan(get().data, month)

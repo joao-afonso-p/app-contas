@@ -45,6 +45,18 @@ export function allocationSummary(
   }
 }
 
+// Estado da alocação de um mês (regra única para Planeamento e Projeções):
+// falta alocar, alocado a mais (excesso) ou certo. `amount` é sempre positivo —
+// o sentido diz-se com palavras, não com o sinal.
+export type AllocationState = 'falta' | 'excesso' | 'certo'
+
+export function allocationState(unallocated: number): { state: AllocationState; amount: number } {
+  if (Math.abs(unallocated) < 0.005) return { state: 'certo', amount: 0 }
+  return unallocated > 0
+    ? { state: 'falta', amount: round2(unallocated) }
+    : { state: 'excesso', amount: round2(-unallocated) }
+}
+
 export function round2(n: number): number {
   return Math.round(n * 100) / 100
 }

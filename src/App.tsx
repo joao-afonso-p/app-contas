@@ -1,5 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { needsOnboarding, useStore, type Screen } from './store/useStore'
+import { screenFromHash } from './lib/route'
 import { cx } from './components/ui'
 import { trackEvent, trackView } from './lib/analytics'
 import { Welcome } from './screens/Welcome'
@@ -52,6 +53,39 @@ export function App() {
   useEffect(() => {
     void init()
   }, [init])
+
+  // Navegação por hash: o botão "voltar"/"avançar" muda o ecrã.
+  const fromPop = useRef(false)
+  useEffect(() => {
+    const onPop = () => {
+      const next = screenFromHash(location.hash) ?? 'overview'
+      if (next !== useStore.getState().screen) {
+        fromPop.current = true
+        useStore.setState({ screen: next })
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  // Scroll: ao abrir um ecrã vai ao topo; ao voltar atrás repõe a posição em que estavas.
+  const lastY = useRef(0)
+  const savedY = useRef(new Map<string, number>())
+  const prevScreen = useRef(screen)
+  useEffect(() => {
+    const onScroll = () => { lastY.current = window.scrollY }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  useLayoutEffect(() => {
+    if (prevScreen.current === screen) return
+    savedY.current.set(prevScreen.current, lastY.current)
+    const y = fromPop.current ? savedY.current.get(screen) ?? 0 : 0
+    fromPop.current = false
+    prevScreen.current = screen
+    window.scrollTo(0, y)
+    lastY.current = y
+  }, [screen])
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { useSessionState } from '../lib/sessionState'
 import {
   Bar,
   Rectangle,
@@ -104,7 +105,7 @@ export function Budgets() {
   const put = useStore((s) => s.put)
 
   const currentMonth = currentMonthKey()
-  const [month, setMonth] = useState<MonthKey>(currentMonth)
+  const [month, setMonth] = useSessionState<MonthKey>('analytics.month', currentMonth)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showSubs, setShowSubs] = useState(false)
   // Janela de 12 meses terminada no mês escolhido (para gráfico/histórico).

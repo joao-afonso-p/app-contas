@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ImportBackupCard } from '../components/Backup'
 import { InstallGuideCard } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
+import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
 import { Badge, Button, Card, InfoHint, Input, SectionTitle, Select } from '../components/ui'
 import { trackEvent } from '../lib/analytics'
 import { parseAmount, uid } from '../lib/format'
@@ -12,6 +13,7 @@ interface DraftIncomeSource {
   id: string
   name: string
   isRent: boolean
+  expectedDay?: number
 }
 interface DraftCategory {
   id: string
@@ -50,7 +52,7 @@ export function Onboarding() {
 
   const [incomeSources, setIncomeSources] = useState<DraftIncomeSource[]>([])
   const [incomeName, setIncomeName] = useState('')
-  const [incomeIsRent, setIncomeIsRent] = useState(false)
+  const [incomeTiming, setIncomeTiming] = useState<{ isRent: boolean; expectedDay?: number }>({ isRent: false })
 
   const [expenseCategories, setExpenseCategories] = useState<DraftCategory[]>([])
   const [expenseName, setExpenseName] = useState('')
@@ -72,9 +74,9 @@ export function Onboarding() {
   const addIncomeSource = () => {
     const name = incomeName.trim()
     if (!name) return
-    setIncomeSources((d) => [...d, { id: uid(), name, isRent: incomeIsRent }])
+    setIncomeSources((d) => [...d, { id: uid(), name, ...incomeTiming }])
     setIncomeName('')
-    setIncomeIsRent(false)
+    setIncomeTiming({ isRent: false })
   }
 
   const addExpenseCategory = () => {
@@ -121,7 +123,7 @@ export function Onboarding() {
   const submit = async () => {
     setBusy(true)
     await completeOnboarding({
-      incomeSources: incomeSources.map((s) => ({ name: s.name, isRent: s.isRent })),
+      incomeSources: incomeSources.map((s) => ({ name: s.name, isRent: s.isRent, expectedDay: s.expectedDay })),
       expenseCategories: expenseCategories.map((c) => ({ name: c.name, subcategories: c.subs })),
       buckets: buckets.map((b) => ({
         name: b.name,
@@ -161,7 +163,7 @@ export function Onboarding() {
                 <li key={s.id} className="flex items-center justify-between gap-2 py-2">
                   <span className="flex items-center gap-1.5 text-sm">
                     {s.name}
-                    {s.isRent && <Badge>Renda</Badge>}
+                    {s.isRent && <Badge>{timingLabel(s.expectedDay)}</Badge>}
                   </span>
                   <RemoveButton
                     label={`Remover ${s.name}`}
@@ -179,11 +181,8 @@ export function Onboarding() {
               onKeyDown={(e) => e.key === 'Enter' && addIncomeSource()}
               className="min-w-0 flex-1"
             />
-            <label className="flex items-center gap-1 text-xs text-muted">
-              <input type="checkbox" checked={incomeIsRent} onChange={(e) => setIncomeIsRent(e.target.checked)} />
-              Renda
-            </label>
-            <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>
+            <IncomeTiming {...incomeTiming} onChange={setIncomeTiming} />
+            <InfoHint label="Quando chega?"><RentExplanation /></InfoHint>
             <Button variant="soft" onClick={addIncomeSource} disabled={!incomeName.trim()}>Adicionar</Button>
           </div>
         </Card>

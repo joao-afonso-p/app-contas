@@ -8,10 +8,12 @@ export type MonthKey = string // "2026-07"
 export interface IncomeSource {
   id: string
   name: string
-  // Rendas (ou outros incomes que chegam a meio do mês): são descontadas no
-  // valor "transferir para a poupança" porque a transferência faz-se logo com
-  // o salário e a renda vai direta para a poupança quando chegar.
+  // "Chega depois": income que só entra depois de fazeres a transferência do
+  // mês (ex.: a renda de uma casa). Não conta para "transferir agora" — transfere-se
+  // quando chegar. (O nome do campo mantém-se por compatibilidade com dados antigos.)
   isRent: boolean
+  // Dia do mês previsto para a entrada (só informativo, usado no lembrete).
+  expectedDay?: number
   archived: boolean
   order: number
 }
@@ -57,6 +59,8 @@ export interface MonthlyPlan {
   // saldos (ver computeBalances). `undefined` (registos anteriores a este
   // campo existir) é tratado como aplicado, para não quebrar saldos antigos.
   closed?: boolean
+  // Incomes "chega depois" deste mês já transferidos para a poupança (incomeSourceId -> true).
+  lateTransferred?: Record<string, boolean>
 }
 
 // ---------- Movimentos de poupança ----------

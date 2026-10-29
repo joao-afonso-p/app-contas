@@ -16,7 +16,7 @@ import {
   SectionTitle,
 } from '../components/ui'
 import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
-import { allocationSummary } from '../lib/calc/allocation'
+import { allocationState, allocationSummary } from '../lib/calc/allocation'
 import { withResidual } from '../lib/calc/archive'
 import { bucketBalance, computeBalances, goalProgress, type BalanceTable } from '../lib/calc/balances'
 import { allGroups, makeResolver } from '../lib/calc/categories'
@@ -30,6 +30,8 @@ import {
   useStore,
 } from '../store/useStore'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
+import { LateIncomeCard } from '../components/LateIncomeCard'
 import type { MonthKey, MonthlyPlan, SavingsBucket } from '../types'
 
 export function Planeamento() {
@@ -66,7 +68,7 @@ export function Planeamento() {
   const readOnly = isClosed || !isDesktop
   const summary = allocationSummary(plan, data.incomeSources)
   const geral = data.savingsBuckets.find((b) => b.name.toLowerCase() === 'geral')
-  const isBalanced = Math.abs(summary.unallocated) < 0.005
+  const alloc = allocationState(summary.unallocated)
 
   const diff = monthDiff(currentMonthKey(), month)
   const isExact = Math.abs(summary.unallocated) < 0.001
@@ -121,6 +123,10 @@ export function Planeamento() {
         </div>
       </div>
 
+      {!isClosed && applyBlockedReason && (
+        <p className="-mt-3 text-right text-xs text-muted">{applyBlockedReason}</p>
+      )}
+
       <p className="-mt-3 text-xs text-muted md:hidden">
         No telemóvel o plano é só de leitura — edita-o no computador.
       </p>
@@ -132,9 +138,9 @@ export function Planeamento() {
           title="Total das despesas do mês — fica na conta corrente"
         />
         <MetricCard
-          label="Transferir para a poupança"
+          label="Transferir agora"
           value={fmtEUR(summary.transferToSavings)}
-          hint={`já descontadas rendas de ${fmtEUR(summary.rentIncome)}`}
+          hint={summary.rentIncome > 0.004 ? `e mais ${fmtEUR(summary.rentIncome)} quando chegar` : 'para a poupança'}
           info={
             <TransferToSavingsExplanation
               totalSavings={summary.totalSavings}
@@ -143,12 +149,16 @@ export function Planeamento() {
             />
           }
         />
-        <div className="col-span-2 sm:col-span-1">
+        <div className="col-span-2 flex sm:col-span-1 [&>*]:flex-1">
           <MetricCard
-            label="Por alocar"
-            value={fmtEUR(summary.unallocated)}
-            tone={isBalanced ? 'positive' : summary.unallocated > 0 ? 'warn' : 'negative'}
-            hint={`${fmtPct(summary.allocationPct)} alocado`}
+            label={alloc.state === 'excesso' ? 'Excesso' : 'Por alocar'}
+            value={fmtEUR(alloc.amount)}
+            tone={alloc.state === 'certo' ? 'positive' : alloc.state === 'falta' ? 'warn' : 'negative'}
+            hint={
+              alloc.state === 'excesso'
+                ? `${fmtPct(summary.allocationPct)} alocado, a mais do que o income`
+                : `${fmtPct(summary.allocationPct)} alocado`
+            }
           />
         </div>
       </div>
@@ -158,11 +168,11 @@ export function Planeamento() {
           <div className="text-sm font-semibold">
             {fmtPct(summary.allocationPct)} alocado
             <span className="ml-2 font-normal text-muted">
-              {isBalanced
+              {alloc.state === 'certo'
                 ? '— tudo alocado'
-                : summary.unallocated > 0.005
-                  ? `— faltam ${fmtEUR(summary.unallocated)}`
-                  : `— excesso de ${fmtEUR(Math.abs(summary.unallocated))}`}
+                : alloc.state === 'falta'
+                  ? `— faltam ${fmtEUR(alloc.amount)}`
+                  : `— excesso de ${fmtEUR(alloc.amount)}`}
             </span>
           </div>
           {!readOnly && summary.unallocated > 0.005 && geral && (
@@ -177,8 +187,14 @@ export function Planeamento() {
             </Button>
           )}
         </div>
-        <ProgressBar pct={summary.allocationPct} tone={isBalanced ? 'accent' : 'warn'} className="mt-3" />
+        <ProgressBar
+          pct={summary.allocationPct}
+          tone={alloc.state === 'certo' ? 'accent' : alloc.state === 'falta' ? 'warn' : 'negative'}
+          className="mt-3"
+        />
       </Card>
+
+      <LateIncomeCard month={month} />
 
       <LineSection
         title="Income"
@@ -221,6 +237,7 @@ interface SimpleDoc {
   archived: boolean
   order: number
   isRent?: boolean
+  expectedDay?: number
   // Arquivado mas ainda com valor neste mês: mostrado para poder ser corrigido.
   residual?: boolean
 }
@@ -255,7 +272,7 @@ function LineSection({
   const setPlanValue = useStore((s) => s.setPlanValue)
   const setScreen = useStore((s) => s.setScreen)
   const [newName, setNewName] = useState('')
-  const [newIsRent, setNewIsRent] = useState(false)
+  const [newTiming, setNewTiming] = useState<{ isRent: boolean; expectedDay?: number }>({ isRent: false })
   const [openWarn, setOpenWarn] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<{ name: string; planeamento: MonthKey[]; projecoes: MonthKey[] } | null>(null)
 
@@ -275,10 +292,13 @@ function LineSection({
     const name = newName.trim()
     if (!name) return
     const doc: SimpleDoc = { id: uid(), name, archived: false, order: docs.length }
-    if (collection === 'incomeSources') doc.isRent = newIsRent
+    if (collection === 'incomeSources') {
+      doc.isRent = newTiming.isRent
+      if (newTiming.isRent && newTiming.expectedDay) doc.expectedDay = newTiming.expectedDay
+    }
     void put(collection, doc as never)
     setNewName('')
-    setNewIsRent(false)
+    setNewTiming({ isRent: false })
   }
 
   return (
@@ -311,8 +331,8 @@ function LineSection({
                   </span>
                 )}
                 {showRentBadge && doc.isRent && (
-                  <span title="Chega a meio do mês — é descontada do valor a transferir para a poupança">
-                    <Badge>Renda</Badge>
+                  <span title="Chega depois da transferência do mês — transfere-se quando entrar">
+                    <Badge>{timingLabel(doc.expectedDay)}</Badge>
                   </span>
                 )}
               </div>
@@ -384,16 +404,11 @@ function LineSection({
           className="min-w-0 flex-1"
         />
         {collection === 'incomeSources' && (
-          <label className="flex items-center gap-1 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={newIsRent}
-              onChange={(e) => setNewIsRent(e.target.checked)}
-            />
-            É renda
-          </label>
+          <>
+            <IncomeTiming {...newTiming} onChange={setNewTiming} />
+            <InfoHint label="Quando chega?"><RentExplanation /></InfoHint>
+          </>
         )}
-        {collection === 'incomeSources' && <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>}
         <Button variant="soft" onClick={add} disabled={!newName.trim()}>
           Adicionar
         </Button>

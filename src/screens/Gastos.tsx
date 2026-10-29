@@ -16,6 +16,7 @@ import { transactionsToCsv } from '../lib/exportTransactions'
 import {
   addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO, uid,
 } from '../lib/format'
+import { useSessionState } from '../lib/sessionState'
 import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
 
@@ -61,7 +62,7 @@ export function Gastos() {
   // Default (sem mês escolhido): mês atual + anterior. Escolher um mês no
   // picker restringe a esse mês só; "Limpar" volta ao default.
   const defaultMonths = [currentMonthKey(), addMonths(currentMonthKey(), -1)]
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = useSessionState<string | null>('gastos.month', null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   const [bulkDate, setBulkDate] = useState('')
@@ -410,7 +411,7 @@ export function Gastos() {
           <span className="text-xs text-muted">Total filtrado · {filtered.length} gasto(s)</span>
           <span className="tnum text-lg font-bold text-negative">{fmtEUR(total)}</span>
         </div>
-        <div className="hidden md:block">
+        <div className="hidden md:flex [&>*]:flex-1">
           <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={`${filtered.length} gasto(s)`} />
         </div>
       </div>

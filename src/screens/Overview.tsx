@@ -22,6 +22,7 @@ import {
   cx,
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
+import { LateIncomeCard } from '../components/LateIncomeCard'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
@@ -272,13 +273,15 @@ export function Overview() {
         </Card>
       )}
 
+      <LateIncomeCard month={calendarMonth} onlyPending />
+
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
         <MetricCard label="Na conta do banco" value={fmtEUR(bankBalance)} />
-        <div className="hidden md:block">
-          <MetricCard label="Distribuído em veículos" value={fmtEUR(totalInvested)} />
+        <div className="hidden md:flex [&>*]:flex-1">
+          <MetricCard label="Investidos" value={fmtEUR(totalInvested)} />
         </div>
-        <div className="hidden md:block">
+        <div className="hidden md:flex [&>*]:flex-1">
           <MetricCard
             label="Taxa de poupança (mês)"
             value={fmtPct(currentRate)}

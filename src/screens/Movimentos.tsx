@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useSessionState } from '../lib/sessionState'
 import { Badge, Button, EmptyState, Input, Modal, Select, cx } from '../components/ui'
 import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO } from '../lib/format'
 import { activeBuckets, activeVehicles, useStore } from '../store/useStore'
@@ -43,10 +44,10 @@ export function Movimentos() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTransferGroupId, setEditingTransferGroupId] = useState<string | null>(null)
 
-  const [filterBucket, setFilterBucket] = useState('all')
+  const [filterBucket, setFilterBucket] = useSessionState('movimentos.bucket', 'all')
   // Default (sem mês escolhido): mês atual + anterior. Escolher um mês no
   // picker restringe a esse mês só; "Limpar" volta ao default.
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
+  const [selectedMonth, setSelectedMonth] = useSessionState<string | null>('movimentos.month', null)
   const currentMonth = currentMonthKey()
   const defaultMonths = [currentMonth, addMonths(currentMonth, -1)]
 
