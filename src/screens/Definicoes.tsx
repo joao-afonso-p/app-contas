@@ -6,6 +6,7 @@ import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
 import { BackupSettings } from '../components/Backup'
 import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
+import { IncomeTiming } from '../components/IncomeTiming'
 import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import {
@@ -25,7 +26,7 @@ type EditableList = {
 }
 
 const LISTS: EditableList[] = [
-  { title: 'Fontes de income', collection: 'incomeSources', hint: 'Marca como renda o que chega a meio do mês' },
+  { title: 'Fontes de income', collection: 'incomeSources', hint: 'Indica quando chega cada income: com o salário, ou depois (ex.: rendas)' },
   {
     title: 'Despesas do planeamento',
     collection: 'expenseCategories',
@@ -546,6 +547,7 @@ interface ListDoc {
   archived: boolean
   order: number
   isRent?: boolean
+  expectedDay?: number
   initialBalance?: number
   fixed?: boolean
 }
@@ -617,7 +619,7 @@ function ListEditor({ title, collection, hint }: EditableList) {
         {hint && (
           <p className="mb-2 flex items-center gap-1 text-xs text-muted">
             {hint}
-            {isIncome && <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>}
+            {isIncome && <InfoHint label="Quando chega?"><RentExplanation /></InfoHint>}
           </p>
         )}
         <ul className="divide-y divide-border">
@@ -626,14 +628,11 @@ function ListEditor({ title, collection, hint }: EditableList) {
               <span className={cx('text-sm', doc.archived && 'text-muted line-through')}>{doc.name}</span>
               <div className="flex items-center gap-2">
                 {isIncome && (
-                  <label className="flex items-center gap-1 text-xs text-muted">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(doc.isRent)}
-                      onChange={(e) => void put(collection, { ...doc, isRent: e.target.checked } as never)}
-                    />
-                    Renda
-                  </label>
+                  <IncomeTiming
+                    isRent={Boolean(doc.isRent)}
+                    expectedDay={doc.expectedDay}
+                    onChange={(t) => void put(collection, { ...doc, isRent: t.isRent, expectedDay: t.expectedDay } as never)}
+                  />
                 )}
                 {isVehicle && (
                   <div className="flex items-center gap-1 text-xs text-muted">

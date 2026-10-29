@@ -16,7 +16,7 @@ import {
   SectionTitle,
 } from '../components/ui'
 import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
-import { allocationSummary } from '../lib/calc/allocation'
+import { allocationState, allocationSummary } from '../lib/calc/allocation'
 import { withResidual } from '../lib/calc/archive'
 import { bucketBalance, computeBalances, goalProgress, type BalanceTable } from '../lib/calc/balances'
 import { allGroups, makeResolver } from '../lib/calc/categories'
@@ -29,6 +29,9 @@ import {
   firstPlanMonth,
   useStore,
 } from '../store/useStore'
+import { useIsDesktop } from '../lib/useIsDesktop'
+import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
+import { LateIncomeCard } from '../components/LateIncomeCard'
 import type { MonthKey, MonthlyPlan, SavingsBucket } from '../types'
 
 export function Planeamento() {
@@ -60,9 +63,12 @@ export function Planeamento() {
 
   const plan = effectivePlan(data, month)
   const isClosed = plan.closed === true
+  // No telemóvel o plano é só de leitura (edita-se no computador); só se pode aplicar.
+  const isDesktop = useIsDesktop()
+  const readOnly = isClosed || !isDesktop
   const summary = allocationSummary(plan, data.incomeSources)
   const geral = data.savingsBuckets.find((b) => b.name.toLowerCase() === 'geral')
-  const isBalanced = Math.abs(summary.unallocated) < 0.005
+  const alloc = allocationState(summary.unallocated)
 
   const diff = monthDiff(currentMonthKey(), month)
   const isExact = Math.abs(summary.unallocated) < 0.001
@@ -99,10 +105,14 @@ export function Planeamento() {
           {isClosed && <Badge tone="accent">Plano aplicado</Badge>}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setScreen('historico')}>Ver histórico</Button>
+          <span className="hidden md:inline-flex">
+            <Button variant="ghost" size="sm" onClick={() => setScreen('historico')}>Ver histórico</Button>
+          </span>
           <MonthPicker month={month} onChange={setMonth} minMonth={addMonths(currentMonthKey(), -2)} />
           {isClosed ? (
-            <Button variant="ghost" size="sm" onClick={() => void reopenPlan(month)}>Editar plano</Button>
+            <span className="hidden md:inline-flex">
+              <Button variant="ghost" size="sm" onClick={() => void reopenPlan(month)}>Editar plano</Button>
+            </span>
           ) : (
             <span title={applyBlockedReason}>
               <Button size="sm" disabled={!canApply} onClick={() => void applyPlan(month)}>
@@ -113,16 +123,24 @@ export function Planeamento() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {!isClosed && applyBlockedReason && (
+        <p className="-mt-3 text-right text-xs text-muted">{applyBlockedReason}</p>
+      )}
+
+      <p className="-mt-3 text-xs text-muted md:hidden">
+        No telemóvel o plano é só de leitura — edita-o no computador.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
         <MetricCard
           label="Deixar na conta corrente"
           value={fmtEUR(summary.leaveInCurrent)}
           title="Total das despesas do mês — fica na conta corrente"
         />
         <MetricCard
-          label="Transferir para a poupança"
+          label="Transferir agora"
           value={fmtEUR(summary.transferToSavings)}
-          hint={`já descontadas rendas de ${fmtEUR(summary.rentIncome)}`}
+          hint={summary.rentIncome > 0.004 ? `e mais ${fmtEUR(summary.rentIncome)} quando chegar` : 'para a poupança'}
           info={
             <TransferToSavingsExplanation
               totalSavings={summary.totalSavings}
@@ -131,27 +149,33 @@ export function Planeamento() {
             />
           }
         />
-        <MetricCard
-          label="Por alocar"
-          value={fmtEUR(summary.unallocated)}
-          tone={isBalanced ? 'positive' : summary.unallocated > 0 ? 'warn' : 'negative'}
-          hint={`${fmtPct(summary.allocationPct)} alocado`}
-        />
+        <div className="col-span-2 flex sm:col-span-1 [&>*]:flex-1">
+          <MetricCard
+            label={alloc.state === 'excesso' ? 'Excesso' : 'Por alocar'}
+            value={fmtEUR(alloc.amount)}
+            tone={alloc.state === 'certo' ? 'positive' : alloc.state === 'falta' ? 'warn' : 'negative'}
+            hint={
+              alloc.state === 'excesso'
+                ? `${fmtPct(summary.allocationPct)} alocado, a mais do que o income`
+                : `${fmtPct(summary.allocationPct)} alocado`
+            }
+          />
+        </div>
       </div>
 
-      <Card className="sticky top-2 z-20 shadow-md">
+      <Card className="md:sticky md:top-2 md:z-20 md:shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-semibold">
             {fmtPct(summary.allocationPct)} alocado
             <span className="ml-2 font-normal text-muted">
-              {isBalanced
+              {alloc.state === 'certo'
                 ? '— tudo alocado'
-                : summary.unallocated > 0.005
-                  ? `— faltam ${fmtEUR(summary.unallocated)}`
-                  : `— excesso de ${fmtEUR(Math.abs(summary.unallocated))}`}
+                : alloc.state === 'falta'
+                  ? `— faltam ${fmtEUR(alloc.amount)}`
+                  : `— excesso de ${fmtEUR(alloc.amount)}`}
             </span>
           </div>
-          {!isClosed && summary.unallocated > 0.005 && geral && (
+          {!readOnly && summary.unallocated > 0.005 && geral && (
             <Button
               size="sm"
               variant="soft"
@@ -163,8 +187,14 @@ export function Planeamento() {
             </Button>
           )}
         </div>
-        <ProgressBar pct={summary.allocationPct} tone={isBalanced ? 'accent' : 'warn'} className="mt-3" />
+        <ProgressBar
+          pct={summary.allocationPct}
+          tone={alloc.state === 'certo' ? 'accent' : alloc.state === 'falta' ? 'warn' : 'negative'}
+          className="mt-3"
+        />
       </Card>
+
+      <LateIncomeCard month={month} />
 
       <LineSection
         title="Income"
@@ -173,7 +203,7 @@ export function Planeamento() {
         docs={withResidual(data.incomeSources, [plan], 'income')}
         month={month}
         plan={plan}
-        locked={isClosed}
+        locked={readOnly}
         footerLabel="Total"
         newPlaceholder="Nova fonte de income…"
         showRentBadge
@@ -186,15 +216,15 @@ export function Planeamento() {
         docs={withResidual(data.expenseCategories, [plan], 'expenses')}
         month={month}
         plan={plan}
-        locked={isClosed}
+        locked={readOnly}
         footerLabel="Deixar na conta corrente"
         newPlaceholder="Nova despesa…"
         overruns={overruns}
       />
 
-      <SavingsSection month={month} plan={plan} balanceTable={balanceTable} locked={isClosed} />
+      <SavingsSection month={month} plan={plan} balanceTable={balanceTable} locked={readOnly} />
 
-      <AutoInvestmentSection month={month} plan={plan} locked={isClosed} />
+      <AutoInvestmentSection month={month} plan={plan} locked={readOnly} />
     </div>
   )
 }
@@ -207,6 +237,7 @@ interface SimpleDoc {
   archived: boolean
   order: number
   isRent?: boolean
+  expectedDay?: number
   // Arquivado mas ainda com valor neste mês: mostrado para poder ser corrigido.
   residual?: boolean
 }
@@ -241,7 +272,7 @@ function LineSection({
   const setPlanValue = useStore((s) => s.setPlanValue)
   const setScreen = useStore((s) => s.setScreen)
   const [newName, setNewName] = useState('')
-  const [newIsRent, setNewIsRent] = useState(false)
+  const [newTiming, setNewTiming] = useState<{ isRent: boolean; expectedDay?: number }>({ isRent: false })
   const [openWarn, setOpenWarn] = useState<string | null>(null)
   const [blocked, setBlocked] = useState<{ name: string; planeamento: MonthKey[]; projecoes: MonthKey[] } | null>(null)
 
@@ -261,10 +292,13 @@ function LineSection({
     const name = newName.trim()
     if (!name) return
     const doc: SimpleDoc = { id: uid(), name, archived: false, order: docs.length }
-    if (collection === 'incomeSources') doc.isRent = newIsRent
+    if (collection === 'incomeSources') {
+      doc.isRent = newTiming.isRent
+      if (newTiming.isRent && newTiming.expectedDay) doc.expectedDay = newTiming.expectedDay
+    }
     void put(collection, doc as never)
     setNewName('')
-    setNewIsRent(false)
+    setNewTiming({ isRent: false })
   }
 
   return (
@@ -297,8 +331,8 @@ function LineSection({
                   </span>
                 )}
                 {showRentBadge && doc.isRent && (
-                  <span title="Chega a meio do mês — é descontada do valor a transferir para a poupança">
-                    <Badge>Renda</Badge>
+                  <span title="Chega depois da transferência do mês — transfere-se quando entrar">
+                    <Badge>{timingLabel(doc.expectedDay)}</Badge>
                   </span>
                 )}
               </div>
@@ -311,7 +345,7 @@ function LineSection({
                 {doc.residual ? (
                   <button
                     onClick={() => void put(collection, { ...doc, residual: undefined, archived: false } as never)}
-                    className="rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+                    className="hidden rounded-lg px-2 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text md:block"
                     title="Reativar"
                   >
                     ↺
@@ -319,7 +353,7 @@ function LineSection({
                 ) : (
                   <button
                     onClick={() => archive(doc)}
-                    className="rounded-lg px-2 py-1 text-sm text-muted hover:bg-surface-2 hover:text-negative"
+                    className="hidden rounded-lg px-2 py-1 text-sm text-muted hover:bg-surface-2 hover:text-negative md:block"
                     aria-label={`Arquivar ${doc.name}`}
                     title="Arquivar"
                   >
@@ -361,7 +395,7 @@ function LineSection({
         <span className="text-xs font-semibold uppercase tracking-wide text-muted">{footerLabel}</span>
         <Money value={total} className="text-sm font-bold" />
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 hidden flex-wrap items-center gap-2 md:flex">
         <Input
           placeholder={newPlaceholder}
           value={newName}
@@ -370,16 +404,11 @@ function LineSection({
           className="min-w-0 flex-1"
         />
         {collection === 'incomeSources' && (
-          <label className="flex items-center gap-1 text-xs text-muted">
-            <input
-              type="checkbox"
-              checked={newIsRent}
-              onChange={(e) => setNewIsRent(e.target.checked)}
-            />
-            É renda
-          </label>
+          <>
+            <IncomeTiming {...newTiming} onChange={setNewTiming} />
+            <InfoHint label="Quando chega?"><RentExplanation /></InfoHint>
+          </>
         )}
-        {collection === 'incomeSources' && <InfoHint label="O que é uma renda?"><RentExplanation /></InfoHint>}
         <Button variant="soft" onClick={add} disabled={!newName.trim()}>
           Adicionar
         </Button>
@@ -469,9 +498,11 @@ function SavingsSection({
     <Card>
       <SectionTitle
         right={
-          <Button variant="ghost" size="sm" onClick={() => setScreen('definicoes')}>
-            Gerir baldes
-          </Button>
+          <span className="hidden md:inline-flex">
+            <Button variant="ghost" size="sm" onClick={() => setScreen('definicoes')}>
+              Gerir baldes
+            </Button>
+          </span>
         }
       >
         Poupanças
@@ -512,7 +543,7 @@ function SavingsSection({
                         {fmtEUR(saldo)} / {fmtEUR(bucket.targetAmount ?? 0)}
                         {bucket.targetDate && ` · até ${monthLabel(bucket.targetDate)}`}
                       </span>
-                      <div className="flex flex-wrap gap-1">
+                      <div className="hidden flex-wrap gap-1 md:flex">
                         <button
                           className="rounded-lg px-2 py-1 font-medium text-accent-strong hover:bg-accent-soft"
                           onClick={() => openAction(bucket, 'partial')}
@@ -613,9 +644,11 @@ function AutoInvestmentSection({
     <Card>
       <SectionTitle
         right={
-          <Button variant="ghost" size="sm" onClick={() => setScreen('definicoes')}>
-            Gerir veículos
-          </Button>
+          <span className="hidden md:inline-flex">
+            <Button variant="ghost" size="sm" onClick={() => setScreen('definicoes')}>
+              Gerir veículos
+            </Button>
+          </span>
         }
       >
         Débitos automáticos

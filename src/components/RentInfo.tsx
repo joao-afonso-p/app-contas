@@ -1,27 +1,26 @@
 import { fmtEUR } from '../lib/format'
 
-// Explicação partilhada do que é uma "renda" e porque é descontada do valor a
-// transferir para a poupança (ver IncomeSource.isRent / allocationSummary).
+// Explicação partilhada de "Quando chega?" e de porque é que um income que chega
+// depois não entra na transferência de agora (ver IncomeSource.isRent / allocationSummary).
 export function RentExplanation() {
   return (
     <div className="flex flex-col gap-1.5">
       <p>
-        <strong>Renda</strong> é um income que só chega <strong>a meio do mês</strong>, depois do salário — ex.: a
-        renda de uma casa arrendada.
+        <strong>Quando chega?</strong> Faz a transferência do mês para a poupança quando entra o salário. Se um
+        income (ex.: a renda de uma casa) só chega <strong>depois</strong> disso, escolhe "Chega depois".
       </p>
       <p>
-        A transferência para a poupança faz-se logo quando entra o salário, e nesse dia a renda ainda não chegou.
-        Por isso é <strong>descontada do valor a transferir</strong>: transferes só a diferença e, quando a renda
-        chegar, vai direta para a poupança.
+        Esse valor não entra na transferência de agora: transferes só o resto e, quando ele chegar, passas-o para a
+        poupança. Se chega com o salário (ou antes de aplicares o plano), deixa em "Chega com o salário".
       </p>
       <p className="text-muted">
-        Continua a contar para o total de income e para a alocação de 100% — muda apenas o que transferes à mão.
+        Conta sempre para o total de income e para a alocação de 100%. O dia previsto é só um lembrete.
       </p>
     </div>
   )
 }
 
-// Detalhe do cálculo do cartão "Transferir para a poupança".
+// Detalhe do cálculo do cartão "Transferir agora".
 export function TransferToSavingsExplanation({
   totalSavings,
   rentIncome,
@@ -40,19 +39,18 @@ export function TransferToSavingsExplanation({
           <span>{fmtEUR(totalSavings)}</span>
         </div>
         <div className="flex justify-between gap-2">
-          <span>− Rendas</span>
+          <span>− Chega depois</span>
           <span>{fmtEUR(rentIncome)}</span>
         </div>
         <div className="flex justify-between gap-2 border-t border-border pt-0.5 font-semibold">
-          <span>= A transferir agora</span>
+          <span>= Transferir agora</span>
           <span>{fmtEUR(transferToSavings)}</span>
         </div>
       </div>
       <p>
-        As rendas chegam a meio do mês, depois do salário — por isso não as transferes agora: quando chegarem vão
-        diretas para a poupança. No fim do mês, a poupança recebe o total de {fmtEUR(totalSavings)}.
+        O valor "chega depois" transfere-se quando entrar. No fim, a poupança recebe o total de {fmtEUR(totalSavings)}.
       </p>
-      <p className="text-muted">Marca/desmarca o que é renda nas fontes de income (Definições).</p>
+      <p className="text-muted">Define o que chega depois nas fontes de income (Definições).</p>
     </div>
   )
 }

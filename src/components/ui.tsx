@@ -56,7 +56,7 @@ export function MetricCard({
         {label}
         {info && <InfoHint label={`Sobre "${label}"`}>{info}</InfoHint>}
       </div>
-      <div className={cx('tnum mt-1 truncate text-2xl font-bold', tones[tone])} title={title}>{value}</div>
+      <div className={cx('tnum mt-1 truncate text-2xl font-bold lg:text-[1.75rem]', tones[tone])} title={title}>{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </Card>
   )

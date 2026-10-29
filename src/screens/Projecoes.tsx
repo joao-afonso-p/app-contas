@@ -9,7 +9,7 @@ import {
 import {
   addMonths, currentMonthKey, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
 } from '../lib/format'
-import { allocationSummary } from '../lib/calc/allocation'
+import { allocationState, allocationSummary } from '../lib/calc/allocation'
 import { withResidual } from '../lib/calc/archive'
 import { activeAccountingMonth, bucketBalance, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
 import {
@@ -313,7 +313,8 @@ export function Projecoes() {
                   </th>
                   {months.map((m, ci) => {
                     const summary = allocationSummary(planByMonth.get(m), incomeSources)
-                    const isBalanced = Math.abs(summary.unallocated) < 0.005
+                    const alloc = allocationState(summary.unallocated)
+                    const isBalanced = alloc.state === 'certo'
                     return (
                       <GridHeaderCell key={m} grid={grid} c={ci}>
                         <div className="tnum flex items-center justify-end gap-1 text-xs font-semibold text-muted">
@@ -333,11 +334,18 @@ export function Projecoes() {
                           )}
                           {monthShort(m)}
                         </div>
-                        <div className={cx('tnum mt-0.5 text-[11px] font-normal', isBalanced ? 'text-muted' : 'text-negative')}>
+                        <div className="tnum mt-0.5 text-[11px] font-normal text-muted">
                           {fmtPct(summary.allocationPct)}
                         </div>
-                        <div className={cx('tnum text-[11px] font-normal', isBalanced ? 'text-muted' : 'text-negative')}>
-                          {fmtEUR(summary.unallocated)}
+                        <div
+                          className={cx(
+                            'tnum text-[11px] font-normal',
+                            isBalanced ? 'text-muted' : alloc.state === 'falta' ? 'text-warn' : 'text-negative',
+                          )}
+                        >
+                          {alloc.state === 'certo'
+                            ? '✓ alocado'
+                            : `${alloc.state === 'falta' ? 'faltam' : 'excesso'} ${fmtEUR(alloc.amount)}`}
                         </div>
                       </GridHeaderCell>
                     )

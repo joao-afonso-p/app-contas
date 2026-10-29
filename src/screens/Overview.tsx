@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -22,6 +22,7 @@ import {
   cx,
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
+import { LateIncomeCard } from '../components/LateIncomeCard'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
@@ -35,6 +36,7 @@ import {
   fmtEURWhole as fmtEUR,
   fmtPct,
   monthLabel,
+  monthOfDate,
   monthRange,
   monthShort,
   parseAmount,
@@ -42,7 +44,9 @@ import {
 } from '../lib/format'
 import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, useStore, vehicleAllocations } from '../store/useStore'
 
-const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6']
+// Uma cor distinta por balde (até 9) — a linha do total tem a sua própria cor.
+const BUCKET_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#06b6d4']
+const TOTAL_KEY = 'total'
 
 export function Overview() {
   const data = useStore((s) => s.data)
@@ -103,18 +107,45 @@ export function Overview() {
 
   // ---------- Evolução de saldos ----------
 
-  // Baldes escondidos na legenda (a cor de cada balde fica sempre a mesma).
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
-  const toggleHidden = (id: string) => {
-    setHidden((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  // Série mostrada no gráfico: o total poupado (por defeito) ou um balde.
+  const [series, setSeries] = useState<string>(TOTAL_KEY)
+  const seriesBucket = buckets.find((b) => b.id === series)
+  const seriesColor = seriesBucket
+    ? BUCKET_COLORS[buckets.findIndex((b) => b.id === seriesBucket.id) % BUCKET_COLORS.length]
+    : 'var(--accent-strong)'
+
+  // Total poupado ao longo do tempo = saldos dos baldes + tudo o que já foi para
+  // veículos até esse mês. O último ponto usa exatamente o valor do cartão.
+  const savedByMonth = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const m of months) {
+      let episodic = 0
+      for (const mv of data.savingsMovements) {
+        if (mv.vehicleId && monthOfDate(mv.date) <= m) episodic += -mv.amount
+      }
+      const auto = [...autoInvestmentTotals(data, m).values()].reduce((acc, v) => acc + v, 0)
+      map.set(m, round2(totalBalance(table, m) + episodic + auto + initialInvested))
+    }
+    map.set(accountingMonth, round2(totalSaved))
+    return map
+  }, [months, data, table, initialInvested, accountingMonth, totalSaved])
+
+  const chartData = months.map((m) => ({
+    mes: monthShort(m),
+    [seriesBucket?.name ?? 'Total poupado']: seriesBucket ? bucketBalance(table, seriesBucket.id, m) : savedByMonth.get(m) ?? 0,
+  }))
+
+  // Variação de cada balde face ao mês anterior, separando o que saiu para
+  // investimento (dinheiro que continua teu) do resto.
+  const prevMonth = months.length > 1 ? months[months.length - 2] : undefined
+  const bucketChange = (bucketId: string) => {
+    if (!prevMonth) return null
+    const delta = bucketBalance(table, bucketId, accountingMonth) - bucketBalance(table, bucketId, prevMonth)
+    const invested = data.savingsMovements
+      .filter((mv) => mv.bucketId === bucketId && mv.vehicleId && monthOfDate(mv.date) === accountingMonth)
+      .reduce((acc, mv) => acc - mv.amount, 0)
+    return { other: round2(delta + invested), invested: round2(invested) }
   }
-  const bucketColor = (id: string) => PALETTE[Math.max(0, buckets.findIndex((b) => b.id === id)) % PALETTE.length]
-  const shownBuckets = buckets.filter((b) => !hidden.has(b.id))
 
   // ---------- Forçar saldo de um balde ----------
   const [forceModal, setForceModal] = useState<{ step: 'form' | 'confirm'; bucketId: string; value: string } | null>(null)
@@ -169,12 +200,6 @@ export function Overview() {
   for (const [vehicleId, invested] of autoTotals.entries()) addToVehicleTotal(vehicleId, invested)
   for (const v of vehiclesWithInitialBalance) addToVehicleTotal(v.id, v.initialBalance ?? 0)
   const vehicleTotals = vehicleTotalOrder.map((id) => vehicleTotalMap.get(id)!)
-
-  const stackedData = months.map((m) => {
-    const row: Record<string, number | string> = { mes: monthShort(m) }
-    for (const b of shownBuckets) row[b.name] = bucketBalance(table, b.id, m)
-    return row
-  })
 
   // ---------- Plano vs. real (últimos 6 meses até ao mês de calendário) ----------
 
@@ -231,7 +256,7 @@ export function Overview() {
           </SectionTitle>
           <ul className="flex flex-col gap-2">
             {insights.slice(0, 4).map((i, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm">
+              <li key={idx} className={cx('items-start gap-2 text-sm', idx >= 2 ? 'hidden md:flex' : 'flex')}>
                 <span className="mt-0.5">
                   {i.kind === 'over' ? '🔴' : i.kind === 'recurring' ? '🔁' : i.kind === 'unassigned' ? '⚠️' : '🟠'}
                 </span>
@@ -239,28 +264,30 @@ export function Overview() {
               </li>
             ))}
             {insights.length > 4 && (
-              <li className="text-xs text-muted">+ {insights.length - 4} alertas em Analytics</li>
+              <li className="hidden text-xs text-muted md:block">+ {insights.length - 4} alertas em Analytics</li>
+            )}
+            {insights.length > 2 && (
+              <li className="text-xs text-muted md:hidden">+ {insights.length - 2} alertas em Analytics (desktop)</li>
             )}
           </ul>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <LateIncomeCard month={calendarMonth} onlyPending />
+
+      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
-        <MetricCard
-          label="Na conta do banco"
-          value={fmtEUR(bankBalance)}
-          hint="depois de distribuído em veículos"
-        />
-        <MetricCard
-          label="Distribuído em veículos"
-          value={fmtEUR(totalInvested)}
-        />
-        <MetricCard
-          label="Taxa de poupança (mês)"
-          value={fmtPct(currentRate)}
-          hint={`do income de ${monthLabel(accountingMonth)}`}
-        />
+        <MetricCard label="Na conta do banco" value={fmtEUR(bankBalance)} />
+        <div className="hidden md:flex [&>*]:flex-1">
+          <MetricCard label="Investidos" value={fmtEUR(totalInvested)} />
+        </div>
+        <div className="hidden md:flex [&>*]:flex-1">
+          <MetricCard
+            label="Taxa de poupança (mês)"
+            value={fmtPct(currentRate)}
+            hint={`do income de ${monthLabel(accountingMonth)}`}
+          />
+        </div>
       </div>
 
       <section>
@@ -280,16 +307,18 @@ export function Overview() {
           Saldos por balde
         </SectionTitle>
         <Card>
+          <p className="mb-2 text-[11px] text-muted md:hidden">Setas: variação face ao mês passado.</p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {buckets.map((b) => (
               <div key={b.id} className="rounded-xl border border-border bg-surface p-3">
-                <div className="flex items-center gap-1.5">
-                  <div className="truncate text-xs font-medium text-muted">{b.name}</div>
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                  <div className="break-words text-xs font-medium text-muted">{b.name}</div>
                   {b.kind === 'goal' && <Badge tone="goal">Objetivo</Badge>}
                 </div>
                 <div className="mt-1">
-                  <Money whole value={bucketBalance(table, b.id, accountingMonth)} className="text-lg font-bold" />
+                  <Money whole value={bucketBalance(table, b.id, accountingMonth)} className="text-lg font-bold lg:text-2xl" />
                 </div>
+                <BucketChange change={bucketChange(b.id)} />
               </div>
             ))}
           </div>
@@ -299,57 +328,54 @@ export function Overview() {
       <section>
         <SectionTitle
           right={
-            <Button variant="ghost" size="sm" onClick={() => setScreen('historico')}>
-              Ver histórico completo
-            </Button>
+            <span className="hidden md:inline-flex">
+              <Button variant="ghost" size="sm" onClick={() => setScreen('historico')}>
+                Ver histórico completo
+              </Button>
+            </span>
           }
         >
           Evolução de saldos
         </SectionTitle>
         <Card>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {buckets.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => toggleHidden(b.id)}
-                title={hidden.has(b.id) ? 'Mostrar no gráfico' : 'Esconder do gráfico'}
-                className={cx(
-                  'flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold transition-colors hover:bg-surface-2',
-                  hidden.has(b.id) ? 'text-muted opacity-50' : 'text-text',
-                )}
-              >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: bucketColor(b.id) }} />
-                {b.name}
-              </button>
-            ))}
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="hidden text-xs font-medium text-muted md:block">
+              {seriesBucket ? `Saldo de ${seriesBucket.name}` : 'Total poupado (baldes + investido)'}
+            </div>
+            <Select value={series} onChange={(e) => setSeries(e.target.value)} aria-label="Série do gráfico" className="w-full md:w-auto">
+              <option value={TOTAL_KEY}>Total poupado</option>
+              {buckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
           </div>
-          {shownBuckets.length === 0 ? (
-            <p className="text-sm text-muted">Mostra pelo menos um balde para ver o gráfico.</p>
-          ) : (
-            <ResponsiveContainer height={300}>
-              <AreaChart data={stackedData}>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<ChartTooltip total format={fmtEUR} />} isAnimationActive={false} />
-                {shownBuckets.map((b) => (
-                  <Area
-                    key={b.id}
-                    type="monotone"
-                    dataKey={b.name}
-                    stackId="s"
-                    stroke={bucketColor(b.id)}
-                    fill={bucketColor(b.id)}
-                    fillOpacity={0.35}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
+          <div className="h-[220px] md:h-[280px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--border)" />
+              <XAxis dataKey="mes" tick={{ fill: 'var(--muted)', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis
+                tick={{ fill: 'var(--muted)', fontSize: 12 }}
+                axisLine={false}
+                tickLine={false}
+                domain={['auto', 'auto']}
+                tickFormatter={(v: number) => String(Math.trunc(v))}
+              />
+              <Tooltip content={<ChartTooltip total={false} format={fmtEUR} />} isAnimationActive={false} />
+              <Line
+                type="monotone"
+                dataKey={seriesBucket?.name ?? 'Total poupado'}
+                stroke={seriesColor}
+                strokeWidth={2.5}
+                dot={{ r: 3.5, fill: seriesColor, stroke: 'var(--surface)', strokeWidth: 1.5 }}
+                activeDot={{ r: 6 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          </div>
         </Card>
       </section>
 
-      <section>
+      <section className="hidden md:block">
         <SectionTitle>Mês a mês: plano vs. real</SectionTitle>
         <Card className="overflow-x-auto thin-scroll">
           <table className="w-full min-w-[640px] text-sm">
@@ -434,7 +460,7 @@ export function Overview() {
               </tfoot>
             </table>
           )}
-          <p className="mt-3 text-xs text-muted">
+          <p className="mt-3 hidden text-xs text-muted md:block">
             A gestão dos veículos disponíveis faz-se em Definições. Para investir, regista um movimento de saída
             marcado como investimento, ou define um débito automático no Planeamento.
           </p>
@@ -489,6 +515,29 @@ export function Overview() {
           </div>
         )}
       </Modal>
+    </div>
+  )
+}
+
+// Variação mensal de um balde. O que saiu para investimento não é "perda":
+// aparece à parte, a cinzento, como "→ X € investidos".
+function BucketChange({ change }: { change: { other: number; invested: number } | null }) {
+  if (!change) return null
+  const { other, invested } = change
+  const hasOther = Math.abs(other) >= 1
+  const hasInvested = invested >= 1
+  const sign = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmtEUR(Math.abs(v))}`
+  if (!hasOther && !hasInvested) {
+    return <div className="mt-0.5 text-[11px] text-muted">· sem variação</div>
+  }
+  return (
+    <div className="mt-0.5 flex flex-col text-[11px]">
+      {hasOther && (
+        <span className={other > 0 ? 'text-positive' : 'text-negative'}>
+          {other > 0 ? '↑' : '↓'} {sign(other)}<span className="hidden md:inline"> vs mês passado</span>
+        </span>
+      )}
+      {hasInvested && <span className="text-muted">→ {fmtEUR(invested)} investidos</span>}
     </div>
   )
 }
