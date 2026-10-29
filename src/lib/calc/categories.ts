@@ -225,7 +225,7 @@ export function legacyNeedingMapping(d: DataSet): { category: TransactionCategor
 // Escolher um balde como categoria principal = gasto pago pela poupança: marca
 // os campos legados (repoePoupanca/fonteBucketId/reposto) para continuarem
 // coerentes com backups e versões antigas da app. A saída do balde é criada
-// em useStore (saveTransaction/addTransactions).
+// NÃO é criada nenhuma saída: categorizar nunca altera saldos.
 export function txCategoryFields(
   d: Pick<DataSet, 'savingsBuckets'>,
   groupId: string | undefined,
@@ -237,7 +237,7 @@ export function txCategoryFields(
     subcategoryId: groupId && subcategoryId ? subcategoryId : undefined,
     repoePoupanca: isBucket,
     fonteBucketId: isBucket ? groupId : undefined,
-    reposto: isBucket,
+    reposto: false,
   }
 }
 

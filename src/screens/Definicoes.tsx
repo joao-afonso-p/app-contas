@@ -14,7 +14,7 @@ import {
 import { normalizeDesc } from '../lib/calc/budgets'
 import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
 import { currentMonthKey, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
-import { allocationBlock, firstPlanMonth, useStore } from '../store/useStore'
+import { allocationBlock, firstPlanMonth, isAutoBucketMovement, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
 
@@ -171,6 +171,8 @@ export function Definicoes() {
           </Card>
         </section>
       )}
+
+      <AutoMovementsSection />
 
       <SavingsSection />
 
@@ -1076,6 +1078,47 @@ function OrphanExpensesSection() {
             )}
           </div>
         )}
+      </Card>
+    </section>
+  )
+}
+
+// ---------- Saídas de poupança criadas automaticamente ao categorizar ----------
+
+function AutoMovementsSection() {
+  const data = useStore((s) => s.data)
+  const revert = useStore((s) => s.revertAutoBucketMovements)
+  const auto = useMemo(() => data.savingsMovements.filter(isAutoBucketMovement), [data.savingsMovements])
+  if (auto.length === 0) return null
+  const total = auto.reduce((sum, m) => sum + Math.abs(m.amount), 0)
+  const perBucket = new Map<string, number>()
+  for (const m of auto) perBucket.set(m.bucketId, (perBucket.get(m.bucketId) ?? 0) + Math.abs(m.amount))
+
+  const apply = async () => {
+    if (!window.confirm(`Remover ${auto.length} saídas "Gasto: …" (${fmtEUR(total, true)}) e devolver esse valor aos baldes? Os gastos ficam intactos. Exporta um backup antes, se ainda não o fizeste.`)) return
+    await revert()
+  }
+
+  return (
+    <section>
+      <SectionTitle>Saídas de poupança automáticas</SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          Por engano, categorizar um gasto com um balde criou uma saída desse balde (movimentos "Gasto: …"). Já não acontece.
+          Aqui podes remover essas saídas: os saldos dos baldes voltam ao que eram e os gastos ficam como estão.
+          Não toca nas reposições confirmadas à mão ("Reposição: …").
+        </p>
+        <ul className="mb-3 flex flex-col gap-1 text-sm">
+          {[...perBucket.entries()].map(([id, v]) => (
+            <li key={id} className="flex justify-between">
+              <span>{data.savingsBuckets.find((b) => b.id === id)?.name ?? 'Balde'}</span>
+              <span className="tnum text-muted">{fmtEUR(v, true)}</span>
+            </li>
+          ))}
+        </ul>
+        <Button size="sm" variant="danger" onClick={() => void apply()}>
+          Remover {auto.length} saídas ({fmtEUR(total, true)})
+        </Button>
       </Card>
     </section>
   )

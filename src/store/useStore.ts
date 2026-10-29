@@ -113,6 +113,7 @@ interface Store {
   // também os gastos que estavam nessas despesas.
   mergeExpensesInto(fromIds: string[], targetId: string, moveTransactions: boolean): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
+  revertAutoBucketMovements(): Promise<number>
 
   // Objetivos extraordinários
   goalPartialPayment(bucketId: string, amount: number, description: string): Promise<void>
@@ -424,8 +425,6 @@ export const useStore = create<Store>((set, get) => ({
   async addTransactions(ts) {
     const docs: Transaction[] = ts.map((t) => ({ ...t, id: uid(), createdAt: nowISO() }))
     await adapter!.putMany('transactions', docs)
-    const movements = docs.filter(hasBucketMovement).map((t) => movementFor(t))
-    if (movements.length) await adapter!.putMany('savingsMovements', movements)
   },
 
   async saveTransaction(fields, existingId) {
@@ -478,6 +477,19 @@ export const useStore = create<Store>((set, get) => ({
 
   // Confirmar reposição cria automaticamente a saída do balde de origem;
   // desmarcar remove esse movimento. Sentido único: gastos -> movimentos.
+  // Limpeza única: remove as saídas "Gasto: …" criadas automaticamente e volta a
+  // marcar esses gastos como não repostos. Os gastos em si ficam intactos.
+  async revertAutoBucketMovements() {
+    const { data } = get()
+    const auto = data.savingsMovements.filter(isAutoBucketMovement)
+    for (const m of auto) {
+      const t = data.transactions.find((x) => x.id === m.transactionId)
+      if (t?.reposto) await adapter!.put('transactions', { ...t, reposto: false })
+      await adapter!.remove('savingsMovements', m.id)
+    }
+    return auto.length
+  },
+
   async setTransactionReposto(transactionId, reposto) {
     const transaction = get().data.transactions.find((t) => t.id === transactionId)
     if (!transaction) return
@@ -552,22 +564,16 @@ export const useStore = create<Store>((set, get) => ({
   },
 }))
 
-// ---------- Gastos pagos pela poupança ----------
+// ---------- Gastos com balde como categoria ----------
+// Categorizar um gasto com um balde NUNCA cria nem apaga movimentos de poupança
+// por si. Só se mantém em sincronia (data/valor/balde) uma saída já existente e
+// ligada a esse gasto (reposição confirmada à mão, no fluxo antigo).
 
-const hasBucketMovement = (t: Transaction): boolean =>
-  Boolean(t.repoePoupanca && t.reposto && t.fonteBucketId)
+// Saídas criadas automaticamente ao categorizar (descrição "Gasto: …"). As
+// "Reposição: …" do fluxo antigo (confirmadas à mão) nunca são tocadas.
+export const isAutoBucketMovement = (m: SavingsMovement): boolean =>
+  Boolean(m.transactionId) && m.description.startsWith('Gasto: ')
 
-const movementFor = (t: Transaction, existing?: SavingsMovement): SavingsMovement => ({
-  ...(existing ?? { id: uid(), createdAt: nowISO() }),
-  date: t.date,
-  bucketId: t.fonteBucketId as string,
-  amount: -Math.abs(t.amount),
-  description: `Gasto: ${t.nome || t.description || 'sem descrição'}`,
-  transactionId: t.id,
-})
-
-// Grava um gasto e mantém a saída da poupança em sincronia (só para gastos
-// cuja categoria principal é um balde).
 async function writeTransaction(
   data: DataSet,
   existing: Transaction | undefined,
@@ -576,12 +582,13 @@ async function writeTransaction(
   subcategoryId: string | undefined,
 ): Promise<void> {
   const linked = existing ? data.savingsMovements.filter((m) => m.transactionId === existing.id) : []
-  // Reposição antiga lançada à mão (sem movimento ligado): nunca criar outro.
-  const manualReposto = Boolean(existing?.reposto && linked.length === 0)
   let cat = txCategoryFields(data, groupId, subcategoryId)
-  // Gasto antigo "repor da poupança" ainda pendente, sem mudar de balde: mantém
-  // o estado (a confirmação continua a ser feita na lista).
-  if (existing && !existing.planCategoryId && existing.repoePoupanca && existing.fonteBucketId === groupId) {
+  // Reposição já confirmada e ligada a uma saída, sem mudar de balde: mantém-na.
+  const keepLinked =
+    Boolean(existing?.reposto) && linked.length > 0 && cat.fonteBucketId !== undefined && existing?.fonteBucketId === cat.fonteBucketId
+  if (keepLinked) cat = { ...cat, reposto: true }
+  // Gasto antigo "repor da poupança" pendente, sem mudar de balde: mantém o estado.
+  else if (existing && !existing.planCategoryId && existing.repoePoupanca && existing.fonteBucketId === groupId) {
     cat = { ...cat, reposto: existing.reposto }
   }
   const tx: Transaction = existing
@@ -589,13 +596,15 @@ async function writeTransaction(
     : { id: uid(), createdAt: nowISO(), categoryId: '', date: '', amount: 0, description: '', ...base, ...cat }
   await adapter!.put('transactions', tx)
 
-  if (!hasBucketMovement(tx)) {
-    for (const m of linked) await adapter!.remove('savingsMovements', m.id)
-    return
+  // Saída ligada: só acompanha data/valor se o balde se mantém. Se o gasto deixou
+  // de ser do balde, a saída (que a app criou) é removida para não distorcer o saldo.
+  if (keepLinked) {
+    const m = linked[0]
+    await adapter!.put('savingsMovements', { ...m, date: tx.date, amount: -Math.abs(tx.amount) })
+    for (const extra of linked.slice(1)) await adapter!.remove('savingsMovements', extra.id)
+  } else if (existing?.reposto && linked.length > 0 && !tx.reposto) {
+    for (const m of linked.filter(isAutoBucketMovement)) await adapter!.remove('savingsMovements', m.id)
   }
-  if (manualReposto) return
-  await adapter!.put('savingsMovements', movementFor(tx, linked[0]))
-  for (const m of linked.slice(1)) await adapter!.remove('savingsMovements', m.id)
 }
 
 // ---------- Selectors auxiliares ----------
