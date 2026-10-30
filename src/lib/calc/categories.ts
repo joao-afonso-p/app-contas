@@ -200,6 +200,22 @@ export function suggestGroupForLegacy(
   })
 }
 
+// Categorias antigas que hoje só se ligam a `groupId` pelo nome (associação implícita).
+// Antes de renomear esse item, fixa-se a ligação por identificador (planCategoryId) para
+// os gastos antigos não ficarem sem categoria.
+export function legacyImplicitlyMappedTo(d: CatData, groupId: string): TransactionCategory[] {
+  const groups = allGroups(d)
+  const ids = new Set(groups.map((g) => g.id))
+  const byName = new Map<string, Group>()
+  for (const g of groups) {
+    const k = normalizeDesc(g.name)
+    if (!byName.has(k) || g.kind === 'expense') byName.set(k, g)
+  }
+  return d.transactionCategories.filter(
+    (c) => !(c.planCategoryId && ids.has(c.planCategoryId)) && byName.get(normalizeDesc(c.name))?.id === groupId,
+  )
+}
+
 // Categorias antigas que ainda têm gastos por associar (nem associação
 // explícita, nem implícita por nome).
 export function legacyNeedingMapping(d: DataSet): { category: TransactionCategory; count: number; total: number }[] {

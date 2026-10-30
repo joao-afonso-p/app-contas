@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { emptyDataSet, type DataSet, type Transaction } from '../../types'
 import { parseBackup, serializeBackup } from '../backup'
 import {
-  activeGroups, categoryOptions, legacyNeedingMapping, makeResolver, matchOptionByText, suggestOption, txCategoryFields,
+  activeGroups, categoryOptions, legacyImplicitlyMappedTo, legacyNeedingMapping, makeResolver, matchOptionByText, suggestOption, txCategoryFields,
 } from './categories'
 import { buildMonthReport, computeInsights } from './planVsActual'
 
@@ -167,5 +167,23 @@ describe('despesas fixas', () => {
     expect(lazer.projected).toBeDefined()
     const over = buildMonthReport({ ...base, groups: g, planExpenses: { casa: 700, lazer: 100 }, fixedIds: new Set(['casa']) })
     expect(over.rows.find((x) => x.group.id === 'casa')!.level).toBe('over')
+  })
+})
+
+describe('renomear sem perder gastos antigos', () => {
+  it('categoria antiga ligada só pelo nome é identificada antes do rename', () => {
+    const d = world()
+    expect(legacyImplicitlyMappedTo(d, 'lazer').map((c) => c.id)).toEqual(['old-lazer'])
+    // já tem associação explícita: não precisa de fixar
+    expect(legacyImplicitlyMappedTo(d, 'casa').map((c) => c.id)).toEqual([])
+  })
+
+  it('depois de fixar a ligação, renomear não deixa os gastos sem categoria', () => {
+    const d = world()
+    const old = tx({ id: 'a', categoryId: 'old-lazer' })
+    expect(makeResolver(d)(old).groupId).toBe('lazer')
+    for (const c of legacyImplicitlyMappedTo(d, 'lazer')) c.planCategoryId = 'lazer'
+    d.expenseCategories[1].name = 'Dia a dia'
+    expect(makeResolver(d)(old).groupId).toBe('lazer')
   })
 })

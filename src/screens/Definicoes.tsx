@@ -10,7 +10,7 @@ import { IncomeTiming } from '../components/IncomeTiming'
 import { Badge, Button, Card, EditableName, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import {
-  activeGroups, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
+  activeGroups, legacyImplicitlyMappedTo, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
 } from '../lib/calc/categories'
 import { normalizeDesc } from '../lib/calc/budgets'
 import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
@@ -393,7 +393,10 @@ function SavingsSection() {
             value={bucket.name}
             muted={bucket.archived}
             className="text-sm"
-            onSave={(name) => void put('savingsBuckets', { ...bucket, name })}
+            onSave={(name) => {
+              for (const c of legacyImplicitlyMappedTo(data, bucket.id)) void put('transactionCategories', { ...c, planCategoryId: bucket.id })
+              void put('savingsBuckets', { ...bucket, name })
+            }}
             validate={(name) => {
               const n = normalizeDesc(name)
               if (data.savingsBuckets.some((b) => b.id !== bucket.id && normalizeDesc(b.name) === n)) return { error: 'Já existe um balde com este nome.' }
@@ -641,7 +644,11 @@ function ListEditor({ title, collection, hint }: EditableList) {
                 value={doc.name}
                 muted={doc.archived}
                 className="text-sm"
-                onSave={(name) => void put(collection, { ...doc, name } as never)}
+                onSave={(name) => {
+                  // Gastos antigos ligados a esta despesa só pelo nome: fixa a ligação antes de renomear.
+                  if (isExpense) for (const c of legacyImplicitlyMappedTo(data, doc.id)) void put('transactionCategories', { ...c, planCategoryId: doc.id })
+                  void put(collection, { ...doc, name } as never)
+                }}
                 validate={(name) => {
                   const n = normalizeDesc(name)
                   if (docs.some((d) => d.id !== doc.id && normalizeDesc(d.name) === n)) return { error: 'Já existe um item com este nome.' }
