@@ -47,8 +47,11 @@ function heatCell(spent: number, planned: number): { bg: string; fg: string } {
 // Dropdown de seleção múltipla: o painel fica aberto entre cliques para ir
 // marcando várias categorias e ver a soma a atualizar no gráfico.
 function CategoryMultiSelect({
-  categories, selectedIds, onToggle,
-}: { categories: { id: string; name: string }[]; selectedIds: string[]; onToggle: (id: string) => void }) {
+  categories, selectedIds, onToggle, defaultId, onSetDefault,
+}: {
+  categories: { id: string; name: string }[]; selectedIds: string[]; onToggle: (id: string) => void
+  defaultId?: string; onSetDefault: (id: string | null) => void
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -83,12 +86,24 @@ function CategoryMultiSelect({
             <p className="p-2 text-xs text-muted">Sem categorias com gastos.</p>
           ) : (
             categories.map((c) => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-2">
-                <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => onToggle(c.id)} />
-                {c.name}
-              </label>
+              <div key={c.id} className="flex items-center rounded-lg hover:bg-surface-2">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-sm">
+                  <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => onToggle(c.id)} />
+                  <span className="truncate">{c.name}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onSetDefault(defaultId === c.id ? null : c.id)}
+                  title={defaultId === c.id ? 'É a categoria padrão do gráfico (tocar para tirar)' : 'Definir como categoria padrão do gráfico'}
+                  aria-label={defaultId === c.id ? `Tirar ${c.name} como padrão` : `Definir ${c.name} como padrão`}
+                  className={cx('shrink-0 px-2 py-1.5 text-sm', defaultId === c.id ? 'text-warn' : 'text-muted hover:text-text')}
+                >
+                  {defaultId === c.id ? '★' : '☆'}
+                </button>
+              </div>
             ))
           )}
+          {categories.length > 0 && <p className="mt-1 px-2 text-[11px] text-muted">★ abre por defeito neste gráfico</p>}
         </div>
       )}
     </div>
@@ -103,7 +118,11 @@ export function Budgets() {
 
   const currentMonth = currentMonthKey()
   const startCfg = monthStartConfigOf(data.meta[0])
-  const [month, setMonth] = useSessionState<MonthKey>('analytics.month', currentMonth)
+  // Sem mês escolhido segue o mês financeiro atual (também depois de um refresh,
+  // quando os dados e o início do mês só chegam depois do primeiro render).
+  const [pickedMonth, setPickedMonth] = useSessionState<MonthKey | null>('analytics.month', null)
+  const month = pickedMonth ?? currentMonth
+  const setMonth = (m: MonthKey) => setPickedMonth(m === currentMonth ? null : m)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showSubs, setShowSubs] = useState(false)
   // Janela de 12 meses terminada no mês escolhido (para gráfico/histórico).
@@ -169,10 +188,14 @@ export function Budgets() {
   // ----- Evolução por categoria (multi-seleção) -----
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const spendGroups = historyGroups
-  // Por defeito: a categoria com mais gasto na janela (não depende do nome).
+  // Sem padrão definido: a categoria com mais gasto na janela (não depende do nome).
   const spentInWindow = (id: string) =>
     months.reduce((sum, m) => sum + (reports.get(m)?.rows.find((x) => x.group.id === id)?.spent ?? 0), 0)
-  const defaultGroup = [...spendGroups].sort((a, b) => spentInWindow(b.id) - spentInWindow(a.id))[0]
+  const setMeta = useStore((s) => s.setMeta)
+  const savedDefaultId = data.meta[0]?.analyticsDefaultGroupId
+  // Padrão escolhido por ti (★); se não houver, ou já não existir, a categoria com mais gasto.
+  const defaultGroup = spendGroups.find((g) => g.id === savedDefaultId)
+    ?? [...spendGroups].sort((a, b) => spentInWindow(b.id) - spentInWindow(a.id))[0]
   const effectiveIds = selectedIds.length > 0 ? selectedIds : (defaultGroup ? [defaultGroup.id] : [])
   const toggleSelected = (id: string) =>
     setSelectedIds((prev) => {
@@ -468,7 +491,15 @@ export function Budgets() {
 
       <section>
         <SectionTitle
-          right={<CategoryMultiSelect categories={spendGroups} selectedIds={effectiveIds} onToggle={toggleSelected} />}
+          right={
+            <CategoryMultiSelect
+              categories={spendGroups}
+              selectedIds={effectiveIds}
+              onToggle={toggleSelected}
+              defaultId={savedDefaultId}
+              onSetDefault={(id) => void setMeta({ analyticsDefaultGroupId: id ?? undefined })}
+            />
+          }
         >
           Evolução por categoria
         </SectionTitle>

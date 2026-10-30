@@ -200,9 +200,9 @@ export function Planeamento() {
           title="Total das despesas do mês — fica na conta corrente"
         />
         <MetricCard
-          label="Transferir agora"
+          label="Transferir agora para a poupança"
           value={fmtEUR(summary.transferToSavings)}
-          hint={summary.rentIncome > 0.004 ? `e mais ${fmtEUR(summary.rentIncome)} quando chegar` : 'para a poupança'}
+          hint={summary.rentIncome > 0.004 ? `e mais ${fmtEUR(summary.rentIncome)} quando chegar` : undefined}
           info={
             <TransferToSavingsExplanation
               totalSavings={summary.totalSavings}
@@ -225,7 +225,7 @@ export function Planeamento() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-surface px-3 py-2 shadow-sm md:sticky md:top-2 md:z-20">
+      <div className="rounded-xl border border-border bg-surface px-5 py-4 shadow-sm md:sticky md:top-2 md:z-20">
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs font-semibold">
             {fmtPct(summary.allocationPct)} alocado
@@ -250,10 +250,9 @@ export function Planeamento() {
           )}
         </div>
         <ProgressBar
-          thin
           pct={summary.allocationPct}
           tone={alloc.state === 'certo' ? 'accent' : alloc.state === 'falta' ? 'warn' : 'negative'}
-          className="mt-1.5"
+          className="mt-3"
         />
       </div>
 

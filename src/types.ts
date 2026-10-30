@@ -252,6 +252,8 @@ export interface AppMeta {
   // (vale a partir de cada mês) e dias próprios de meses específicos.
   monthStartRules?: { from: MonthKey; day: number }[]
   monthStartOverrides?: Record<MonthKey, number>
+  // Categoria que abre por defeito no gráfico "Evolução por categoria" do Analytics.
+  analyticsDefaultGroupId?: string
 }
 
 // ---------- Coleções ----------
