@@ -303,7 +303,9 @@ export function Budgets() {
                   isCurrent={isCurrent}
                   onIgnoreAlerts={() => {
                     const cat = data.expenseCategories.find((c) => c.id === r.group.id)
-                    if (cat) void put('expenseCategories', { ...cat, fixed: true })
+                    if (!cat) return
+                    if (!window.confirm(`Deixar de avisar "Quase no limite" em "${cat.name}"? Passa a contar como despesa fixa e só fica vermelha se ultrapassares o plano. Podes reverter em Definições → Despesas do planeamento.`)) return
+                    void put('expenseCategories', { ...cat, fixed: true })
                   }}
                 />
               ))}
