@@ -7,7 +7,7 @@ import {
   accountingMonth, buildVehicleSummaries, holdingsSeries, injectedBreakdown, medianMonthlyInjection, monthlyAfterYears, projectWithContributions, seriesMonths,
   type Holding, type VehicleSummary,
 } from '../lib/calc/investments'
-import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
+import { addMonths, calendarMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
 import { InvestmentSimulator } from '../components/InvestmentSimulator'
 import { useStore } from '../store/useStore'
 
@@ -63,7 +63,7 @@ function monthsSince(iso: string): number {
 export function Investimentos() {
   const data = useStore((s) => s.data)
   const put = useStore((s) => s.put)
-  const calendar = currentMonthKey()
+  const calendar = calendarMonthKey()
   const today = todayISO()
   const through = accountingMonth(data, calendar)
 

@@ -29,6 +29,7 @@ import type {
 } from '../types'
 import { COLLECTIONS, emptyDataSet } from '../types'
 import { initialScreen, pushScreen } from '../lib/route'
+import { setMonthStartConfig, type MonthStartConfig } from '../lib/financialMonth'
 
 export type Screen =
   | 'planeamento'
@@ -74,6 +75,8 @@ interface Store {
   leaveSpace(): Promise<void>
   setScreen(s: Screen): void
   setMonth(m: MonthKey): void
+  setMonthStartDefault(day: number, fromMonth: MonthKey): Promise<void>
+  setMonthStartOverride(month: MonthKey, day: number | null): Promise<void>
   toggleTheme(): void
 
   put<C extends CollectionName>(c: C, doc: DataSet[C][number]): Promise<void>
@@ -128,11 +131,22 @@ interface Store {
 }
 
 let adapter: DataAdapter | null = null
+// Enquanto o utilizador não escolher um mês no Planeamento, segue o mês financeiro atual.
+let monthTouched = false
+
+export const monthStartConfigOf = (meta: AppMeta | undefined): MonthStartConfig => ({
+  rules: meta?.monthStartRules ?? [],
+  overrides: meta?.monthStartOverrides ?? {},
+})
 
 async function startAdapter(next: DataAdapter, set: (p: Partial<Store>) => void): Promise<void> {
   adapter?.stop()
   adapter = next
-  await next.start((data) => set({ data }))
+  await next.start((data) => {
+    // O mês financeiro depende dos metadados: atualiza-se antes de os ecrãs recalcularem.
+    setMonthStartConfig(monthStartConfigOf(data.meta[0]))
+    set({ data, ...(monthTouched ? {} : { month: currentMonthKey() }) })
+  })
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -305,7 +319,28 @@ export const useStore = create<Store>((set, get) => ({
     pushScreen(screen)
     set({ screen })
   },
-  setMonth: (month) => set({ month }),
+  setMonth: (month) => {
+    monthTouched = true
+    set({ month })
+  },
+
+  // Novo dia de início por defeito, a partir de `fromMonth` (inclusive). Os meses
+  // anteriores nunca mudam: o histórico de defaults guarda cada regra.
+  async setMonthStartDefault(day, fromMonth) {
+    const d = Math.min(31, Math.max(1, Math.round(day)))
+    const rules = (get().data.meta[0]?.monthStartRules ?? []).filter((r) => r.from !== fromMonth)
+    rules.push({ from: fromMonth, day: d })
+    rules.sort((a, b) => a.from.localeCompare(b.from))
+    await get().setMeta({ monthStartRules: rules })
+  },
+
+  // Dia de início só para um mês (null = voltar ao default).
+  async setMonthStartOverride(month, day) {
+    const next = { ...(get().data.meta[0]?.monthStartOverrides ?? {}) }
+    if (day === null) delete next[month]
+    else next[month] = Math.min(31, Math.max(1, Math.round(day)))
+    await get().setMeta({ monthStartOverrides: next })
+  },
   toggleTheme: () => {
     const theme = get().theme === 'dark' ? 'light' : 'dark'
     localStorage.setItem(LS_THEME, theme)

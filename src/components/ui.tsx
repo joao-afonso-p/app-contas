@@ -147,8 +147,8 @@ export function Badge({
 }
 
 export function ProgressBar({
-  pct, tone = 'accent', className,
-}: { pct: number; tone?: 'accent' | 'goal' | 'warn' | 'negative'; className?: string }) {
+  pct, tone = 'accent', className, thin,
+}: { pct: number; tone?: 'accent' | 'goal' | 'warn' | 'negative'; className?: string; thin?: boolean }) {
   const tones = {
     accent: 'bg-accent-strong',
     goal: 'bg-goal',
@@ -156,7 +156,7 @@ export function ProgressBar({
     negative: 'bg-negative',
   }
   return (
-    <div className={cx('h-2 w-full overflow-hidden rounded-full bg-surface-2', className)}>
+    <div className={cx(thin ? 'h-1' : 'h-2', 'w-full overflow-hidden rounded-full bg-surface-2', className)}>
       <div
         className={cx('h-full rounded-full transition-all duration-500', tones[tone])}
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}

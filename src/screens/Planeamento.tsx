@@ -14,6 +14,7 @@ import {
   MoneyCell,
   ProgressBar,
   SectionTitle,
+  Select,
 } from '../components/ui'
 import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
 import { allocationState, allocationSummary } from '../lib/calc/allocation'
@@ -21,15 +22,17 @@ import { withResidual } from '../lib/calc/archive'
 import { bucketBalance, computeBalances, goalProgress, type BalanceTable } from '../lib/calc/balances'
 import { allGroups, makeResolver } from '../lib/calc/categories'
 import { buildMonthReport, detectFixedGroups, groupMonthTotals, recurringOverruns, type Overrun } from '../lib/calc/planVsActual'
-import { addMonths, currentMonthKey, dayOfMonth, fmtEUR, fmtPct, monthDiff, monthLabel, monthRange, parseAmount, uid } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDayMonth, fmtEUR, fmtPct, monthDiff, monthLabel, monthRange, parseAmount, todayISO, uid } from '../lib/format'
 import {
   activeBuckets,
   allocationBlock,
   effectivePlan,
   firstPlanMonth,
+  monthStartConfigOf,
   useStore,
 } from '../store/useStore'
 import { useIsDesktop } from '../lib/useIsDesktop'
+import { addDaysISO, defaultStartDay, earliestApplyDate, monthStartDate } from '../lib/financialMonth'
 import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
 import { LateIncomeCard } from '../components/LateIncomeCard'
 import type { MonthKey, MonthlyPlan, SavingsBucket } from '../types'
@@ -72,7 +75,15 @@ export function Planeamento() {
 
   const diff = monthDiff(currentMonthKey(), month)
   const isExact = Math.abs(summary.unallocated) < 0.001
-  const dayOk = diff <= 0 || (diff === 1 && dayOfMonth() >= 25)
+  const startCfg = monthStartConfigOf(data.meta[0])
+  const setMonthStartOverride = useStore((s) => s.setMonthStartOverride)
+  const [startOpen, setStartOpen] = useState(false)
+  const [startDraft, setStartDraft] = useState(1)
+  const hasOverride = Boolean(startCfg.overrides[month])
+  const startIso = monthStartDate(startCfg, month)
+  const endIso = addDaysISO(monthStartDate(startCfg, addMonths(month, 1)), -1)
+  const earliest = earliestApplyDate(startCfg, month)
+  const dayOk = diff <= 0 || (diff === 1 && todayISO() >= earliest)
   const canApply = !isClosed && isExact && dayOk
   const applyBlockedReason = isClosed
     ? undefined
@@ -81,7 +92,7 @@ export function Planeamento() {
       : !dayOk
         ? diff >= 2
           ? 'Aplica primeiro o plano dos meses anteriores.'
-          : `Só podes aplicar o plano de ${monthLabel(month)} a partir do dia 25 de ${monthLabel(currentMonthKey())}.`
+          : `Só podes aplicar o plano de ${monthLabel(month)} a partir de ${fmtDayMonth(earliest)}.`
         : undefined
 
   const balanceTable = useMemo(
@@ -123,6 +134,49 @@ export function Planeamento() {
         </div>
       </div>
 
+      <div className="-mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span className="tnum">
+          Mês financeiro: <strong className="font-semibold text-text">{fmtDayMonth(startIso)} → {fmtDayMonth(endIso)}</strong>
+          {hasOverride && ' · ajustado'}
+        </span>
+        {isDesktop && (
+          <button
+            onClick={() => { setStartDraft(startCfg.overrides[month] ?? defaultStartDay(startCfg, month)); setStartOpen(true) }}
+            className="rounded-full border border-border bg-surface px-2.5 py-0.5 font-medium text-text hover:bg-surface-2"
+          >
+            alterar
+          </button>
+        )}
+      </div>
+
+      <Modal open={startOpen} onClose={() => setStartOpen(false)} title={`Início de ${monthLabel(month, true)}`}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted">
+            Escolhe o dia em que este mês financeiro começa (1–31; em meses curtos usa o último dia).
+            Só afeta {monthLabel(month, true)}: os outros meses seguem o padrão das Definições.
+          </p>
+          <div className="flex items-center gap-3">
+            <Select value={String(startDraft)} onChange={(e) => setStartDraft(Number(e.target.value))}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>dia {d}</option>)}
+            </Select>
+            <span className="tnum text-sm text-text">
+              {fmtDayMonth(monthStartDate({ ...startCfg, overrides: { ...startCfg.overrides, [month]: startDraft } }, month))}
+              {' → '}
+              {fmtDayMonth(addDaysISO(monthStartDate({ ...startCfg, overrides: { ...startCfg.overrides, [month]: startDraft } }, addMonths(month, 1)), -1))}
+            </span>
+          </div>
+          <div className="mt-1 flex justify-end gap-2">
+            {hasOverride && (
+              <Button variant="ghost" className="mr-auto" onClick={() => { void setMonthStartOverride(month, null); setStartOpen(false) }}>
+                Repor padrão
+              </Button>
+            )}
+            <Button variant="ghost" onClick={() => setStartOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { void setMonthStartOverride(month, startDraft); setStartOpen(false) }}>Guardar</Button>
+          </div>
+        </div>
+      </Modal>
+
       {!isClosed && applyBlockedReason && (
         <p className="-mt-3 text-right text-xs text-muted">{applyBlockedReason}</p>
       )}
@@ -163,16 +217,16 @@ export function Planeamento() {
         </div>
       </div>
 
-      <Card className="md:sticky md:top-2 md:z-20 md:shadow-md">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-sm font-semibold">
+      <div className="rounded-xl border border-border bg-surface px-3 py-2 shadow-sm md:sticky md:top-2 md:z-20">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs font-semibold">
             {fmtPct(summary.allocationPct)} alocado
-            <span className="ml-2 font-normal text-muted">
+            <span className="ml-1.5 font-normal text-muted">
               {alloc.state === 'certo'
-                ? '— tudo alocado'
+                ? '· tudo alocado'
                 : alloc.state === 'falta'
-                  ? `— faltam ${fmtEUR(alloc.amount)}`
-                  : `— excesso de ${fmtEUR(alloc.amount)}`}
+                  ? `· faltam ${fmtEUR(alloc.amount)}`
+                  : `· excesso de ${fmtEUR(alloc.amount)}`}
             </span>
           </div>
           {!readOnly && summary.unallocated > 0.005 && geral && (
@@ -183,16 +237,17 @@ export function Planeamento() {
                 void setPlanValue(month, 'savings', geral.id, (plan?.savings[geral.id] || 0) + summary.unallocated)
               }
             >
-              Transferir sobra para Geral
+              Sobra para Geral
             </Button>
           )}
         </div>
         <ProgressBar
+          thin
           pct={summary.allocationPct}
           tone={alloc.state === 'certo' ? 'accent' : alloc.state === 'falta' ? 'warn' : 'negative'}
-          className="mt-3"
+          className="mt-1.5"
         />
-      </Card>
+      </div>
 
       <LateIncomeCard month={month} />
 
@@ -678,3 +733,4 @@ function AutoInvestmentSection({
     </Card>
   )
 }
+

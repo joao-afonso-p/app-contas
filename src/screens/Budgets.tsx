@@ -19,13 +19,15 @@ import { Badge, Button, Card, EmptyState, MacroTitle, MetricCard, ProgressBar, S
 import { allGroups, legacyNeedingMapping, makeResolver } from '../lib/calc/categories'
 import { findOrphanExpenses } from '../lib/calc/mergeExpenses'
 import {
-  buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, sortByAttention,
+  attentionInsights, buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, sortByAttention,
   type CategoryRow, type MonthReport, type SubRow,
 } from '../lib/calc/planVsActual'
 import { SavingsAnalytics } from '../components/SavingsAnalytics'
 import { SubcategoryAnalytics } from '../components/SubcategoryAnalytics'
-import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, monthRange, monthShort } from '../lib/format'
-import { effectivePlan, useStore } from '../store/useStore'
+import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, monthRange, monthShort, todayISO } from '../lib/format'
+import { effectivePlan, monthStartConfigOf, useStore } from '../store/useStore'
+import { daysUntilNextMonth, monthDayInfo, monthProgress } from '../lib/financialMonth'
+import { activeAccountingMonth } from '../lib/calc/balances'
 import type { MonthKey, Transaction } from '../types'
 
 // Cor da célula do histórico: sem gasto = cinza; dentro do plano = verde leve;
@@ -40,11 +42,6 @@ function heatCell(spent: number, planned: number): { bg: string; fg: string } {
   const over = Math.min(1, (spent - planned) / planned)
   const alpha = 0.4 + 0.5 * over
   return { bg: `rgba(220, 38, 38, ${alpha.toFixed(2)})`, fg: over > 0.35 ? '#fff' : 'var(--text)' }
-}
-
-function daysInMonth(m: MonthKey): number {
-  const [y, mo] = m.split('-').map(Number)
-  return new Date(y, mo, 0).getDate()
 }
 
 // Dropdown de seleção múltipla: o painel fica aberto entre cliques para ir
@@ -105,6 +102,7 @@ export function Budgets() {
   const put = useStore((s) => s.put)
 
   const currentMonth = currentMonthKey()
+  const startCfg = monthStartConfigOf(data.meta[0])
   const [month, setMonth] = useSessionState<MonthKey>('analytics.month', currentMonth)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showSubs, setShowSubs] = useState(false)
@@ -126,7 +124,7 @@ export function Budgets() {
     const map = new Map<MonthKey, MonthReport>()
     const totals = groupMonthTotals(data.transactions, resolve)
     for (const m of months) {
-      const elapsed = m === currentMonth ? new Date().getDate() / daysInMonth(m) : undefined
+      const elapsed = m === currentMonth ? monthProgress(startCfg, m, todayISO()) : undefined
       map.set(m, buildMonthReport({
         month: m, transactions: data.transactions, resolve, groups,
         subcategories: data.subcategories, planExpenses: planFor(m), elapsed,
@@ -135,14 +133,18 @@ export function Budgets() {
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [months, data, resolve, groups, currentMonth])
+  }, [months, data, resolve, groups, currentMonth, startCfg])
 
   const report = reports.get(month)!
-  const insights = useMemo(
-    () => computeInsights(monthRange(addMonths(month, -3), month).map((m) => reports.get(m)).filter((r): r is MonthReport => Boolean(r))),
-    [reports, month],
-  )
   const isCurrent = month === currentMonth
+  const accountingMonth = activeAccountingMonth(data.monthlyPlans, currentMonth)
+  const insights = useMemo(() => {
+    const all = computeInsights(monthRange(addMonths(month, -3), month).map((m) => reports.get(m)).filter((r): r is MonthReport => Boolean(r)))
+    // No mês atual só se mostra o que merece atenção agora (ver attentionInsights).
+    return isCurrent
+      ? attentionInsights(all, { currentMonth, accountingMonth, daysUntilNextMonth: daysUntilNextMonth(startCfg, currentMonth, todayISO()) })
+      : all
+  }, [reports, month, isCurrent, currentMonth, accountingMonth, startCfg])
   const rows = sortByAttention(report.rows.filter((r) => r.planned > 0 || r.spent > 0))
   const diff = report.plannedTotal - report.spentInPlan
   const pendingLegacy = legacyNeedingMapping(data)
@@ -269,7 +271,7 @@ export function Budgets() {
           label={diff >= 0 ? 'Ainda disponível' : 'Acima do plano'}
           value={fmtEUR(Math.abs(diff))}
           tone={report.plannedTotal === 0 ? 'default' : diff >= 0 ? 'positive' : 'negative'}
-          hint={isCurrent && report.plannedTotal > 0 ? `dia ${new Date().getDate()} de ${daysInMonth(month)}` : undefined}
+          hint={isCurrent && report.plannedTotal > 0 ? `dia ${monthDayInfo(startCfg, month, todayISO()).day} de ${monthDayInfo(startCfg, month, todayISO()).total}` : undefined}
         />
         <MetricCard
           label="Fora do plano"

@@ -1,3 +1,4 @@
+import { financialMonthOf, getMonthStartConfig } from './financialMonth'
 import type { MonthKey } from '../types'
 
 const eur = new Intl.NumberFormat('pt-PT', {
@@ -47,8 +48,14 @@ export function monthKey(date: Date): MonthKey {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-export function currentMonthKey(): MonthKey {
+// Mês de calendário de hoje (investimentos e afins, que não dependem do salário).
+export function calendarMonthKey(): MonthKey {
   return monthKey(new Date())
+}
+
+// Mês financeiro de hoje (ver financialMonth.ts). Igual ao de calendário por defeito.
+export function currentMonthKey(): MonthKey {
+  return financialMonthOf(getMonthStartConfig(), todayISO())
 }
 
 export function addMonths(key: MonthKey, delta: number): MonthKey {
@@ -93,6 +100,13 @@ export function fmtDate(iso: string): string {
   return `${d}/${m}/${y}`
 }
 
+const MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+// "2026-10-28" -> "28 out"
+export function fmtDayMonth(iso: string): string {
+  const [, m, d] = iso.slice(0, 10).split('-').map(Number)
+  return `${d} ${MONTHS_SHORT[m - 1]}`
+}
+
 export function todayISO(): string {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -106,7 +120,13 @@ export function dayOfMonth(): number {
   return new Date().getDate()
 }
 
+// Mês financeiro a que pertence uma data (gastos, movimentos de poupança, alertas).
 export function monthOfDate(iso: string): MonthKey {
+  return financialMonthOf(getMonthStartConfig(), iso)
+}
+
+// Mês de calendário de uma data (investimentos).
+export function calendarMonthOf(iso: string): MonthKey {
   return iso.slice(0, 7)
 }
 

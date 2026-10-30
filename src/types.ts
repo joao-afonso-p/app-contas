@@ -248,6 +248,10 @@ export interface AppMeta {
   // sincronização, ou edição manual de alguma célula) — a partir daqui uma
   // sincronização só atualiza o mês atual, nunca o resto do horizonte.
   projectionsInitialized?: boolean
+  // Início do mês financeiro (ver lib/financialMonth.ts): histórico de defaults
+  // (vale a partir de cada mês) e dias próprios de meses específicos.
+  monthStartRules?: { from: MonthKey; day: number }[]
+  monthStartOverrides?: Record<MonthKey, number>
 }
 
 // ---------- Coleções ----------

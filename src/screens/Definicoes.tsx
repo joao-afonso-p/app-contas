@@ -14,8 +14,9 @@ import {
 } from '../lib/calc/categories'
 import { normalizeDesc } from '../lib/calc/budgets'
 import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
-import { currentMonthKey, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
-import { allocationBlock, firstPlanMonth, isAutoBucketMovement, useStore } from '../store/useStore'
+import { addMonths, currentMonthKey, fmtDayMonth, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
+import { addDaysISO, defaultStartDay, monthStartDate } from '../lib/financialMonth'
+import { allocationBlock, firstPlanMonth, isAutoBucketMovement, monthStartConfigOf, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
 
@@ -172,6 +173,8 @@ export function Definicoes() {
           </Card>
         </section>
       )}
+
+      <MonthStartSection />
 
       <AutoMovementsSection />
 
@@ -1118,6 +1121,57 @@ function AutoMovementsSection() {
         <Button size="sm" variant="danger" onClick={() => void apply()}>
           Remover {auto.length} saídas ({fmtEUR(total, true)})
         </Button>
+      </Card>
+    </section>
+  )
+}
+
+// ---------- Início do mês financeiro ----------
+
+function MonthStartSection() {
+  const data = useStore((s) => s.data)
+  const setMonthStartDefault = useStore((s) => s.setMonthStartDefault)
+  const cfg = monthStartConfigOf(data.meta[0])
+  const current = currentMonthKey()
+  const [day, setDay] = useState(() => defaultStartDay(cfg, addMonths(current, 1)))
+  const [from, setFrom] = useState(() => addMonths(current, 1))
+
+  const draftCfg = { ...cfg, rules: [...cfg.rules.filter((r) => r.from !== from), { from, day }] }
+  const start = monthStartDate(draftCfg, from)
+  const end = addDaysISO(monthStartDate(draftCfg, addMonths(from, 1)), -1)
+  const rules = [...cfg.rules].sort((a, b) => a.from.localeCompare(b.from))
+
+  return (
+    <section>
+      <SectionTitle>Início do mês financeiro</SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          O dia em que começa o teu mês (ex.: quando recebes o salário). Por defeito é dia 1. Com dia 28, novembro
+          começa a 28 de outubro, e gastos e movimentos dessas datas contam para novembro. Vale para os meses a
+          partir do que escolheres: os anteriores não mudam. Podes ajustar um mês em concreto no Planeamento.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted">Dia de início</label>
+            <Select value={String(day)} onChange={(e) => setDay(Number(e.target.value))}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>dia {d}</option>)}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">A partir de</label>
+            <Input type="month" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} />
+          </div>
+          <Button onClick={() => void setMonthStartDefault(day, from)}>Guardar</Button>
+        </div>
+        <p className="tnum mt-3 text-xs text-muted">
+          {monthLabel(from, true)}: {fmtDayMonth(start)} → {fmtDayMonth(end)}
+        </p>
+        <p className="mt-2 text-xs text-muted">
+          Em vigor: {rules.length === 0
+            ? 'dia 1 (padrão)'
+            : `dia 1 até ${monthLabel(addMonths(rules[0].from, -1))}` +
+              rules.map((r, i) => `, dia ${r.day} a partir de ${monthLabel(r.from)}${i < rules.length - 1 ? '' : ''}`).join('')}
+        </p>
       </Card>
     </section>
   )

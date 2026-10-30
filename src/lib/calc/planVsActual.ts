@@ -318,3 +318,18 @@ export function recurringOverruns(reports: MonthReport[], needed = 3): Map<strin
   }
   return out
 }
+
+
+// "Atenção": só mostra o que merece atenção agora. Com o plano do mês seguinte já
+// aplicado, os alertas de gasto do mês anterior desaparecem (só fica o que falta
+// categorizar). O aviso "3 meses acima" só aparece nos últimos dias do mês financeiro,
+// quando se aproxima o novo planeamento.
+export const RECURRING_ALERT_DAYS = 10
+
+export function attentionInsights<T extends { kind: string }>(
+  insights: T[],
+  opts: { currentMonth: string; accountingMonth: string; daysUntilNextMonth: number },
+): T[] {
+  if (opts.accountingMonth > opts.currentMonth) return insights.filter((i) => i.kind === 'unassigned')
+  return insights.filter((i) => i.kind !== 'recurring' || opts.daysUntilNextMonth <= RECURRING_ALERT_DAYS)
+}
