@@ -1,5 +1,5 @@
 import type { AssetEntry, DataSet, InvestmentAsset, InvestmentVehicle, MonthKey, ValueCheckpoint } from '../../types'
-import { addMonths, monthOfDate, monthRange } from '../format'
+import { addMonths, calendarMonthOf as monthOfDate, monthRange } from '../format'
 import { round2 } from './allocation'
 import { activeAccountingMonth } from './balances'
 

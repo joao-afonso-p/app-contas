@@ -37,7 +37,7 @@ export function MetricCard({
 }: {
   label: string
   value: string
-  hint?: string
+  hint?: ReactNode
   tone?: 'default' | 'positive' | 'negative' | 'warn' | 'accent'
   title?: string
   // Explicação mostrada num ⓘ ao lado do label (funciona também em mobile, ao contrário do `title`).
@@ -147,8 +147,8 @@ export function Badge({
 }
 
 export function ProgressBar({
-  pct, tone = 'accent', className,
-}: { pct: number; tone?: 'accent' | 'goal' | 'warn' | 'negative'; className?: string }) {
+  pct, tone = 'accent', className, thin,
+}: { pct: number; tone?: 'accent' | 'goal' | 'warn' | 'negative'; className?: string; thin?: boolean }) {
   const tones = {
     accent: 'bg-accent-strong',
     goal: 'bg-goal',
@@ -156,7 +156,7 @@ export function ProgressBar({
     negative: 'bg-negative',
   }
   return (
-    <div className={cx('h-2 w-full overflow-hidden rounded-full bg-surface-2', className)}>
+    <div className={cx(thin ? 'h-1' : 'h-2', 'w-full overflow-hidden rounded-full bg-surface-2', className)}>
       <div
         className={cx('h-full rounded-full transition-all duration-500', tones[tone])}
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
@@ -373,5 +373,73 @@ export function MoneyCell({
     >
       {value ? fmtEUR(value) : placeholder}
     </button>
+  )
+}
+
+// Nome editável no local (✎). Não altera identificadores: o histórico, os planos e as
+// análises apontam para o item, por isso passam a mostrar o novo nome sozinhos.
+// `validate` devolve um erro (bloqueia) ou um aviso (pede confirmação).
+export function EditableName({
+  value, onSave, validate, className, muted,
+}: {
+  value: string
+  onSave: (name: string) => void
+  validate?: (name: string) => { error?: string; warn?: string } | null
+  className?: string
+  muted?: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [error, setError] = useState('')
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) ref.current?.select()
+  }, [editing])
+
+  const cancel = () => { setEditing(false); setError('') }
+  const commit = () => {
+    const name = draft.trim()
+    if (name === value) return cancel()
+    if (!name) return setError('O nome não pode ficar vazio.')
+    const v = validate?.(name)
+    if (v?.error) return setError(v.error)
+    if (v?.warn && !window.confirm(`${v.warn} Usar o mesmo nome?`)) return
+    onSave(name)
+    cancel()
+  }
+
+  if (editing) {
+    return (
+      <span className="flex min-w-0 flex-col">
+        <input
+          ref={ref}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setError('') }}
+          onBlur={() => { if (!error) commit() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') cancel()
+          }}
+          aria-label="Novo nome"
+          className="w-full min-w-24 max-w-56 rounded-lg border border-accent bg-surface px-2 py-0.5 text-sm text-text focus:outline-none"
+        />
+        {error && <span className="mt-0.5 text-[11px] text-negative">{error}</span>}
+      </span>
+    )
+  }
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <span className={cx('truncate', muted && 'text-muted line-through', className)}>{value}</span>
+      <button
+        type="button"
+        onClick={() => { setDraft(value); setError(''); setEditing(true) }}
+        className="shrink-0 rounded px-1 text-xs text-muted hover:text-accent-strong"
+        aria-label={`Renomear ${value}`}
+        title="Renomear"
+      >
+        ✎
+      </button>
+    </span>
   )
 }

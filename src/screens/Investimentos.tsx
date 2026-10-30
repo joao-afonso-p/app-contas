@@ -1,13 +1,14 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Bar, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartLegend, ChartTooltip, compactEUR, cursorStyle } from '../components/ChartParts'
-import { Badge, Button, Card, EmptyState, Input, MetricCard, Modal, SectionTitle, Select, cx } from '../components/ui'
+import { Badge, Button, Card, EditableName, EmptyState, Input, MetricCard, Modal, SectionTitle, Select, cx } from '../components/ui'
 import { round2 } from '../lib/calc/allocation'
+import { normalizeDesc } from '../lib/calc/budgets'
 import {
   accountingMonth, buildVehicleSummaries, holdingsSeries, injectedBreakdown, medianMonthlyInjection, monthlyAfterYears, projectWithContributions, seriesMonths,
   type Holding, type VehicleSummary,
 } from '../lib/calc/investments'
-import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
+import { addMonths, calendarMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
 import { InvestmentSimulator } from '../components/InvestmentSimulator'
 import { useStore } from '../store/useStore'
 
@@ -63,7 +64,7 @@ function monthsSince(iso: string): number {
 export function Investimentos() {
   const data = useStore((s) => s.data)
   const put = useStore((s) => s.put)
-  const calendar = currentMonthKey()
+  const calendar = calendarMonthKey()
   const today = todayISO()
   const through = accountingMonth(data, calendar)
 
@@ -720,6 +721,35 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
               <span className="font-semibold text-text">{h.annualized !== null ? fmtPct(h.annualized) : '—'}</span>
               <div className="mt-0.5">{h.annualized === null ? 'precisa de 2 checkpoints com pelo menos 3 meses de intervalo' : 'entre o primeiro e o último checkpoint, descontando entradas'}</div>
             </div>
+            {(asset || h.vehicleId) && (
+              <div className="mt-3">
+                <div className="mb-1 font-semibold text-text">{asset ? 'Nome do ativo' : 'Nome do veículo'}</div>
+                {asset ? (
+                  <EditableName
+                    value={asset.name}
+                    className="text-sm"
+                    onSave={(name) => void put('investmentAssets', { ...asset, name })}
+                    validate={(name) =>
+                      data.investmentAssets.some((a) => a.vehicleId === asset.vehicleId && a.id !== asset.id && normalizeDesc(a.name) === normalizeDesc(name))
+                        ? { error: 'Já existe um ativo com este nome neste veículo.' }
+                        : null}
+                  />
+                ) : (() => {
+                  const vehicle = data.investmentVehicles.find((v) => v.id === h.vehicleId)
+                  return vehicle ? (
+                    <EditableName
+                      value={vehicle.name}
+                      className="text-sm"
+                      onSave={(name) => void put('investmentVehicles', { ...vehicle, name })}
+                      validate={(name) =>
+                        data.investmentVehicles.some((v) => v.id !== vehicle.id && normalizeDesc(v.name) === normalizeDesc(name))
+                          ? { error: 'Já existe um veículo com este nome.' }
+                          : null}
+                    />
+                  ) : null
+                })()}
+              </div>
+            )}
             {asset && (
               <div className="mt-3 flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => void put('investmentAssets', { ...asset, archived: !asset.archived })}>

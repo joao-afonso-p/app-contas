@@ -19,13 +19,15 @@ import { Badge, Button, Card, EmptyState, MacroTitle, MetricCard, ProgressBar, S
 import { allGroups, legacyNeedingMapping, makeResolver } from '../lib/calc/categories'
 import { findOrphanExpenses } from '../lib/calc/mergeExpenses'
 import {
-  buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, sortByAttention,
+  attentionInsights, buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, sortByAttention,
   type CategoryRow, type MonthReport, type SubRow,
 } from '../lib/calc/planVsActual'
 import { SavingsAnalytics } from '../components/SavingsAnalytics'
 import { SubcategoryAnalytics } from '../components/SubcategoryAnalytics'
-import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, monthRange, monthShort } from '../lib/format'
-import { effectivePlan, useStore } from '../store/useStore'
+import { addMonths, currentMonthKey, fmtDate, fmtEURWhole as fmtEUR, monthRange, monthShort, todayISO } from '../lib/format'
+import { effectivePlan, monthStartConfigOf, useStore } from '../store/useStore'
+import { daysUntilNextMonth, monthDayInfo, monthProgress } from '../lib/financialMonth'
+import { activeAccountingMonth } from '../lib/calc/balances'
 import type { MonthKey, Transaction } from '../types'
 
 // Cor da célula do histórico: sem gasto = cinza; dentro do plano = verde leve;
@@ -42,16 +44,14 @@ function heatCell(spent: number, planned: number): { bg: string; fg: string } {
   return { bg: `rgba(220, 38, 38, ${alpha.toFixed(2)})`, fg: over > 0.35 ? '#fff' : 'var(--text)' }
 }
 
-function daysInMonth(m: MonthKey): number {
-  const [y, mo] = m.split('-').map(Number)
-  return new Date(y, mo, 0).getDate()
-}
-
 // Dropdown de seleção múltipla: o painel fica aberto entre cliques para ir
 // marcando várias categorias e ver a soma a atualizar no gráfico.
 function CategoryMultiSelect({
-  categories, selectedIds, onToggle,
-}: { categories: { id: string; name: string }[]; selectedIds: string[]; onToggle: (id: string) => void }) {
+  categories, selectedIds, onToggle, defaultId, onSetDefault,
+}: {
+  categories: { id: string; name: string }[]; selectedIds: string[]; onToggle: (id: string) => void
+  defaultId?: string; onSetDefault: (id: string | null) => void
+}) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -86,12 +86,24 @@ function CategoryMultiSelect({
             <p className="p-2 text-xs text-muted">Sem categorias com gastos.</p>
           ) : (
             categories.map((c) => (
-              <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-surface-2">
-                <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => onToggle(c.id)} />
-                {c.name}
-              </label>
+              <div key={c.id} className="flex items-center rounded-lg hover:bg-surface-2">
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 px-2 py-1.5 text-sm">
+                  <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => onToggle(c.id)} />
+                  <span className="truncate">{c.name}</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => onSetDefault(defaultId === c.id ? null : c.id)}
+                  title={defaultId === c.id ? 'É a categoria padrão do gráfico (tocar para tirar)' : 'Definir como categoria padrão do gráfico'}
+                  aria-label={defaultId === c.id ? `Tirar ${c.name} como padrão` : `Definir ${c.name} como padrão`}
+                  className={cx('shrink-0 px-2 py-1.5 text-sm', defaultId === c.id ? 'text-warn' : 'text-muted hover:text-text')}
+                >
+                  {defaultId === c.id ? '★' : '☆'}
+                </button>
+              </div>
             ))
           )}
+          {categories.length > 0 && <p className="mt-1 px-2 text-[11px] text-muted">★ abre por defeito neste gráfico</p>}
         </div>
       )}
     </div>
@@ -105,7 +117,12 @@ export function Budgets() {
   const put = useStore((s) => s.put)
 
   const currentMonth = currentMonthKey()
-  const [month, setMonth] = useSessionState<MonthKey>('analytics.month', currentMonth)
+  const startCfg = monthStartConfigOf(data.meta[0])
+  // Sem mês escolhido segue o mês financeiro atual (também depois de um refresh,
+  // quando os dados e o início do mês só chegam depois do primeiro render).
+  const [pickedMonth, setPickedMonth] = useSessionState<MonthKey | null>('analytics.month', null)
+  const month = pickedMonth ?? currentMonth
+  const setMonth = (m: MonthKey) => setPickedMonth(m === currentMonth ? null : m)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showSubs, setShowSubs] = useState(false)
   // Janela de 12 meses terminada no mês escolhido (para gráfico/histórico).
@@ -126,7 +143,7 @@ export function Budgets() {
     const map = new Map<MonthKey, MonthReport>()
     const totals = groupMonthTotals(data.transactions, resolve)
     for (const m of months) {
-      const elapsed = m === currentMonth ? new Date().getDate() / daysInMonth(m) : undefined
+      const elapsed = m === currentMonth ? monthProgress(startCfg, m, todayISO()) : undefined
       map.set(m, buildMonthReport({
         month: m, transactions: data.transactions, resolve, groups,
         subcategories: data.subcategories, planExpenses: planFor(m), elapsed,
@@ -135,14 +152,18 @@ export function Budgets() {
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [months, data, resolve, groups, currentMonth])
+  }, [months, data, resolve, groups, currentMonth, startCfg])
 
   const report = reports.get(month)!
-  const insights = useMemo(
-    () => computeInsights(monthRange(addMonths(month, -3), month).map((m) => reports.get(m)).filter((r): r is MonthReport => Boolean(r))),
-    [reports, month],
-  )
   const isCurrent = month === currentMonth
+  const accountingMonth = activeAccountingMonth(data.monthlyPlans, currentMonth)
+  const insights = useMemo(() => {
+    const all = computeInsights(monthRange(addMonths(month, -3), month).map((m) => reports.get(m)).filter((r): r is MonthReport => Boolean(r)))
+    // No mês atual só se mostra o que merece atenção agora (ver attentionInsights).
+    return isCurrent
+      ? attentionInsights(all, { currentMonth, accountingMonth, daysUntilNextMonth: daysUntilNextMonth(startCfg, currentMonth, todayISO()) })
+      : all
+  }, [reports, month, isCurrent, currentMonth, accountingMonth, startCfg])
   const rows = sortByAttention(report.rows.filter((r) => r.planned > 0 || r.spent > 0))
   const diff = report.plannedTotal - report.spentInPlan
   const pendingLegacy = legacyNeedingMapping(data)
@@ -167,8 +188,14 @@ export function Budgets() {
   // ----- Evolução por categoria (multi-seleção) -----
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const spendGroups = historyGroups
-  // Por defeito: "Outros" (se existir), senão a primeira categoria.
-  const defaultGroup = spendGroups.find((g) => g.name.trim().toLowerCase() === 'outros') ?? spendGroups[0]
+  // Sem padrão definido: a categoria com mais gasto na janela (não depende do nome).
+  const spentInWindow = (id: string) =>
+    months.reduce((sum, m) => sum + (reports.get(m)?.rows.find((x) => x.group.id === id)?.spent ?? 0), 0)
+  const setMeta = useStore((s) => s.setMeta)
+  const savedDefaultId = data.meta[0]?.analyticsDefaultGroupId
+  // Padrão escolhido por ti (★); se não houver, ou já não existir, a categoria com mais gasto.
+  const defaultGroup = spendGroups.find((g) => g.id === savedDefaultId)
+    ?? [...spendGroups].sort((a, b) => spentInWindow(b.id) - spentInWindow(a.id))[0]
   const effectiveIds = selectedIds.length > 0 ? selectedIds : (defaultGroup ? [defaultGroup.id] : [])
   const toggleSelected = (id: string) =>
     setSelectedIds((prev) => {
@@ -269,7 +296,7 @@ export function Budgets() {
           label={diff >= 0 ? 'Ainda disponível' : 'Acima do plano'}
           value={fmtEUR(Math.abs(diff))}
           tone={report.plannedTotal === 0 ? 'default' : diff >= 0 ? 'positive' : 'negative'}
-          hint={isCurrent && report.plannedTotal > 0 ? `dia ${new Date().getDate()} de ${daysInMonth(month)}` : undefined}
+          hint={isCurrent && report.plannedTotal > 0 ? `dia ${monthDayInfo(startCfg, month, todayISO()).day} de ${monthDayInfo(startCfg, month, todayISO()).total}` : undefined}
         />
         <MetricCard
           label="Fora do plano"
@@ -299,7 +326,9 @@ export function Budgets() {
                   isCurrent={isCurrent}
                   onIgnoreAlerts={() => {
                     const cat = data.expenseCategories.find((c) => c.id === r.group.id)
-                    if (cat) void put('expenseCategories', { ...cat, fixed: true })
+                    if (!cat) return
+                    if (!window.confirm(`Deixar de avisar "Quase no limite" em "${cat.name}"? Passa a contar como despesa fixa e só fica vermelha se ultrapassares o plano. Podes reverter em Definições → Despesas do planeamento.`)) return
+                    void put('expenseCategories', { ...cat, fixed: true })
                   }}
                 />
               ))}
@@ -462,7 +491,15 @@ export function Budgets() {
 
       <section>
         <SectionTitle
-          right={<CategoryMultiSelect categories={spendGroups} selectedIds={effectiveIds} onToggle={toggleSelected} />}
+          right={
+            <CategoryMultiSelect
+              categories={spendGroups}
+              selectedIds={effectiveIds}
+              onToggle={toggleSelected}
+              defaultId={savedDefaultId}
+              onSetDefault={(id) => void setMeta({ analyticsDefaultGroupId: id ?? undefined })}
+            />
+          }
         >
           Evolução por categoria
         </SectionTitle>

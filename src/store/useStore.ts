@@ -29,6 +29,7 @@ import type {
 } from '../types'
 import { COLLECTIONS, emptyDataSet } from '../types'
 import { initialScreen, pushScreen } from '../lib/route'
+import { setMonthStartConfig, type MonthStartConfig } from '../lib/financialMonth'
 
 export type Screen =
   | 'planeamento'
@@ -74,6 +75,8 @@ interface Store {
   leaveSpace(): Promise<void>
   setScreen(s: Screen): void
   setMonth(m: MonthKey): void
+  setMonthStartDefault(day: number, fromMonth: MonthKey): Promise<void>
+  setMonthStartOverride(month: MonthKey, day: number | null): Promise<void>
   toggleTheme(): void
 
   put<C extends CollectionName>(c: C, doc: DataSet[C][number]): Promise<void>
@@ -116,6 +119,7 @@ interface Store {
   mergeExpensesInto(fromIds: string[], targetId: string, moveTransactions: boolean): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
   revertAutoBucketMovements(): Promise<number>
+  createMovementFromTransaction(transactionId: string, bucketId: string, description: string): Promise<boolean>
 
   // Objetivos extraordinários
   goalPartialPayment(bucketId: string, amount: number, description: string): Promise<void>
@@ -127,11 +131,22 @@ interface Store {
 }
 
 let adapter: DataAdapter | null = null
+// Enquanto o utilizador não escolher um mês no Planeamento, segue o mês financeiro atual.
+let monthTouched = false
+
+export const monthStartConfigOf = (meta: AppMeta | undefined): MonthStartConfig => ({
+  rules: meta?.monthStartRules ?? [],
+  overrides: meta?.monthStartOverrides ?? {},
+})
 
 async function startAdapter(next: DataAdapter, set: (p: Partial<Store>) => void): Promise<void> {
   adapter?.stop()
   adapter = next
-  await next.start((data) => set({ data }))
+  await next.start((data) => {
+    // O mês financeiro depende dos metadados: atualiza-se antes de os ecrãs recalcularem.
+    setMonthStartConfig(monthStartConfigOf(data.meta[0]))
+    set({ data, ...(monthTouched ? {} : { month: currentMonthKey() }) })
+  })
 }
 
 export const useStore = create<Store>((set, get) => ({
@@ -304,7 +319,28 @@ export const useStore = create<Store>((set, get) => ({
     pushScreen(screen)
     set({ screen })
   },
-  setMonth: (month) => set({ month }),
+  setMonth: (month) => {
+    monthTouched = true
+    set({ month })
+  },
+
+  // Novo dia de início por defeito, a partir de `fromMonth` (inclusive). Os meses
+  // anteriores nunca mudam: o histórico de defaults guarda cada regra.
+  async setMonthStartDefault(day, fromMonth) {
+    const d = Math.min(31, Math.max(1, Math.round(day)))
+    const rules = (get().data.meta[0]?.monthStartRules ?? []).filter((r) => r.from !== fromMonth)
+    rules.push({ from: fromMonth, day: d })
+    rules.sort((a, b) => a.from.localeCompare(b.from))
+    await get().setMeta({ monthStartRules: rules })
+  },
+
+  // Dia de início só para um mês (null = voltar ao default).
+  async setMonthStartOverride(month, day) {
+    const next = { ...(get().data.meta[0]?.monthStartOverrides ?? {}) }
+    if (day === null) delete next[month]
+    else next[month] = Math.min(31, Math.max(1, Math.round(day)))
+    await get().setMeta({ monthStartOverrides: next })
+  },
   toggleTheme: () => {
     const theme = get().theme === 'dark' ? 'light' : 'dark'
     localStorage.setItem(LS_THEME, theme)
@@ -483,6 +519,25 @@ export const useStore = create<Store>((set, get) => ({
     if (res.monthlyPlans.length) await adapter!.putMany('monthlyPlans', res.monthlyPlans)
     if (res.projectionPlans.length) await adapter!.putMany('projectionPlans', res.projectionPlans)
     if (res.transactions.length) await adapter!.putMany('transactions', res.transactions)
+  },
+
+  // Cria, a pedido do utilizador, a saída de poupança correspondente a um gasto.
+  // A descrição nunca começa por "Gasto: " (reservado às saídas automáticas antigas,
+  // que a limpeza em Definições remove). Só uma vez por gasto.
+  async createMovementFromTransaction(transactionId, bucketId, description) {
+    const { data } = get()
+    const t = data.transactions.find((x) => x.id === transactionId)
+    if (!t || !data.savingsBuckets.some((b) => b.id === bucketId)) return false
+    if (data.savingsMovements.some((m) => m.transactionId === transactionId)) return false
+    const text = description.trim() || t.description
+    await get().addMovement({
+      date: t.date,
+      bucketId,
+      amount: -Math.abs(t.amount),
+      description: text.startsWith('Gasto: ') ? text.slice(7) : text,
+      transactionId,
+    })
+    return true
   },
 
   async deleteTransaction(transactionId) {

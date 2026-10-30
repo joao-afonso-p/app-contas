@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   EmptyState,
+  InfoHint,
   Input,
   MetricCard,
   Modal,
@@ -23,15 +24,15 @@ import {
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
 import { LateIncomeCard } from '../components/LateIncomeCard'
+import { daysSinceMonthStart, daysUntilNextMonth, monthProgress } from '../lib/financialMonth'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
 import { activeAccountingMonth, bucketBalance, computeBalances, totalBalance } from '../lib/calc/balances'
 import { savingsRate } from '../lib/calc/projections'
 import { allGroups, makeResolver } from '../lib/calc/categories'
-import { buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, type MonthReport } from '../lib/calc/planVsActual'
+import { attentionInsights, buildMonthReport, computeInsights, detectFixedGroups, groupMonthTotals, type MonthReport } from '../lib/calc/planVsActual'
 import {
   addMonths,
   currentMonthKey,
-  dayOfMonth,
   fmtEUR as fmtEURExact,
   fmtEURWhole as fmtEUR,
   fmtPct,
@@ -42,7 +43,7 @@ import {
   parseAmount,
   todayISO,
 } from '../lib/format'
-import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, useStore, vehicleAllocations } from '../store/useStore'
+import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, monthStartConfigOf, useStore, vehicleAllocations } from '../store/useStore'
 
 // Uma cor distinta por balde (até 9) — a linha do total tem a sua própria cor.
 const BUCKET_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#06b6d4']
@@ -83,6 +84,17 @@ export function Overview() {
   // por isso "na conta do banco" não volta a subtraí-las.
   const bankBalance = totalNow
 
+  // Incomes "chega depois" do plano aplicado que ainda não entraram: o saldo dos
+  // baldes já os conta (o plano reservou-os), mas a conta poupança ainda não.
+  const pendingLate = useMemo(() => {
+    const plan = data.monthlyPlans.find((p) => p.id === accountingMonth)
+    if (!plan || plan.closed === false) return []
+    return data.incomeSources
+      .filter((s) => s.isRent && (plan.income[s.id] || 0) > 0.004 && !plan.lateTransferred?.[s.id])
+      .map((s) => ({ id: s.id, name: s.name, amount: plan.income[s.id] || 0 }))
+  }, [data.monthlyPlans, data.incomeSources, accountingMonth])
+  const pendingLateTotal = round2(pendingLate.reduce((acc, p) => acc + p.amount, 0))
+
   const autoTotals = useMemo(
     () => autoInvestmentTotals(data, accountingMonth),
     [data, accountingMonth],
@@ -103,7 +115,8 @@ export function Overview() {
   const currentRate = savingsRate(currentSummary.totalIncome, currentSummary.totalSavings)
 
   const calendarPlan = data.monthlyPlans.find((p) => p.id === calendarMonth)
-  const showApplyWarning = dayOfMonth() >= 10 && calendarPlan?.closed !== true
+  const startCfg = monthStartConfigOf(data.meta[0])
+  const showApplyWarning = daysSinceMonthStart(startCfg, calendarMonth, todayISO()) >= 9 && calendarPlan?.closed !== true
 
   // ---------- Evolução de saldos ----------
 
@@ -208,8 +221,6 @@ export function Overview() {
     const resolve = makeResolver(data)
     const groups = allGroups(data)
     const totals = groupMonthTotals(data.transactions, resolve)
-    const today = new Date()
-    const dim = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
     return reportMonths.map((m): { report: MonthReport; income: number; savingsPlanned: number } => {
       const saved = data.monthlyPlans.find((p) => p.id === m)
       const plan = saved ?? (m === calendarMonth ? effectivePlan(data, m) : undefined)
@@ -217,7 +228,7 @@ export function Overview() {
       return {
         report: buildMonthReport({
           month: m, transactions: data.transactions, resolve, groups, subcategories: data.subcategories,
-          planExpenses: plan?.expenses, elapsed: m === calendarMonth ? today.getDate() / dim : undefined,
+          planExpenses: plan?.expenses, elapsed: m === calendarMonth ? monthProgress(startCfg, m, todayISO()) : undefined,
           fixedIds: detectFixedGroups(groups, totals, m),
         }),
         income: summary.totalIncome,
@@ -225,7 +236,14 @@ export function Overview() {
       }
     })
   }, [data, reportMonths, calendarMonth])
-  const insights = useMemo(() => computeInsights(reports.map((r) => r.report)), [reports])
+  const insights = useMemo(
+    () => attentionInsights(computeInsights(reports.map((r) => r.report)), {
+      currentMonth: calendarMonth,
+      accountingMonth,
+      daysUntilNextMonth: daysUntilNextMonth(startCfg, calendarMonth, todayISO()),
+    }),
+    [reports, calendarMonth, accountingMonth, startCfg],
+  )
 
   return (
     <div className="fade-up flex flex-col gap-6">
@@ -273,11 +291,39 @@ export function Overview() {
         </Card>
       )}
 
-      <LateIncomeCard month={calendarMonth} onlyPending />
+      <LateIncomeCard month={accountingMonth} onlyPending />
 
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
-        <MetricCard label="Na conta do banco" value={fmtEUR(bankBalance)} />
+        <MetricCard
+          label="Na conta do banco"
+          value={fmtEUR(bankBalance)}
+          hint={
+            pendingLateTotal > 0.004 ? (
+              <span className="flex flex-col gap-0.5">
+                <span>Na poupança hoje: {fmtEUR(bankBalance - pendingLateTotal)}</span>
+                <span className="flex items-center gap-1">
+                  faltam {fmtEUR(pendingLateTotal)} para chegar
+                  <InfoHint label="Porque é que o valor é diferente do banco?">
+                    <p className="font-semibold">Faltam {fmtEUR(pendingLateTotal)} para chegar:</p>
+                    <ul className="tnum mt-1 flex flex-col gap-0.5">
+                      {pendingLate.map((p) => (
+                        <li key={p.id} className="flex justify-between gap-3">
+                          <span>{p.name}</span>
+                          <span>{fmtEUR(p.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-muted">
+                      O saldo grande inclui o que o plano já reservou mas ainda não entrou na conta. Quando o dinheiro
+                      chegar e marcares "Já transferi", os dois valores igualam-se.
+                    </p>
+                  </InfoHint>
+                </span>
+              </span>
+            ) : undefined
+          }
+        />
         <div className="hidden md:flex [&>*]:flex-1">
           <MetricCard label="Investidos" value={fmtEUR(totalInvested)} />
         </div>

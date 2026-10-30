@@ -7,15 +7,16 @@ import { BackupSettings } from '../components/Backup'
 import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { IncomeTiming } from '../components/IncomeTiming'
-import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
+import { Badge, Button, Card, EditableName, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import {
-  activeGroups, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
+  activeGroups, legacyImplicitlyMappedTo, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
 } from '../lib/calc/categories'
 import { normalizeDesc } from '../lib/calc/budgets'
 import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
-import { currentMonthKey, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
-import { allocationBlock, firstPlanMonth, isAutoBucketMovement, useStore } from '../store/useStore'
+import { addMonths, currentMonthKey, fmtDayMonth, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
+import { START_DAY_CHOICES, addDaysISO, defaultStartDay, monthStartDate } from '../lib/financialMonth'
+import { allocationBlock, firstPlanMonth, isAutoBucketMovement, monthStartConfigOf, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
 
@@ -172,6 +173,8 @@ export function Definicoes() {
           </Card>
         </section>
       )}
+
+      <MonthStartSection />
 
       <AutoMovementsSection />
 
@@ -386,9 +389,21 @@ function SavingsSection() {
       <>
         <div className="flex min-w-0 items-center gap-2">
           {dragHandle}
-          <span className={cx('truncate text-sm', bucket.archived && 'text-muted line-through')}>
-            {bucket.name}
-          </span>
+          <EditableName
+            value={bucket.name}
+            muted={bucket.archived}
+            className="text-sm"
+            onSave={(name) => {
+              for (const c of legacyImplicitlyMappedTo(data, bucket.id)) void put('transactionCategories', { ...c, planCategoryId: bucket.id })
+              void put('savingsBuckets', { ...bucket, name })
+            }}
+            validate={(name) => {
+              const n = normalizeDesc(name)
+              if (data.savingsBuckets.some((b) => b.id !== bucket.id && normalizeDesc(b.name) === n)) return { error: 'Já existe um balde com este nome.' }
+              if (data.expenseCategories.some((c) => normalizeDesc(c.name) === n)) return { warn: 'Já existe uma despesa do planeamento com este nome.' }
+              return null
+            }}
+          />
           {bucket.kind === 'goal' && (
             <span title={goalCaption}>
               <Badge tone="goal">Objetivo</Badge>
@@ -625,7 +640,22 @@ function ListEditor({ title, collection, hint }: EditableList) {
         <ul className="divide-y divide-border">
           {docs.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-2 py-2">
-              <span className={cx('text-sm', doc.archived && 'text-muted line-through')}>{doc.name}</span>
+              <EditableName
+                value={doc.name}
+                muted={doc.archived}
+                className="text-sm"
+                onSave={(name) => {
+                  // Gastos antigos ligados a esta despesa só pelo nome: fixa a ligação antes de renomear.
+                  if (isExpense) for (const c of legacyImplicitlyMappedTo(data, doc.id)) void put('transactionCategories', { ...c, planCategoryId: doc.id })
+                  void put(collection, { ...doc, name } as never)
+                }}
+                validate={(name) => {
+                  const n = normalizeDesc(name)
+                  if (docs.some((d) => d.id !== doc.id && normalizeDesc(d.name) === n)) return { error: 'Já existe um item com este nome.' }
+                  if (isExpense && data.savingsBuckets.some((b) => normalizeDesc(b.name) === n)) return { warn: 'Já existe um balde de poupança com este nome.' }
+                  return null
+                }}
+              />
               <div className="flex items-center gap-2">
                 {isIncome && (
                   <IncomeTiming
@@ -796,7 +826,16 @@ function SubcategoriesSection() {
                             sc.archived && 'text-muted line-through',
                           )}
                         >
-                          {sc.name}
+                          <EditableName
+                            value={sc.name}
+                            muted={sc.archived}
+                            className="text-xs font-medium"
+                            onSave={(name) => void put('subcategories', { ...sc, name })}
+                            validate={(name) =>
+                              subcategoriesOf(data.subcategories, g.id, true).some((x) => x.id !== sc.id && normalizeDesc(x.name) === normalizeDesc(name))
+                                ? { error: 'Já existe uma subcategoria com este nome.' }
+                                : null}
+                          />
                           {used > 0 && <span className="text-[10px] text-muted">{used}</span>}
                           <button
                             title={sc.archived ? 'Reativar' : 'Arquivar'}
@@ -1118,6 +1157,83 @@ function AutoMovementsSection() {
         <Button size="sm" variant="danger" onClick={() => void apply()}>
           Remover {auto.length} saídas ({fmtEUR(total, true)})
         </Button>
+      </Card>
+    </section>
+  )
+}
+
+// ---------- Início do mês financeiro ----------
+
+const startDayLabel = (d: number): string =>
+  d >= 16 ? `dia ${d} do mês anterior` : `dia ${d} do próprio mês${d === 1 ? ' (padrão)' : ''}`
+
+function MonthStartSection() {
+  const data = useStore((s) => s.data)
+  const setMonthStartDefault = useStore((s) => s.setMonthStartDefault)
+  const cfg = monthStartConfigOf(data.meta[0])
+  const current = currentMonthKey()
+  // Por defeito aplica-se ao mês seguinte ao atual (o atual e os anteriores ficam como estão).
+  const [fromPick, setFromPick] = useState<string | null>(null)
+  const [pickingMonth, setPickingMonth] = useState(false)
+  const from = fromPick ?? addMonths(current, 1)
+  const [dayPick, setDayPick] = useState<number | null>(null)
+  const day = dayPick ?? defaultStartDay(cfg, from)
+  const choices = START_DAY_CHOICES.includes(day) ? START_DAY_CHOICES : [day, ...START_DAY_CHOICES]
+
+  const draftCfg = { ...cfg, rules: [...cfg.rules.filter((r) => r.from !== from), { from, day }] }
+  const start = monthStartDate(draftCfg, from)
+  const end = addDaysISO(monthStartDate(draftCfg, addMonths(from, 1)), -1)
+
+  // Lista explícita do que está em vigor, mês a partir de mês.
+  const rules = [...cfg.rules].sort((a, b) => a.from.localeCompare(b.from))
+  const inForce = [
+    { label: rules.length ? `Até ${monthLabel(addMonths(rules[0].from, -1))}` : 'Sempre', day: 1 },
+    ...rules.map((r) => ({ label: `Desde ${monthLabel(r.from)}`, day: r.day })),
+  ]
+
+  return (
+    <section>
+      <SectionTitle>Início do mês financeiro</SectionTitle>
+      <Card>
+        <p className="mb-3 text-xs text-muted">
+          A data em que começa o teu mês (ex.: quando recebes o salário), entre o dia 20 do mês anterior e o dia 5 do
+          próprio mês. Com início a 28 do mês anterior, novembro começa a 28 de outubro, e gastos e movimentos dessas
+          datas contam para novembro. Podes ajustar um mês em concreto no Planeamento.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="mb-1 block text-xs text-muted">Início do mês</label>
+            <Select value={String(day)} onChange={(e) => setDayPick(Number(e.target.value))}>
+              {choices.map((d) => <option key={d} value={d}>{startDayLabel(d)}</option>)}
+            </Select>
+          </div>
+          <Button onClick={() => void setMonthStartDefault(day, from)}>Guardar</Button>
+        </div>
+        <p className="tnum mt-3 text-sm text-text">
+          {monthLabel(from, true)}: {fmtDayMonth(start)} → {fmtDayMonth(end)}
+        </p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+          Aplica-se a {monthLabel(from, true)} e seguintes; os meses anteriores ficam como estão.
+          <button className="font-medium text-accent-strong hover:underline" onClick={() => setPickingMonth((v) => !v)}>
+            {pickingMonth ? 'fechar' : 'alterar mês'}
+          </button>
+        </p>
+        {pickingMonth && (
+          <div className="mt-2 max-w-48">
+            <Input type="month" value={from} onChange={(e) => e.target.value && setFromPick(e.target.value)} />
+          </div>
+        )}
+
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-1 text-xs font-semibold text-muted">Em vigor</div>
+          <ul className="flex flex-col gap-0.5 text-xs text-muted">
+            {inForce.map((r) => (
+              <li key={r.label}>
+                {r.label}: <span className="text-text">{r.day >= 16 ? `dia ${r.day} do mês anterior` : `dia ${r.day} do próprio mês`}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </Card>
     </section>
   )
