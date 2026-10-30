@@ -38,6 +38,13 @@ export function startDayFor(cfg: MonthStartConfig, month: MonthKey): number {
   return cfg.overrides[month] || defaultStartDay(cfg, month)
 }
 
+// Dias de início que a app oferece: 20–31 do mês anterior e 1–5 do próprio mês.
+// (Valores antigos fora deste intervalo continuam a funcionar.)
+export const START_DAY_CHOICES: readonly number[] = [
+  ...Array.from({ length: 12 }, (_, i) => 20 + i),
+  1, 2, 3, 4, 5,
+]
+
 // Data (ISO) em que o mês financeiro começa.
 export function monthStartDate(cfg: MonthStartConfig, month: MonthKey): string {
   const day = startDayFor(cfg, month)

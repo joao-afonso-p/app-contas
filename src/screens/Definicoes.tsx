@@ -15,7 +15,7 @@ import {
 import { normalizeDesc } from '../lib/calc/budgets'
 import { findOrphanExpenses, planMerge } from '../lib/calc/mergeExpenses'
 import { addMonths, currentMonthKey, fmtDayMonth, fmtEUR, monthLabel, monthShort, uid } from '../lib/format'
-import { addDaysISO, defaultStartDay, monthStartDate } from '../lib/financialMonth'
+import { START_DAY_CHOICES, addDaysISO, defaultStartDay, monthStartDate } from '../lib/financialMonth'
 import { allocationBlock, firstPlanMonth, isAutoBucketMovement, monthStartConfigOf, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
@@ -1128,50 +1128,76 @@ function AutoMovementsSection() {
 
 // ---------- Início do mês financeiro ----------
 
+const startDayLabel = (d: number): string =>
+  d >= 16 ? `dia ${d} do mês anterior` : `dia ${d} do próprio mês${d === 1 ? ' (padrão)' : ''}`
+
 function MonthStartSection() {
   const data = useStore((s) => s.data)
   const setMonthStartDefault = useStore((s) => s.setMonthStartDefault)
   const cfg = monthStartConfigOf(data.meta[0])
   const current = currentMonthKey()
-  const [day, setDay] = useState(() => defaultStartDay(cfg, addMonths(current, 1)))
-  const [from, setFrom] = useState(() => addMonths(current, 1))
+  // Por defeito aplica-se ao mês seguinte ao atual (o atual e os anteriores ficam como estão).
+  const [fromPick, setFromPick] = useState<string | null>(null)
+  const [pickingMonth, setPickingMonth] = useState(false)
+  const from = fromPick ?? addMonths(current, 1)
+  const [dayPick, setDayPick] = useState<number | null>(null)
+  const day = dayPick ?? defaultStartDay(cfg, from)
+  const choices = START_DAY_CHOICES.includes(day) ? START_DAY_CHOICES : [day, ...START_DAY_CHOICES]
 
   const draftCfg = { ...cfg, rules: [...cfg.rules.filter((r) => r.from !== from), { from, day }] }
   const start = monthStartDate(draftCfg, from)
   const end = addDaysISO(monthStartDate(draftCfg, addMonths(from, 1)), -1)
+
+  // Lista explícita do que está em vigor, mês a partir de mês.
   const rules = [...cfg.rules].sort((a, b) => a.from.localeCompare(b.from))
+  const inForce = [
+    { label: rules.length ? `Até ${monthLabel(addMonths(rules[0].from, -1))}` : 'Sempre', day: 1 },
+    ...rules.map((r) => ({ label: `Desde ${monthLabel(r.from)}`, day: r.day })),
+  ]
 
   return (
     <section>
       <SectionTitle>Início do mês financeiro</SectionTitle>
       <Card>
         <p className="mb-3 text-xs text-muted">
-          O dia em que começa o teu mês (ex.: quando recebes o salário). Por defeito é dia 1. Com dia 28, novembro
-          começa a 28 de outubro, e gastos e movimentos dessas datas contam para novembro. Vale para os meses a
-          partir do que escolheres: os anteriores não mudam. Podes ajustar um mês em concreto no Planeamento.
+          A data em que começa o teu mês (ex.: quando recebes o salário), entre o dia 20 do mês anterior e o dia 5 do
+          próprio mês. Com início a 28 do mês anterior, novembro começa a 28 de outubro, e gastos e movimentos dessas
+          datas contam para novembro. Podes ajustar um mês em concreto no Planeamento.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="mb-1 block text-xs text-muted">Dia de início</label>
-            <Select value={String(day)} onChange={(e) => setDay(Number(e.target.value))}>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>dia {d}</option>)}
+            <label className="mb-1 block text-xs text-muted">Início do mês</label>
+            <Select value={String(day)} onChange={(e) => setDayPick(Number(e.target.value))}>
+              {choices.map((d) => <option key={d} value={d}>{startDayLabel(d)}</option>)}
             </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">A partir de</label>
-            <Input type="month" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} />
           </div>
           <Button onClick={() => void setMonthStartDefault(day, from)}>Guardar</Button>
         </div>
-        <p className="tnum mt-3 text-xs text-muted">
+        <p className="tnum mt-3 text-sm text-text">
           {monthLabel(from, true)}: {fmtDayMonth(start)} → {fmtDayMonth(end)}
         </p>
-        <p className="mt-2 text-xs text-muted">
-          Em vigor: {rules.length === 0
-            ? 'dia 1 (padrão)'
-            : `dia 1 até ${monthLabel(addMonths(rules[0].from, -1))}` +
-              rules.map((r, i) => `, dia ${r.day} a partir de ${monthLabel(r.from)}${i < rules.length - 1 ? '' : ''}`).join('')}
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+          Aplica-se a {monthLabel(from, true)} e seguintes; os meses anteriores ficam como estão.
+          <button className="font-medium text-accent-strong hover:underline" onClick={() => setPickingMonth((v) => !v)}>
+            {pickingMonth ? 'fechar' : 'alterar mês'}
+          </button>
         </p>
+        {pickingMonth && (
+          <div className="mt-2 max-w-48">
+            <Input type="month" value={from} onChange={(e) => e.target.value && setFromPick(e.target.value)} />
+          </div>
+        )}
+
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-1 text-xs font-semibold text-muted">Em vigor</div>
+          <ul className="flex flex-col gap-0.5 text-xs text-muted">
+            {inForce.map((r) => (
+              <li key={r.label}>
+                {r.label}: <span className="text-text">{r.day >= 16 ? `dia ${r.day} do mês anterior` : `dia ${r.day} do próprio mês`}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </Card>
     </section>
   )

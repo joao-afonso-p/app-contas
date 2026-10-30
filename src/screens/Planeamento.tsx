@@ -32,7 +32,7 @@ import {
   useStore,
 } from '../store/useStore'
 import { useIsDesktop } from '../lib/useIsDesktop'
-import { addDaysISO, defaultStartDay, earliestApplyDate, monthStartDate } from '../lib/financialMonth'
+import { START_DAY_CHOICES, addDaysISO, defaultStartDay, earliestApplyDate, monthStartDate } from '../lib/financialMonth'
 import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
 import { LateIncomeCard } from '../components/LateIncomeCard'
 import type { MonthKey, MonthlyPlan, SavingsBucket } from '../types'
@@ -152,19 +152,27 @@ export function Planeamento() {
       <Modal open={startOpen} onClose={() => setStartOpen(false)} title={`Início de ${monthLabel(month, true)}`}>
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted">
-            Escolhe o dia em que este mês financeiro começa (1–31; em meses curtos usa o último dia).
-            Só afeta {monthLabel(month, true)}: os outros meses seguem o padrão das Definições.
+            Escolhe a data em que este mês financeiro começa. Só afeta {monthLabel(month, true)}: os outros meses
+            seguem o padrão das Definições.
           </p>
-          <div className="flex items-center gap-3">
-            <Select value={String(startDraft)} onChange={(e) => setStartDraft(Number(e.target.value))}>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>dia {d}</option>)}
-            </Select>
-            <span className="tnum text-sm text-text">
-              {fmtDayMonth(monthStartDate({ ...startCfg, overrides: { ...startCfg.overrides, [month]: startDraft } }, month))}
-              {' → '}
-              {fmtDayMonth(addDaysISO(monthStartDate({ ...startCfg, overrides: { ...startCfg.overrides, [month]: startDraft } }, addMonths(month, 1)), -1))}
-            </span>
-          </div>
+          {(() => {
+            const dateOf = (d: number) => monthStartDate({ rules: [], overrides: { [month]: d } }, month)
+            const def = defaultStartDay(startCfg, month)
+            const choices = START_DAY_CHOICES.includes(startDraft) ? START_DAY_CHOICES : [startDraft, ...START_DAY_CHOICES]
+            const draftCfg = { ...startCfg, overrides: { ...startCfg.overrides, [month]: startDraft } }
+            return (
+              <div className="flex flex-wrap items-center gap-3">
+                <Select value={String(startDraft)} onChange={(e) => setStartDraft(Number(e.target.value))}>
+                  {choices.map((d) => (
+                    <option key={d} value={d}>{fmtDayMonth(dateOf(d))}{d === def ? ' (padrão)' : ''}</option>
+                  ))}
+                </Select>
+                <span className="tnum text-sm text-text">
+                  {fmtDayMonth(monthStartDate(draftCfg, month))} → {fmtDayMonth(addDaysISO(monthStartDate(draftCfg, addMonths(month, 1)), -1))}
+                </span>
+              </div>
+            )
+          })()}
           <div className="mt-1 flex justify-end gap-2">
             {hasOverride && (
               <Button variant="ghost" className="mr-auto" onClick={() => { void setMonthStartOverride(month, null); setStartOpen(false) }}>
