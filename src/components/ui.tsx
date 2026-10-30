@@ -375,3 +375,71 @@ export function MoneyCell({
     </button>
   )
 }
+
+// Nome editável no local (✎). Não altera identificadores: o histórico, os planos e as
+// análises apontam para o item, por isso passam a mostrar o novo nome sozinhos.
+// `validate` devolve um erro (bloqueia) ou um aviso (pede confirmação).
+export function EditableName({
+  value, onSave, validate, className, muted,
+}: {
+  value: string
+  onSave: (name: string) => void
+  validate?: (name: string) => { error?: string; warn?: string } | null
+  className?: string
+  muted?: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [error, setError] = useState('')
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) ref.current?.select()
+  }, [editing])
+
+  const cancel = () => { setEditing(false); setError('') }
+  const commit = () => {
+    const name = draft.trim()
+    if (name === value) return cancel()
+    if (!name) return setError('O nome não pode ficar vazio.')
+    const v = validate?.(name)
+    if (v?.error) return setError(v.error)
+    if (v?.warn && !window.confirm(`${v.warn} Usar o mesmo nome?`)) return
+    onSave(name)
+    cancel()
+  }
+
+  if (editing) {
+    return (
+      <span className="flex min-w-0 flex-col">
+        <input
+          ref={ref}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setError('') }}
+          onBlur={() => { if (!error) commit() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') cancel()
+          }}
+          aria-label="Novo nome"
+          className="w-full min-w-24 max-w-56 rounded-lg border border-accent bg-surface px-2 py-0.5 text-sm text-text focus:outline-none"
+        />
+        {error && <span className="mt-0.5 text-[11px] text-negative">{error}</span>}
+      </span>
+    )
+  }
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <span className={cx('truncate', muted && 'text-muted line-through', className)}>{value}</span>
+      <button
+        type="button"
+        onClick={() => { setDraft(value); setError(''); setEditing(true) }}
+        className="shrink-0 rounded px-1 text-xs text-muted hover:text-accent-strong"
+        aria-label={`Renomear ${value}`}
+        title="Renomear"
+      >
+        ✎
+      </button>
+    </span>
+  )
+}

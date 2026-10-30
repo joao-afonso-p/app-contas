@@ -169,8 +169,10 @@ export function Budgets() {
   // ----- Evolução por categoria (multi-seleção) -----
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const spendGroups = historyGroups
-  // Por defeito: "Outros" (se existir), senão a primeira categoria.
-  const defaultGroup = spendGroups.find((g) => g.name.trim().toLowerCase() === 'outros') ?? spendGroups[0]
+  // Por defeito: a categoria com mais gasto na janela (não depende do nome).
+  const spentInWindow = (id: string) =>
+    months.reduce((sum, m) => sum + (reports.get(m)?.rows.find((x) => x.group.id === id)?.spent ?? 0), 0)
+  const defaultGroup = [...spendGroups].sort((a, b) => spentInWindow(b.id) - spentInWindow(a.id))[0]
   const effectiveIds = selectedIds.length > 0 ? selectedIds : (defaultGroup ? [defaultGroup.id] : [])
   const toggleSelected = (id: string) =>
     setSelectedIds((prev) => {

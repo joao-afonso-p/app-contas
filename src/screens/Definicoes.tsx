@@ -7,7 +7,7 @@ import { BackupSettings } from '../components/Backup'
 import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { IncomeTiming } from '../components/IncomeTiming'
-import { Badge, Button, Card, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
+import { Badge, Button, Card, EditableName, InfoHint, Input, Modal, Money, MoneyCell, SectionTitle, Select, cx } from '../components/ui'
 import { bucketBalance, computeBalances } from '../lib/calc/balances'
 import {
   activeGroups, legacyNeedingMapping, makeResolver, newSubcategory, subcategoriesOf, suggestGroupForLegacy, type Group,
@@ -389,9 +389,18 @@ function SavingsSection() {
       <>
         <div className="flex min-w-0 items-center gap-2">
           {dragHandle}
-          <span className={cx('truncate text-sm', bucket.archived && 'text-muted line-through')}>
-            {bucket.name}
-          </span>
+          <EditableName
+            value={bucket.name}
+            muted={bucket.archived}
+            className="text-sm"
+            onSave={(name) => void put('savingsBuckets', { ...bucket, name })}
+            validate={(name) => {
+              const n = normalizeDesc(name)
+              if (data.savingsBuckets.some((b) => b.id !== bucket.id && normalizeDesc(b.name) === n)) return { error: 'Já existe um balde com este nome.' }
+              if (data.expenseCategories.some((c) => normalizeDesc(c.name) === n)) return { warn: 'Já existe uma despesa do planeamento com este nome.' }
+              return null
+            }}
+          />
           {bucket.kind === 'goal' && (
             <span title={goalCaption}>
               <Badge tone="goal">Objetivo</Badge>
@@ -628,7 +637,18 @@ function ListEditor({ title, collection, hint }: EditableList) {
         <ul className="divide-y divide-border">
           {docs.map((doc) => (
             <li key={doc.id} className="flex items-center justify-between gap-2 py-2">
-              <span className={cx('text-sm', doc.archived && 'text-muted line-through')}>{doc.name}</span>
+              <EditableName
+                value={doc.name}
+                muted={doc.archived}
+                className="text-sm"
+                onSave={(name) => void put(collection, { ...doc, name } as never)}
+                validate={(name) => {
+                  const n = normalizeDesc(name)
+                  if (docs.some((d) => d.id !== doc.id && normalizeDesc(d.name) === n)) return { error: 'Já existe um item com este nome.' }
+                  if (isExpense && data.savingsBuckets.some((b) => normalizeDesc(b.name) === n)) return { warn: 'Já existe um balde de poupança com este nome.' }
+                  return null
+                }}
+              />
               <div className="flex items-center gap-2">
                 {isIncome && (
                   <IncomeTiming
@@ -799,7 +819,16 @@ function SubcategoriesSection() {
                             sc.archived && 'text-muted line-through',
                           )}
                         >
-                          {sc.name}
+                          <EditableName
+                            value={sc.name}
+                            muted={sc.archived}
+                            className="text-xs font-medium"
+                            onSave={(name) => void put('subcategories', { ...sc, name })}
+                            validate={(name) =>
+                              subcategoriesOf(data.subcategories, g.id, true).some((x) => x.id !== sc.id && normalizeDesc(x.name) === normalizeDesc(name))
+                                ? { error: 'Já existe uma subcategoria com este nome.' }
+                                : null}
+                          />
                           {used > 0 && <span className="text-[10px] text-muted">{used}</span>}
                           <button
                             title={sc.archived ? 'Reativar' : 'Arquivar'}
