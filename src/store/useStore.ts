@@ -116,6 +116,7 @@ interface Store {
   mergeExpensesInto(fromIds: string[], targetId: string, moveTransactions: boolean): Promise<void>
   setTransactionReposto(transactionId: string, reposto: boolean): Promise<void>
   revertAutoBucketMovements(): Promise<number>
+  createMovementFromTransaction(transactionId: string, bucketId: string, description: string): Promise<boolean>
 
   // Objetivos extraordinários
   goalPartialPayment(bucketId: string, amount: number, description: string): Promise<void>
@@ -483,6 +484,25 @@ export const useStore = create<Store>((set, get) => ({
     if (res.monthlyPlans.length) await adapter!.putMany('monthlyPlans', res.monthlyPlans)
     if (res.projectionPlans.length) await adapter!.putMany('projectionPlans', res.projectionPlans)
     if (res.transactions.length) await adapter!.putMany('transactions', res.transactions)
+  },
+
+  // Cria, a pedido do utilizador, a saída de poupança correspondente a um gasto.
+  // A descrição nunca começa por "Gasto: " (reservado às saídas automáticas antigas,
+  // que a limpeza em Definições remove). Só uma vez por gasto.
+  async createMovementFromTransaction(transactionId, bucketId, description) {
+    const { data } = get()
+    const t = data.transactions.find((x) => x.id === transactionId)
+    if (!t || !data.savingsBuckets.some((b) => b.id === bucketId)) return false
+    if (data.savingsMovements.some((m) => m.transactionId === transactionId)) return false
+    const text = description.trim() || t.description
+    await get().addMovement({
+      date: t.date,
+      bucketId,
+      amount: -Math.abs(t.amount),
+      description: text.startsWith('Gasto: ') ? text.slice(7) : text,
+      transactionId,
+    })
+    return true
   },
 
   async deleteTransaction(transactionId) {

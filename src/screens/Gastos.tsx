@@ -14,9 +14,10 @@ import { getOpenAiKey } from '../lib/apiKey'
 import { deliverFile } from '../lib/download'
 import { transactionsToCsv } from '../lib/exportTransactions'
 import {
-  addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO, uid,
+  fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO, uid,
 } from '../lib/format'
 import { useSessionState } from '../lib/sessionState'
+import { makeDuplicateDetector } from '../lib/calc/dedupe'
 import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
 
@@ -37,6 +38,8 @@ const splitKey = (key: string) => {
   return { groupId: groupId || undefined, subId: subId || undefined }
 }
 
+const LIST_PAGE = 150
+
 export function Gastos() {
   const data = useStore((s) => s.data)
   const put = useStore((s) => s.put)
@@ -45,6 +48,7 @@ export function Gastos() {
   const saveTransaction = useStore((s) => s.saveTransaction)
   const setTransactionCategory = useStore((s) => s.setTransactionCategory)
   const deleteTransaction = useStore((s) => s.deleteTransaction)
+  const createMovementFromTransaction = useStore((s) => s.createMovementFromTransaction)
   const bulkUpdateTransactions = useStore((s) => s.bulkUpdateTransactions)
   const setScreen = useStore((s) => s.setScreen)
 
@@ -59,9 +63,8 @@ export function Gastos() {
   }
 
   // ---------- Filtros ----------
-  // Default (sem mês escolhido): mês atual + anterior. Escolher um mês no
-  // picker restringe a esse mês só; "Limpar" volta ao default.
-  const defaultMonths = [currentMonthKey(), addMonths(currentMonthKey(), -1)]
+  // Sem mês escolhido: os gastos mais recentes (incluindo datas futuras), em
+  // páginas de LIST_PAGE. Escolher um mês mostra esse mês inteiro.
   const [selectedMonth, setSelectedMonth] = useSessionState<string | null>('gastos.month', null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -78,10 +81,7 @@ export function Gastos() {
     : []
 
   const filtered = data.transactions
-    // "Sem categoria" ignora a janela por defeito: o aviso conta todos os meses.
-    .filter((t) => (selectedMonth
-      ? monthOfDate(t.date) === selectedMonth
-      : categoryFilter === 'none' || defaultMonths.includes(monthOfDate(t.date))))
+    .filter((t) => !selectedMonth || monthOfDate(t.date) === selectedMonth)
     .filter((t) => {
       if (categoryFilter === 'all') return true
       if (categoryFilter === 'none') return isUnassigned(resolve(t))
@@ -96,15 +96,22 @@ export function Gastos() {
       return (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
     })
 
+  // "Sem categoria" mostra todos (é uma lista de trabalho); sem mês, só os mais recentes.
+  const [limit, setLimit] = useState(LIST_PAGE)
+  const limited = !selectedMonth && categoryFilter !== 'none'
+  const visible = limited ? filtered.slice(0, limit) : filtered
+  const hiddenCount = filtered.length - visible.length
+  const countLabel = hiddenCount > 0 ? `${visible.length} de ${filtered.length} gasto(s)` : `${filtered.length} gasto(s)`
+
   // Seleção só conta gastos ainda visíveis/existentes.
-  const selectedIds = filtered.filter((t) => selected.has(t.id)).map((t) => t.id)
-  const allSelected = filtered.length > 0 && selectedIds.length === filtered.length
+  const selectedIds = visible.filter((t) => selected.has(t.id)).map((t) => t.id)
+  const allSelected = visible.length > 0 && selectedIds.length === visible.length
   const toggleOne = (id: string) => setSelected((prev) => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id); else next.add(id)
     return next
   })
-  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(filtered.map((t) => t.id)))
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(visible.map((t) => t.id)))
   const openBulk = () => { setBulkDate(''); setBulkGroup(''); setBulkSub(''); setBulkOpen(true) }
   const applyBulk = () => {
     if (!bulkDate && !bulkGroup) return
@@ -289,17 +296,12 @@ export function Gastos() {
     }
     setNoRows(false)
 
-    const key = (date: string, amount: number, description: string) =>
-      `${monthOfDate(date)}|${amount}|${description.trim()}`
-
-    const seen = new Set(data.transactions.map((t) => key(t.date, t.amount, t.description)))
+    const detector = makeDuplicateDetector(data.transactions)
 
     setRows(parsed.map((r) => {
       const opt = matchOptionByText(r.categoriaText, data) ?? suggestOption(r.description, data.categoryRules, data)
       const suggested = keyOf(opt?.groupId, opt?.subcategoryId)
-      const k = key(r.date, r.amount, r.description)
-      const duplicate = seen.has(k)
-      if (!duplicate) seen.add(k)
+      const duplicate = detector.check({ date: r.date, amount: r.amount, description: r.description })
       return {
         date: r.date, nome: r.nome, description: r.description, amount: r.amount,
         included: !duplicate, optionKey: suggested, suggested, duplicate,
@@ -348,6 +350,26 @@ export function Gastos() {
       }
     }
     closeImport()
+  }
+
+  // ---------- Criar movimento de poupança a partir de um gasto ----------
+  const [moveFor, setMoveFor] = useState<Transaction | null>(null)
+  const [moveStep, setMoveStep] = useState<1 | 2>(1)
+  const [moveBucket, setMoveBucket] = useState('')
+  const [moveDesc, setMoveDesc] = useState('')
+  const moveBuckets = data.savingsBuckets.filter((b) => !b.archived).sort((a, b) => a.order - b.order)
+  const movementOf = (t: Transaction) => data.savingsMovements.find((m) => m.transactionId === t.id)
+  const bucketNameOf = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
+  const openMove = (t: Transaction) => {
+    setMoveFor(t)
+    setMoveStep(1)
+    setMoveBucket('')
+    setMoveDesc(t.nome || t.description)
+  }
+  const confirmMove = async () => {
+    if (!moveFor || !moveBucket) return
+    await createMovementFromTransaction(moveFor.id, moveBucket, moveDesc.trim() || moveFor.description)
+    setMoveFor(null)
   }
 
   const changeCategory = (transactionId: string, gid: string | undefined, sid: string | undefined) => {
@@ -408,11 +430,11 @@ export function Gastos() {
           )}
         </Card>
         <div className="flex items-baseline justify-between rounded-2xl border border-border bg-surface px-4 py-3 md:hidden">
-          <span className="text-xs text-muted">Total filtrado · {filtered.length} gasto(s)</span>
+          <span className="text-xs text-muted">Total filtrado · {countLabel}</span>
           <span className="tnum text-lg font-bold text-negative">{fmtEUR(total)}</span>
         </div>
         <div className="hidden md:flex [&>*]:flex-1">
-          <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={`${filtered.length} gasto(s)`} />
+          <MetricCard label="Total filtrado" value={fmtEUR(total)} tone="negative" hint={countLabel} />
         </div>
       </div>
 
@@ -464,7 +486,7 @@ export function Gastos() {
           <EmptyState title="Sem gastos neste filtro" hint="Os gastos entram pelo extrato do banco (Importar extrato, em desktop)." />
         ) : (
           <div className="flex flex-col divide-y divide-border">
-            {filtered.map((t) => (
+            {visible.map((t) => (
               <Fragment key={t.id}>
               <div className="flex flex-col gap-1.5 py-3 md:hidden">
                 <div className="flex items-baseline justify-between gap-3">
@@ -483,6 +505,7 @@ export function Gastos() {
                     onSelect={(gid, sid) => changeCategory(t.id, gid, sid)}
                     onCreateSubcategory={createSubcategory}
                   />
+                  {movementOf(t) && <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>}
                 </div>
               </div>
               <div className="hidden flex-col gap-2 py-3 md:flex md:flex-row md:items-center md:justify-between">
@@ -516,6 +539,20 @@ export function Gastos() {
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
                   <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
+                  {movementOf(t) ? (
+                    <span title="Já tem movimento de poupança">
+                      <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => openMove(t)}
+                      className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+                      aria-label="Criar movimento de poupança"
+                      title="Criar movimento de poupança"
+                    >
+                      ↔
+                    </button>
+                  )}
                   <button
                     onClick={() => openEdit(t)}
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
@@ -538,6 +575,12 @@ export function Gastos() {
               </div>
               </Fragment>
             ))}
+          </div>
+        )}
+        {hiddenCount > 0 && (
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+            <span className="text-xs text-muted">A mostrar {visible.length} de {filtered.length}</span>
+            <Button size="sm" variant="ghost" onClick={() => setLimit((n) => n + LIST_PAGE)}>Mostrar mais</Button>
           </div>
         )}
       </Card>
@@ -626,6 +669,16 @@ export function Gastos() {
             <label className="mb-1 block text-xs text-muted">Descrição</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />
           </div>
+          {editingId && (() => {
+            const t = data.transactions.find((x) => x.id === editingId)
+            if (!t) return null
+            const mv = movementOf(t)
+            return mv ? (
+              <p className="text-xs text-muted">↔ Movimento criado no balde {bucketNameOf(mv.bucketId)}.</p>
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => openMove(t)}>Criar movimento de poupança</Button>
+            )
+          })()}
           {addError && <p className="text-sm text-negative">{addError}</p>}
           <div className="mt-1 flex justify-end gap-2">
             {editingId && (
@@ -645,6 +698,54 @@ export function Gastos() {
             <Button onClick={submitAdd}>Guardar</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal: criar movimento de poupança a partir de um gasto */}
+      <Modal
+        open={moveFor !== null}
+        onClose={() => setMoveFor(null)}
+        title={moveStep === 1 ? 'Criar movimento de poupança' : 'Confirmar movimento'}
+      >
+        {moveFor && moveStep === 1 && (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl bg-surface-2 px-3 py-2 text-sm">
+              <div className="font-medium text-text">{moveFor.nome || moveFor.description}</div>
+              <div className="tnum text-xs text-muted">{fmtDate(moveFor.date)} · {fmtEUR(moveFor.amount)}</div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">Balde de onde sai</label>
+              <Select value={moveBucket} onChange={(e) => setMoveBucket(e.target.value)} className="w-full">
+                <option value="">— escolhe um balde —</option>
+                {moveBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">Descrição do movimento</label>
+              <Input value={moveDesc} onChange={(e) => setMoveDesc(e.target.value)} />
+            </div>
+            <div className="mt-1 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setMoveFor(null)}>Cancelar</Button>
+              <Button disabled={!moveBucket} onClick={() => setMoveStep(2)}>Continuar</Button>
+            </div>
+          </div>
+        )}
+        {moveFor && moveStep === 2 && (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text">
+              Vai registar em Movimentos uma <strong>saída de {fmtEUR(moveFor.amount)}</strong> do balde{' '}
+              <strong>{bucketNameOf(moveBucket)}</strong>, com data {fmtDate(moveFor.date)} e a descrição "
+              {moveDesc.trim() || moveFor.description}". O saldo desse balde desce {fmtEUR(moveFor.amount)}.
+            </p>
+            <p className="text-xs text-muted">
+              O gasto mantém a sua categoria. Depois de criado, o movimento é independente: se mudares o valor do
+              gasto, edita o movimento em Movimentos.
+            </p>
+            <div className="mt-1 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setMoveStep(1)}>Voltar</Button>
+              <Button onClick={() => void confirmMove()}>Confirmar e criar</Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Modal edição em massa */}

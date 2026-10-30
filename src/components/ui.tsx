@@ -37,7 +37,7 @@ export function MetricCard({
 }: {
   label: string
   value: string
-  hint?: string
+  hint?: ReactNode
   tone?: 'default' | 'positive' | 'negative' | 'warn' | 'accent'
   title?: string
   // Explicação mostrada num ⓘ ao lado do label (funciona também em mobile, ao contrário do `title`).

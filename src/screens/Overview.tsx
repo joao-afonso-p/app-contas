@@ -13,6 +13,7 @@ import {
   Button,
   Card,
   EmptyState,
+  InfoHint,
   Input,
   MetricCard,
   Modal,
@@ -82,6 +83,17 @@ export function Overview() {
   // para veículos já saíram de lá (foram registadas como movimento negativo),
   // por isso "na conta do banco" não volta a subtraí-las.
   const bankBalance = totalNow
+
+  // Incomes "chega depois" do plano aplicado que ainda não entraram: o saldo dos
+  // baldes já os conta (o plano reservou-os), mas a conta poupança ainda não.
+  const pendingLate = useMemo(() => {
+    const plan = data.monthlyPlans.find((p) => p.id === accountingMonth)
+    if (!plan || plan.closed === false) return []
+    return data.incomeSources
+      .filter((s) => s.isRent && (plan.income[s.id] || 0) > 0.004 && !plan.lateTransferred?.[s.id])
+      .map((s) => ({ id: s.id, name: s.name, amount: plan.income[s.id] || 0 }))
+  }, [data.monthlyPlans, data.incomeSources, accountingMonth])
+  const pendingLateTotal = round2(pendingLate.reduce((acc, p) => acc + p.amount, 0))
 
   const autoTotals = useMemo(
     () => autoInvestmentTotals(data, accountingMonth),
@@ -273,11 +285,39 @@ export function Overview() {
         </Card>
       )}
 
-      <LateIncomeCard month={calendarMonth} onlyPending />
+      <LateIncomeCard month={accountingMonth} onlyPending />
 
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
-        <MetricCard label="Na conta do banco" value={fmtEUR(bankBalance)} />
+        <MetricCard
+          label="Na conta do banco"
+          value={fmtEUR(bankBalance)}
+          hint={
+            pendingLateTotal > 0.004 ? (
+              <span className="flex flex-col gap-0.5">
+                <span>Na poupança hoje: {fmtEUR(bankBalance - pendingLateTotal)}</span>
+                <span className="flex items-center gap-1">
+                  faltam {fmtEUR(pendingLateTotal)} para chegar
+                  <InfoHint label="Porque é que o valor é diferente do banco?">
+                    <p className="font-semibold">Faltam {fmtEUR(pendingLateTotal)} para chegar:</p>
+                    <ul className="tnum mt-1 flex flex-col gap-0.5">
+                      {pendingLate.map((p) => (
+                        <li key={p.id} className="flex justify-between gap-3">
+                          <span>{p.name}</span>
+                          <span>{fmtEUR(p.amount)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-muted">
+                      O saldo grande inclui o que o plano já reservou mas ainda não entrou na conta. Quando o dinheiro
+                      chegar e marcares "Já transferi", os dois valores igualam-se.
+                    </p>
+                  </InfoHint>
+                </span>
+              </span>
+            ) : undefined
+          }
+        />
         <div className="hidden md:flex [&>*]:flex-1">
           <MetricCard label="Investidos" value={fmtEUR(totalInvested)} />
         </div>
