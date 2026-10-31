@@ -87,12 +87,12 @@ export function BreakdownPanel({
                           {r.label}
                         </span>
                       </td>
-                      <td className="tnum px-2 py-2 text-right font-semibold">{r.thisMonth > 0 ? fmtEUR(r.thisMonth) : '—'}</td>
-                      <td className="tnum px-2 py-2 text-right text-muted">{r.avg3 > 0 ? fmtEUR(r.avg3) : '—'}</td>
-                      <td className="tnum px-2 py-2 text-right text-muted">{r.avg6 > 0 ? fmtEUR(r.avg6) : '—'}</td>
-                      <td className="tnum px-2 py-2 text-right text-muted">{r.median3 > 0 ? fmtEUR(r.median3) : '—'}</td>
+                      <td className="tnum px-2 py-2 text-right font-semibold">{r.thisMonth > 0 ? fmtEUR(r.thisMonth) : '–'}</td>
+                      <td className="tnum px-2 py-2 text-right text-muted">{r.avg3 > 0 ? fmtEUR(r.avg3) : '–'}</td>
+                      <td className="tnum px-2 py-2 text-right text-muted">{r.avg6 > 0 ? fmtEUR(r.avg6) : '–'}</td>
+                      <td className="tnum px-2 py-2 text-right text-muted">{r.median3 > 0 ? fmtEUR(r.median3) : '–'}</td>
                       <td className={cx('tnum px-2 py-2 text-right', up ? 'font-semibold text-warn' : 'text-muted')}>
-                        {r.delta === 0 ? '—' : `${r.delta > 0 ? '+' : ''}${fmtEUR(r.delta)}`}
+                        {r.delta === 0 ? '–' : `${r.delta > 0 ? '+' : ''}${fmtEUR(r.delta)}`}
                       </td>
                       <td className="py-2 pl-3">
                         <div className="flex items-center gap-2">
@@ -114,7 +114,7 @@ export function BreakdownPanel({
                   <td className="tnum px-2 py-2 text-right text-muted">{fmtEUR(totals.avg6)}</td>
                   <td className="tnum px-2 py-2 text-right text-muted">{fmtEUR(totals.median3)}</td>
                   <td className="tnum px-2 py-2 text-right text-muted">
-                    {Math.abs(totals.thisMonth - totals.median3) < 0.005 ? '—' : `${totals.thisMonth > totals.median3 ? '+' : ''}${fmtEUR(totals.thisMonth - totals.median3)}`}
+                    {Math.abs(totals.thisMonth - totals.median3) < 0.005 ? '–' : `${totals.thisMonth > totals.median3 ? '+' : ''}${fmtEUR(totals.thisMonth - totals.median3)}`}
                   </td>
                   <td />
                 </tr>

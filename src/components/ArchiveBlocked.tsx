@@ -20,7 +20,7 @@ export function ArchiveBlockedModal({
       <div className="flex flex-col gap-3 text-sm">
         <p className="text-muted">
           Ainda tem valor alocado no mês atual ou em meses futuros. Põe-no a 0 (ou passa o valor para outra
-          linha, por exemplo a nova) e depois volta aqui — assim os 100% do plano ficam sempre certos.
+          linha, por exemplo a nova) e depois volta aqui. Assim os 100% do plano ficam sempre certos.
         </p>
         {planeamento.length > 0 && (
           <p><strong>Planeamento:</strong> {list(planeamento)}</p>

@@ -360,7 +360,7 @@ export function Gastos() {
   const [moveDesc, setMoveDesc] = useState('')
   const moveBuckets = data.savingsBuckets.filter((b) => !b.archived).sort((a, b) => a.order - b.order)
   const movementOf = (t: Transaction) => data.savingsMovements.find((m) => m.transactionId === t.id)
-  const bucketNameOf = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
+  const bucketNameOf = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
   const openMove = (t: Transaction) => {
     setMoveFor(t)
     setMoveStep(1)
@@ -443,7 +443,7 @@ export function Gastos() {
         <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
           <span className="flex min-w-0 items-start gap-2 text-sm text-text">
             <Link size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-            {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} por associar às categorias do plano — até lá, esses gastos não contam no Analytics.`}
+            {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} por associar às categorias do plano. Até lá, esses gastos não contam no Analytics.`}
           </span>
           <Button size="sm" variant="soft" className="shrink-0" onClick={() => setScreen('definicoes')}>Associar</Button>
         </Card>
@@ -453,7 +453,7 @@ export function Gastos() {
         <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
           <span className="flex min-w-0 items-start gap-2 text-sm text-text">
             <TriangleAlert size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-            {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria — atribui-${uncategorizedCount === 1 ? 'o' : 'os'} a uma categoria do plano para o Analytics ficar certo.`}
+            {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria: atribui-${uncategorizedCount === 1 ? 'o' : 'os'} a uma categoria do plano para o Analytics ficar certo.`}
           </span>
           <Button size="sm" variant="soft" className="shrink-0" onClick={() => { setSelectedMonth(null); setCategoryFilter('none'); setSubFilter('all') }}>
             Ver
@@ -587,7 +587,7 @@ export function Gastos() {
       </Card>
 
       <p className="hidden text-xs text-muted md:block">
-        Dica: escolhe como categoria um balde de poupança (ex.: Geral) quando o gasto é pago pela poupança —
+        Dica: escolhe como categoria um balde de poupança (ex.: Geral) quando o gasto é pago pela poupança,
         não conta contra o orçamento do mês. Não mexe no saldo do balde: se quiseres, regista a saída em Movimentos.
       </p>
 
@@ -608,7 +608,7 @@ export function Gastos() {
                 onChange={(e) => { setGroupId(e.target.value); setSubId(''); setNewSubName('') }}
                 className="w-full"
               >
-                <option value="">— escolher —</option>
+                <option value="">Escolher</option>
                 <optgroup label="Orçamento do mês">
                   {groups.filter((g) => g.kind === 'expense').map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
@@ -631,7 +631,7 @@ export function Gastos() {
                 disabled={!groupId}
                 className="w-full"
               >
-                <option value="">— nenhuma —</option>
+                <option value="">Nenhuma</option>
                 {groupId && subcategoriesOf(data.subcategories, groupId).map((sc) => (
                   <option key={sc.id} value={sc.id}>{sc.name}</option>
                 ))}
@@ -716,7 +716,7 @@ export function Gastos() {
             <div>
               <label className="mb-1 block text-xs text-muted">Balde de onde sai</label>
               <Select value={moveBucket} onChange={(e) => setMoveBucket(e.target.value)} className="w-full">
-                <option value="">— escolhe um balde —</option>
+                <option value="">Escolhe um balde</option>
                 {moveBuckets.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </Select>
             </div>
@@ -761,7 +761,7 @@ export function Gastos() {
             <div>
               <label className="mb-1 block text-xs text-muted">Categoria</label>
               <Select value={bulkGroup} onChange={(e) => { setBulkGroup(e.target.value); setBulkSub('') }} className="w-full">
-                <option value="">— não alterar —</option>
+                <option value="">Não alterar</option>
                 <optgroup label="Orçamento do mês">
                   {groups.filter((g) => g.kind === 'expense').map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
@@ -779,7 +779,7 @@ export function Gastos() {
             <div>
               <label className="mb-1 block text-xs text-muted">Subcategoria</label>
               <Select value={bulkSub} onChange={(e) => setBulkSub(e.target.value)} disabled={!bulkGroup} className="w-full">
-                <option value="">— nenhuma —</option>
+                <option value="">Nenhuma</option>
                 {bulkGroup && subcategoriesOf(data.subcategories, bulkGroup).map((sc) => (
                   <option key={sc.id} value={sc.id}>{sc.name}</option>
                 ))}
@@ -893,7 +893,7 @@ export function Gastos() {
               <>
                 <p className="text-sm text-muted">
                   Envia o PDF ou Excel do extrato do banco. A app extrai o texto e usa a IA (OpenAI)
-                  para preencher automaticamente os movimentos — depois podes rever tudo antes de importar.
+                  para preencher automaticamente os movimentos. Depois podes rever tudo antes de importar.
                   O ficheiro não é guardado em lado nenhum.
                 </p>
                 <input
@@ -965,7 +965,7 @@ export function Gastos() {
                     disabled={!r.included}
                     className="w-full sm:w-48"
                   >
-                    <option value="">— escolher —</option>
+                    <option value="">Escolher</option>
                     {categoryOptions(data).map((o) => (
                       <option key={keyOf(o.groupId, o.subcategoryId)} value={keyOf(o.groupId, o.subcategoryId)}>{o.label}</option>
                     ))}
@@ -975,7 +975,7 @@ export function Gastos() {
             </div>
             {includedSemCategoria > 0 && (
               <p className="text-xs text-muted">
-                {`${includedSemCategoria} ${includedSemCategoria === 1 ? 'linha vai ficar' : 'linhas vão ficar'} sem categoria — podes atribuir agora ou depois, na lista de gastos.`}
+                {`${includedSemCategoria} ${includedSemCategoria === 1 ? 'linha vai ficar' : 'linhas vão ficar'} sem categoria: podes atribuir agora ou depois, na lista de gastos.`}
               </p>
             )}
             <div className="flex justify-end gap-2">

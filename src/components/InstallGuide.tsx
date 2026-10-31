@@ -87,7 +87,7 @@ export function InstallGuideContent({ compact, initialPlatform }: { compact?: bo
 
       {showStorageNote && (
         <Note tone="warn">
-          <strong>Importante:</strong> instala primeiro e usa sempre a app do ecrã principal — os dados guardados
+          <strong>Importante:</strong> instala primeiro e usa sempre a app do ecrã principal: os dados guardados
           no Safari não passam para a app instalada. Se já tens dados aqui, exporta uma cópia de segurança em
           Definições → Dados e importa-a na app instalada.
         </Note>
@@ -164,7 +164,7 @@ export function InstallGuideCard() {
         {platform === 'desktop'
           ? 'Guarda esta página nos favoritos do teu browser (⌘D / Ctrl+D). O computador tem todas as funcionalidades; no telemóvel instalas a app para o dia a dia.'
           : platform === 'ios'
-            ? 'Recomendamos instalar a app no ecrã principal antes de preencheres isto — os dados guardados no Safari não passam para a app instalada.'
+            ? 'Recomendamos instalar a app no ecrã principal antes de preencheres isto: os dados guardados no Safari não passam para a app instalada.'
             : 'Adiciona a app ao ecrã principal do telemóvel para a abrires num toque.'}
       </p>
       <Button size="sm" variant="soft" onClick={() => setOpen(true)}>Ver como fazer</Button>

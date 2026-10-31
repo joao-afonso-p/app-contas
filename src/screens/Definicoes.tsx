@@ -32,7 +32,7 @@ const LISTS: EditableList[] = [
   {
     title: 'Despesas do planeamento',
     collection: 'expenseCategories',
-    hint: 'São as categorias principais dos Gastos e do Analytics: o que planeias aqui compara-se com o que gastas. Os detalhes (ex.: eletricidade, água) são subcategorias — ver abaixo.',
+    hint: 'São as categorias principais dos Gastos e do Analytics: o que planeias aqui compara-se com o que gastas. Os detalhes (ex.: eletricidade, água) são subcategorias (ver abaixo).',
   },
   {
     title: 'Veículos de investimento',
@@ -153,7 +153,7 @@ export function Definicoes() {
           <Card>
             <BackupSettings />
             <p className="mb-3 text-sm text-muted">
-              Apaga tudo — categorias, baldes, objetivos, veículos e todo o histórico — e volta a
+              Apaga tudo (categorias, baldes, objetivos, veículos e todo o histórico) e volta a
               mostrar o onboarding para configurares a conta outra vez do zero.
             </p>
             <Button
@@ -197,13 +197,13 @@ export function Definicoes() {
         <SectionTitle>Sobre</SectionTitle>
         <Card>
           <p className="text-sm text-muted">
-            Contas — app privada de finanças pessoais. Os saldos são sempre calculados a partir do
+            Contas, app privada de finanças pessoais. Os saldos são sempre calculados a partir do
             planeamento e dos movimentos; nada é escrito à mão. {data.savingsBuckets.length} baldes,{' '}
             {data.transactions.length} gastos registados.
           </p>
           <p className="mt-2 text-xs text-muted">
             Para sabermos quantas pessoas usam a app, contamos visitas de forma anónima com o GoatCounter
-            (sem cookies e sem guardar o IP). Só é registado qual o ecrã aberto — nunca valores, nomes,
+            (sem cookies e sem guardar o IP). Só é registado qual o ecrã aberto, nunca valores, nomes,
             categorias ou o código de espaço.
           </p>
         </Card>
@@ -369,7 +369,7 @@ function SavingsSection() {
     const canDelete = Math.abs(saldo) < 0.5
     const deleteHint = canDelete
       ? undefined
-      : 'Só é possível apagar baldes com saldo zero — faz um movimento de saída ou transferência primeiro'
+      : 'Só é possível apagar baldes com saldo zero: faz um movimento de saída ou transferência primeiro'
     const goalCaption = bucket.kind === 'goal' && (bucket.targetAmount || bucket.targetDate)
       ? `${bucket.targetAmount ? `Alvo: ${fmtEUR(bucket.targetAmount)}` : ''}${bucket.targetDate ? ` · até ${monthLabel(bucket.targetDate)}` : ''}`.trim()
       : undefined
@@ -599,7 +599,7 @@ function ListEditor({ title, collection, hint }: EditableList) {
     if (isVehicle && (data.investmentAssets.some((a) => a.vehicleId === doc.id)
       || data.assetEntries.some((e) => e.vehicleId === doc.id)
       || data.valueCheckpoints.some((c) => c.vehicleId === doc.id))) {
-      window.alert(`"${doc.name}" tem ativos, entradas ou checkpoints na página Investimento. Para não perderes esses dados, não é possível apagá-lo — arquiva-o.`)
+      window.alert(`"${doc.name}" tem ativos, entradas ou checkpoints na página Investimento. Para não perderes esses dados, não é possível apagá-lo. Arquiva-o.`)
       return
     }
     setDeleteTarget(doc)
@@ -740,7 +740,7 @@ function ListEditor({ title, collection, hint }: EditableList) {
                 </>
               )}
               {isVehicle
-                ? ' Esta ação não pode ser desfeita — os movimentos de poupança que já o referenciam mantêm-se, mas deixa de aparecer nas listas.'
+                ? ' Esta ação não pode ser desfeita. Os movimentos de poupança que já o referenciam mantêm-se, mas deixa de aparecer nas listas.'
                 : ' Esta ação não pode ser desfeita. Os planos de meses anteriores mantêm os valores que lá estavam.'}
               {isExpense && affectedTransactions > 0 && (
                 <>
@@ -801,7 +801,7 @@ function SubcategoriesSection() {
       <Card>
         <p className="mb-3 text-xs text-muted">
           Opcionais: detalham uma categoria principal (ex.: Utilities → Eletricidade, Água, Gás,
-          Comunicações). Podes criar a qualquer momento — os gastos já registados mantêm-se onde estão e
+          Comunicações). Podes criar a qualquer momento. Os gastos já registados mantêm-se onde estão e
           podes movê-los para uma subcategoria na lista de Gastos. Também podes detalhar baldes de poupança.
         </p>
         {groups.length === 0 ? (
@@ -924,7 +924,7 @@ function LegacyCategoriesSection() {
 
   if (pending.length === 0 && mapped.length === 0) return null
 
-  const groupName = (id?: string) => groups.find((g) => g.id === id)?.name ?? data.expenseCategories.find((x) => x.id === id)?.name ?? data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
+  const groupName = (id?: string) => groups.find((g) => g.id === id)?.name ?? data.expenseCategories.find((x) => x.id === id)?.name ?? data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
 
   return (
     <section>
@@ -959,7 +959,7 @@ function LegacyCategoriesSection() {
                       onChange={(e) => setChoice(c.id, { parentId: e.target.value, sub: 'new' }, c)}
                       className="min-w-0 flex-1"
                     >
-                      <option value="">— categoria do plano —</option>
+                      <option value="">Categoria do plano</option>
                       {groups.map((g) => (
                         <option key={g.id} value={g.id}>{g.kind === 'bucket' ? `${g.name} (poupança)` : g.name}</option>
                       ))}
@@ -1092,7 +1092,7 @@ function OrphanExpensesSection() {
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
           <span className="text-sm text-muted">Juntar em</span>
           <Select value={targetId} onChange={(e) => setTarget(e.target.value)}>
-            <option value="">— escolher despesa —</option>
+            <option value="">Escolher despesa</option>
             {targets.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
           <label className="flex items-center gap-1.5 text-xs text-muted">
@@ -1104,7 +1104,7 @@ function OrphanExpensesSection() {
 
         {preview && preview.rows.length > 0 && (
           <div className="mt-3 rounded-xl bg-surface-2 p-3 text-xs">
-            <div className="mb-1.5 font-semibold text-text">Pré-visualização — "{targetName}"</div>
+            <div className="mb-1.5 font-semibold text-text">Pré-visualização: "{targetName}"</div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted">
               {preview.rows.map((r) => (
                 <span key={`${r.projection}${r.month}`} className="tnum">

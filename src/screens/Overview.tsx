@@ -204,7 +204,7 @@ export function Overview() {
   const addToVehicleTotal = (vehicleId: string, amount: number) => {
     let entry = vehicleTotalMap.get(vehicleId)
     if (!entry) {
-      const vehicleName = data.investmentVehicles.find((v) => v.id === vehicleId)?.name ?? '—'
+      const vehicleName = data.investmentVehicles.find((v) => v.id === vehicleId)?.name ?? '–'
       entry = { vehicleId, vehicleName, invested: 0 }
       vehicleTotalMap.set(vehicleId, entry)
       vehicleTotalOrder.push(vehicleId)
@@ -449,18 +449,18 @@ export function Overview() {
                     <td className={cx('py-2 pr-3 font-medium', m === calendarMonth && 'text-accent-strong')}>
                       {monthShort(m)}{m === calendarMonth && <span className="ml-1 text-[10px] font-normal text-muted">em curso</span>}
                     </td>
-                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtEUR(income) : '—'}</td>
-                    <td className="tnum px-2 py-2 text-right">{report.hasPlan ? fmtEUR(report.plannedTotal) : '—'}</td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtEUR(income) : '–'}</td>
+                    <td className="tnum px-2 py-2 text-right">{report.hasPlan ? fmtEUR(report.plannedTotal) : '–'}</td>
                     <td className="tnum px-2 py-2 text-right">{fmtEUR(report.spentCash)}</td>
                     <td className="px-2 py-2 text-right">
                       {report.hasPlan ? (
                         <span className={cx('tnum', diff > 0.5 ? 'text-negative' : diff < -0.5 ? 'text-positive' : '')}>
                           {diff > 0.5 ? '+' : ''}{fmtEUR(diff)}
                         </span>
-                      ) : <span className="text-muted">—</span>}
+                      ) : <span className="text-muted">–</span>}
                     </td>
-                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(planRate) : '—'}</td>
-                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(realRate) : '—'}</td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(planRate) : '–'}</td>
+                    <td className="tnum px-2 py-2 text-right">{income > 0 ? fmtPct(realRate) : '–'}</td>
                   </tr>
                 )
               })}

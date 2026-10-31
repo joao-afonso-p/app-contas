@@ -146,7 +146,7 @@ export function Onboarding() {
           <LogoMark size={72} className="mx-auto mb-3 text-text" />
           <h1 className="text-2xl">Vamos começar</h1>
           <p className="mt-1 text-sm text-muted">
-            Cria só o que precisas — podes sempre editar tudo depois em Definições. Os valores atuais que
+            Cria só o que precisas. Podes sempre editar tudo depois em Definições. Os valores atuais que
             indicares ficam registados como o saldo no fim do mês passado.
           </p>
         </div>
@@ -156,7 +156,7 @@ export function Onboarding() {
 
         <Card className="mb-4">
           <SectionTitle>Fontes de rendimento</SectionTitle>
-          <p className="mb-2 text-xs text-muted">De onde entra dinheiro todos os meses — ex.: salário, freelance.</p>
+          <p className="mb-2 text-xs text-muted">De onde entra dinheiro todos os meses (ex.: salário, freelance).</p>
           {incomeSources.length > 0 && (
             <ul className="mb-3 divide-y divide-border">
               {incomeSources.map((s) => (
@@ -191,7 +191,7 @@ export function Onboarding() {
           <SectionTitle>Despesas do planeamento</SectionTitle>
           <p className="mb-2 text-xs text-muted">
             As categorias do teu orçamento mensal (ex.: Casa, Carro, Lazer). São também as categorias
-            principais dos Gastos — assim consegues comparar o que planeaste com o que realmente gastaste.
+            principais dos Gastos, assim consegues comparar o que planeaste com o que realmente gastaste.
             Podes (opcionalmente) detalhar cada uma em subcategorias, por exemplo Casa → Eletricidade, Água,
             Gás. Isto também se faz mais tarde, em Definições.
           </p>
@@ -247,7 +247,7 @@ export function Onboarding() {
         <Card className="mb-4">
           <SectionTitle>Baldes de poupança e objetivos</SectionTitle>
           <p className="mb-2 text-xs text-muted">
-            Onde guardas o dinheiro poupado — "Fixo" para poupança contínua, "Objetivo" para uma meta com
+            Onde guardas o dinheiro poupado: "Fixo" para poupança contínua, "Objetivo" para uma meta com
             valor e data (ex.: carro novo). Nos Gastos também podes escolher um balde como categoria, para
             registar despesas pagas pela poupança (ficam fora do orçamento do mês).
           </p>
@@ -316,7 +316,7 @@ export function Onboarding() {
         <Card className="mb-4">
           <SectionTitle>Veículos de investimento</SectionTitle>
           <p className="mb-2 text-xs text-muted">
-            Só para acompanhares o total investido fora da app (ex.: XTB, Certificados de Aforro, ETFs) — o
+            Só para acompanhares o total investido fora da app (ex.: XTB, Certificados de Aforro, ETFs). O
             dinheiro sai dos baldes mas continua a ser teu.
           </p>
           {vehicles.length > 0 && (

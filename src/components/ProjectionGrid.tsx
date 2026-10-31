@@ -403,7 +403,7 @@ export function GridRow({
               />
             ) : (
               <div className={cx('tnum rounded-lg px-2 py-1 text-right text-sm', !value && 'text-muted')}>
-                {value ? fmtEUR(value) : '—'}
+                {value ? fmtEUR(value) : '–'}
               </div>
             )}
             {st.showHandle && (
