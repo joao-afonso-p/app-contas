@@ -19,6 +19,9 @@
   --warn-soft: #fbefd2;
   --goal: #6b4c8a;
   --goal-soft: #eae3f1;
+  --bead-1: #d9573b;
+  --bead-2: #e8a21c;
+  --bead-3: #1f8a8a;
 }
 
 .dark {
@@ -38,6 +41,9 @@
   --warn-soft: #3d2d0a;
   --goal: #b79ced;
   --goal-soft: #2b2145;
+  --bead-1: #ff7a59;
+  --bead-2: #f2b134;
+  --bead-3: #3cc4b0;
 }
 
 @theme inline {

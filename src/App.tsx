@@ -15,6 +15,7 @@ import { Overview } from './screens/Overview'
 import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
 import { InstallNudge } from './components/InstallGuide'
+import { LogoMark, Wordmark } from './components/Logo'
 
 const NAV: { id: Screen; label: string; icon: string; mobile: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: '📊', mobile: true },
@@ -131,11 +132,9 @@ export function App() {
       {/* Sidebar desktop */}
       <aside className="pt-safe sticky top-0 hidden h-dvh w-56 shrink-0 flex-col border-r border-border bg-surface p-4 md:flex">
         <div className="mb-6 flex items-center gap-2 px-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-strong text-lg font-black text-white">
-            €
-          </div>
+          <LogoMark size={44} className="shrink-0 text-text" />
           <div>
-            <div className="text-base font-black leading-tight">Contas</div>
+            <Wordmark className="text-xl" />
             <div className="text-[11px] text-muted">{mode === 'space' ? 'Sincronizado' : 'Local'}</div>
           </div>
         </div>
