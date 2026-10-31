@@ -41,6 +41,7 @@ export type Screen =
   | 'overview'
   | 'definicoes'
   | 'historico'
+  | 'guia'
 
 export type Mode = 'local' | 'space'
 type Status = 'boot' | 'welcome' | 'ready' | 'error'

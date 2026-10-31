@@ -47,6 +47,7 @@ export function Definicoes() {
   const createPremiumSpace = useStore((s) => s.createPremiumSpace)
   const leaveSpace = useStore((s) => s.leaveSpace)
   const resetAccount = useStore((s) => s.resetAccount)
+  const setScreen = useStore((s) => s.setScreen)
 
   const [joinOpen, setJoinOpen] = useState(false)
   const [code, setCode] = useState('')
@@ -206,6 +207,9 @@ export function Definicoes() {
             (sem cookies e sem guardar o IP). Só é registado qual o ecrã aberto, nunca valores, nomes,
             categorias ou o código de espaço.
           </p>
+          <div className="mt-3">
+            <Button size="sm" variant="soft" onClick={() => setScreen('guia')}>Abrir o guia</Button>
+          </div>
         </Card>
       </section>
 
