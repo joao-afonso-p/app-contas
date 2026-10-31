@@ -16,16 +16,17 @@ import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
 import { InstallNudge } from './components/InstallGuide'
 import { LogoMark, Wordmark } from './components/Logo'
+import { ArrowLeftRight, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
 
-const NAV: { id: Screen; label: string; icon: string; mobile: boolean }[] = [
-  { id: 'overview', label: 'Overview', icon: '📊', mobile: true },
-  { id: 'planeamento', label: 'Planeamento', icon: '📅', mobile: true },
-  { id: 'movimentos', label: 'Movimentos', icon: '↔️', mobile: true },
-  { id: 'gastos', label: 'Gastos', icon: '🧾', mobile: true },
-  { id: 'budgets', label: 'Analytics', icon: '🔎', mobile: false },
-  { id: 'investimentos', label: 'Investimento', icon: '🌱', mobile: false },
-  { id: 'projecoes', label: 'Projeções', icon: '📈', mobile: false },
-  { id: 'definicoes', label: 'Definições', icon: '⚙️', mobile: true },
+const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean }[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard, mobile: true },
+  { id: 'planeamento', label: 'Planeamento', icon: CalendarDays, mobile: true },
+  { id: 'movimentos', label: 'Movimentos', icon: ArrowLeftRight, mobile: true },
+  { id: 'gastos', label: 'Gastos', icon: Receipt, mobile: true },
+  { id: 'budgets', label: 'Analytics', icon: ScanSearch, mobile: false },
+  { id: 'investimentos', label: 'Investimento', icon: Sprout, mobile: false },
+  { id: 'projecoes', label: 'Projeções', icon: TrendingUp, mobile: false },
+  { id: 'definicoes', label: 'Definições', icon: Settings, mobile: true },
 ]
 
 const SCREENS: Record<Screen, () => React.JSX.Element> = {
@@ -150,16 +151,17 @@ export function App() {
                   : 'text-muted hover:bg-surface-2 hover:text-text',
               )}
             >
-              <span className="text-base">{item.icon}</span>
+              <item.icon size={18} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
               {item.label}
             </button>
           ))}
         </nav>
         <button
           onClick={toggleTheme}
-          className="mt-auto rounded-xl border border-border px-3 py-2 text-sm text-muted hover:bg-surface-2"
+          className="mt-auto flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted hover:bg-surface-2"
         >
-          {theme === 'dark' ? '☀️ Tema claro' : '🌙 Tema escuro'}
+          {theme === 'dark' ? <Sun size={16} strokeWidth={1.75} aria-hidden="true" /> : <Moon size={16} strokeWidth={1.75} aria-hidden="true" />}
+          {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
         </button>
       </aside>
 
@@ -183,7 +185,7 @@ export function App() {
                 screen === item.id ? 'text-accent-strong' : 'text-muted',
               )}
             >
-              <span className="text-xl leading-none">{item.icon}</span>
+              <item.icon size={22} strokeWidth={1.75} aria-hidden="true" />
               {item.label}
             </button>
           ))}

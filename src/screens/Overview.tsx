@@ -21,6 +21,7 @@ import {
   SectionTitle,
   Select,
   cx,
+  InsightIcon,
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
 import { LateIncomeCard } from '../components/LateIncomeCard'
@@ -44,6 +45,7 @@ import {
   todayISO,
 } from '../lib/format'
 import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, monthStartConfigOf, useStore, vehicleAllocations } from '../store/useStore'
+import { TriangleAlert } from 'lucide-react'
 
 // Uma cor distinta por balde (até 9) — a linha do total tem a sua própria cor.
 const BUCKET_COLORS = ['#1f8a8a', '#d9573b', '#e8a21c', '#6b4c8a', '#3b7bbf', '#c9507a', '#5f8f3a', '#8a5a3b', '#7c93c9']
@@ -255,7 +257,7 @@ export function Overview() {
       {showApplyWarning && (
         <Card className="border-warn/40 bg-warn-soft">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-lg">⚠️</span>
+            <TriangleAlert size={20} strokeWidth={1.75} className="shrink-0 text-warn" aria-hidden="true" />
             <div className="flex flex-1 flex-wrap items-center gap-2 text-sm font-medium">
               O plano de {monthLabel(calendarMonth, true)} ainda não foi aplicado.
               <Badge tone="warn">Por aplicar</Badge>
@@ -276,7 +278,7 @@ export function Overview() {
             {insights.slice(0, 4).map((i, idx) => (
               <li key={idx} className={cx('items-start gap-2 text-sm', idx >= 2 ? 'hidden md:flex' : 'flex')}>
                 <span className="mt-0.5">
-                  {i.kind === 'over' ? '🔴' : i.kind === 'recurring' ? '🔁' : i.kind === 'unassigned' ? '⚠️' : '🟠'}
+                  <InsightIcon kind={i.kind} />
                 </span>
                 <span>{i.text}</span>
               </li>

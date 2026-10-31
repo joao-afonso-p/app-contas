@@ -9,6 +9,7 @@ import { parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { BucketKind } from '../types'
 import { LogoMark } from '../components/Logo'
+import { X } from 'lucide-react'
 
 interface DraftIncomeSource {
   id: string
@@ -42,7 +43,7 @@ function RemoveButton({ onClick, label }: { onClick: () => void; label: string }
       aria-label={label}
       className="shrink-0 rounded-lg px-1.5 py-0.5 text-sm text-muted hover:bg-surface-2 hover:text-negative"
     >
-      ✕
+      <X size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
   )
 }
@@ -214,7 +215,7 @@ export function Onboarding() {
                           aria-label={`Remover subcategoria ${name}`}
                           className="hover:text-negative"
                         >
-                          ✕
+                          <X size={13} strokeWidth={2} aria-hidden="true" />
                         </button>
                       </span>
                     ))}

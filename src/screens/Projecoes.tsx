@@ -19,6 +19,7 @@ import {
   activeBuckets, firstPlanMonth, useStore,
 } from '../store/useStore'
 import type { MonthKey, PlannedMovement, SavingsBucket } from '../types'
+import { Check, Pencil, Trash } from 'lucide-react'
 
 const HORIZONS = [12, 18, 24, 36]
 
@@ -579,7 +580,7 @@ export function Projecoes() {
                                   : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
                               )}
                             >
-                              ✓
+                              <Check size={10} strokeWidth={3.5} aria-hidden="true" />
                             </span>
                           </button>
                           <button
@@ -587,7 +588,7 @@ export function Projecoes() {
                             className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
                             aria-label="Editar movimento"
                           >
-                            ✎
+                            <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => {
@@ -599,7 +600,7 @@ export function Projecoes() {
                             className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
                             aria-label="Apagar movimento"
                           >
-                            🗑
+                            <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
                           </button>
                         </td>
                       </tr>

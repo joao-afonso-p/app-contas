@@ -19,6 +19,7 @@ import { START_DAY_CHOICES, addDaysISO, defaultStartDay, monthStartDate } from '
 import { allocationBlock, firstPlanMonth, isAutoBucketMovement, monthStartConfigOf, useStore } from '../store/useStore'
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
+import { X } from 'lucide-react'
 
 type EditableList = {
   title: string
@@ -850,7 +851,7 @@ function SubcategoriesSection() {
                               onClick={() => void remove('subcategories', sc.id)}
                               className="text-muted hover:text-negative"
                             >
-                              ✕
+                              <X size={14} strokeWidth={1.75} aria-hidden="true" />
                             </button>
                           )}
                         </span>

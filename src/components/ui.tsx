@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { CircleAlert, Pencil, Repeat, TriangleAlert, X } from 'lucide-react'
 import { fmtEUR, fmtEURWhole, parseAmount } from '../lib/format'
 
 export function cx(...parts: (string | false | null | undefined)[]): string {
@@ -183,7 +184,7 @@ export function Modal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar">✕</button>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
         </div>
         {children}
       </div>
@@ -438,8 +439,17 @@ export function EditableName({
         aria-label={`Renomear ${value}`}
         title="Renomear"
       >
-        ✎
+        <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
       </button>
     </span>
   )
+}
+
+// Ícone de um alerta de "Atenção" (Overview e Analytics), por tipo.
+export function InsightIcon({ kind }: { kind: string }) {
+  const common = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const
+  if (kind === 'over') return <CircleAlert {...common} className="text-negative" />
+  if (kind === 'recurring') return <Repeat {...common} className="text-goal" />
+  if (kind === 'unassigned') return <TriangleAlert {...common} className="text-warn" />
+  return <CircleAlert {...common} className="text-warn" />
 }

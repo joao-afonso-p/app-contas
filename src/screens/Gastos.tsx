@@ -20,6 +20,7 @@ import { useSessionState } from '../lib/sessionState'
 import { makeDuplicateDetector } from '../lib/calc/dedupe'
 import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
+import { Link, Pencil, Trash, TriangleAlert } from 'lucide-react'
 
 interface PreviewRow {
   date: string
@@ -441,7 +442,7 @@ export function Gastos() {
       {pendingLegacy.length > 0 && (
         <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
           <span className="flex min-w-0 items-start gap-2 text-sm text-text">
-            <span>🔗</span>
+            <Link size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
             {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} por associar às categorias do plano — até lá, esses gastos não contam no Analytics.`}
           </span>
           <Button size="sm" variant="soft" className="shrink-0" onClick={() => setScreen('definicoes')}>Associar</Button>
@@ -451,7 +452,7 @@ export function Gastos() {
       {uncategorizedCount > 0 && categoryFilter !== 'none' && (
         <Card className="flex items-center justify-between gap-3 border-warn/40 bg-warn-soft/40">
           <span className="flex min-w-0 items-start gap-2 text-sm text-text">
-            <span>⚠️</span>
+            <TriangleAlert size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
             {`${uncategorizedCount} gasto${uncategorizedCount === 1 ? '' : 's'} sem categoria — atribui-${uncategorizedCount === 1 ? 'o' : 'os'} a uma categoria do plano para o Analytics ficar certo.`}
           </span>
           <Button size="sm" variant="soft" className="shrink-0" onClick={() => { setSelectedMonth(null); setCategoryFilter('none'); setSubFilter('all') }}>
@@ -558,7 +559,7 @@ export function Gastos() {
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
                     aria-label="Editar gasto"
                   >
-                    ✎
+                    <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                   <button
                     onClick={() => {
@@ -569,7 +570,7 @@ export function Gastos() {
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-negative"
                     aria-label="Apagar gasto"
                   >
-                    🗑
+                    <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </div>
               </div>

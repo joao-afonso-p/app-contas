@@ -15,7 +15,7 @@ import {
 } from 'recharts'
 import { ChartLegend, ChartTooltip, compactEUR, cursorStyle, diffLabelRenderer } from '../components/ChartParts'
 import { MonthPicker } from '../components/MonthPicker'
-import { Badge, Button, Card, EmptyState, MacroTitle, MetricCard, ProgressBar, SectionTitle, cx } from '../components/ui'
+import { Badge, Button, Card, EmptyState, InsightIcon, MacroTitle, MetricCard, ProgressBar, SectionTitle, cx } from '../components/ui'
 import { allGroups, legacyNeedingMapping, makeResolver } from '../lib/calc/categories'
 import { findOrphanExpenses } from '../lib/calc/mergeExpenses'
 import {
@@ -29,6 +29,7 @@ import { effectivePlan, monthStartConfigOf, useStore } from '../store/useStore'
 import { daysUntilNextMonth, monthDayInfo, monthProgress } from '../lib/financialMonth'
 import { activeAccountingMonth } from '../lib/calc/balances'
 import type { MonthKey, Transaction } from '../types'
+import { Link, Star } from 'lucide-react'
 
 // Cor da célula do histórico: sem gasto = cinza; dentro do plano = verde leve;
 // acima do plano = vermelho cada vez mais escuro conforme o excesso relativo.
@@ -98,7 +99,7 @@ function CategoryMultiSelect({
                   aria-label={defaultId === c.id ? `Tirar ${c.name} como padrão` : `Definir ${c.name} como padrão`}
                   className={cx('shrink-0 px-2 py-1.5 text-sm', defaultId === c.id ? 'text-warn' : 'text-muted hover:text-text')}
                 >
-                  {defaultId === c.id ? '★' : '☆'}
+                  <Star size={16} strokeWidth={1.75} fill={defaultId === c.id ? 'currentColor' : 'none'} aria-hidden="true" />
                 </button>
               </div>
             ))
@@ -242,7 +243,7 @@ export function Budgets() {
 
       {pendingLegacy.length > 0 && (
         <Card className="flex flex-wrap items-center gap-2 border-warn/40 bg-warn-soft/40">
-          <span>🔗</span>
+          <Link size={16} strokeWidth={1.75} className="shrink-0 text-warn" aria-hidden="true" />
           <span className="flex-1 text-sm text-text">
             {`${pendingLegacy.length} categoria${pendingLegacy.length === 1 ? ' antiga' : 's antigas'} de gastos por associar às categorias do plano. Enquanto não o fizeres, esses gastos (${fmtEUR(pendingLegacy.reduce((s, p) => s + p.total, 0))}) não entram nesta análise por categoria.`}
           </span>
@@ -252,7 +253,7 @@ export function Budgets() {
 
       {orphanExpenses.length > 0 && (
         <Card className="flex flex-wrap items-center gap-2 border-warn/40 bg-warn-soft/40">
-          <span>🔗</span>
+          <Link size={16} strokeWidth={1.75} className="shrink-0 text-warn" aria-hidden="true" />
           <span className="flex-1 text-sm text-text">
             {`${orphanExpenses.length} ${orphanExpenses.length === 1 ? 'despesa apagada ainda tem' : 'despesas apagadas ainda têm'} valor planeado em meses passados (${fmtEUR(orphanExpenses.reduce((s, o) => s + o.total, 0))}). Esse valor não entra nas comparações por categoria — junta-o a uma despesa ativa.`}
           </span>
@@ -276,7 +277,7 @@ export function Budgets() {
             {insights.map((i, idx) => (
               <li key={idx} className="flex items-start gap-2 text-sm">
                 <span className="mt-0.5">
-                  {i.kind === 'over' ? '🔴' : i.kind === 'recurring' ? '🔁' : i.kind === 'unassigned' ? '⚠️' : '🟠'}
+                  <InsightIcon kind={i.kind} />
                 </span>
                 <span>{i.text}</span>
               </li>

@@ -7,6 +7,7 @@ import {
 import { fmtEUR, parseAmount } from '../lib/format'
 import type { MonthKey } from '../types'
 import { Button, Input, Select, cx } from './ui'
+import { X } from 'lucide-react'
 
 // Grelha editável tipo Excel para as Projeções: seleção por arrasto/shift,
 // teclado, copiar/colar (compatível com Excel), preencher com a alça,
@@ -483,7 +484,7 @@ export function GridSelectionBar({ grid }: { grid: ProjectionGrid }) {
         {multiCol && <Button variant="ghost" size="sm" onClick={grid.fillRight} title="Cmd/Ctrl+R">Preencher →</Button>}
         {multiRow && <Button variant="ghost" size="sm" onClick={grid.fillDown} title="Cmd/Ctrl+D">Preencher ↓</Button>}
         <Button variant="ghost" size="sm" onClick={grid.clearValues}>Limpar</Button>
-        <Button variant="ghost" size="sm" onClick={grid.clearSelection}>✕</Button>
+        <Button variant="ghost" size="sm" onClick={grid.clearSelection} aria-label="Limpar seleção"><X size={16} strokeWidth={1.75} aria-hidden="true" /></Button>
       </div>
     </div>
   )

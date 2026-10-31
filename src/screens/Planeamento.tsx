@@ -36,6 +36,7 @@ import { START_DAY_CHOICES, addDaysISO, defaultStartDay, earliestApplyDate, mont
 import { IncomeTiming, timingLabel } from '../components/IncomeTiming'
 import { LateIncomeCard } from '../components/LateIncomeCard'
 import type { MonthKey, MonthlyPlan, SavingsBucket } from '../types'
+import { TriangleAlert } from 'lucide-react'
 
 export function Planeamento() {
   const month = useStore((s) => s.month)
@@ -384,7 +385,7 @@ function LineSection({
                     title="Acima do plano há 3 meses — toca para ver"
                     className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn"
                   >
-                    ⚠ 3 meses acima ▾
+                    <TriangleAlert size={13} strokeWidth={2} className="mr-1 inline align-[-2px]" aria-hidden="true" />3 meses acima ▾
                   </button>
                 )}
                 {doc.residual && (
