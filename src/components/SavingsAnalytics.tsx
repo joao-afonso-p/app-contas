@@ -22,7 +22,7 @@ import { ChartLegend, ChartTooltip, compactEUR, cursorStyle } from './ChartParts
 import { BreakdownPanel } from './BreakdownPanel'
 import { Card, EmptyState, MetricCard, MacroTitle, Select, cx } from './ui'
 
-const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#84cc16', '#f97316']
+const PALETTE = ['#1f8a8a', '#d9573b', '#e8a21c', '#6b4c8a', '#3b7bbf', '#c9507a', '#5f8f3a', '#8a5a3b']
 const AUTO_LABEL = 'Débitos automáticos'
 const AUTO_ROW_LABEL = 'Débitos automáticos'
 

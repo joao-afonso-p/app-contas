@@ -46,7 +46,7 @@ import {
 import { activeBuckets, autoInvestmentTotals, effectivePlan, firstPlanMonth, monthStartConfigOf, useStore, vehicleAllocations } from '../store/useStore'
 
 // Uma cor distinta por balde (até 9) — a linha do total tem a sua própria cor.
-const BUCKET_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948', '#06b6d4']
+const BUCKET_COLORS = ['#1f8a8a', '#d9573b', '#e8a21c', '#6b4c8a', '#3b7bbf', '#c9507a', '#5f8f3a', '#8a5a3b', '#7c93c9']
 const TOTAL_KEY = 'total'
 
 export function Overview() {
