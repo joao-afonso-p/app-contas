@@ -4,6 +4,7 @@ import { Badge, Button, EmptyState, Input, Modal, Select, cx } from '../componen
 import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO } from '../lib/format'
 import { activeBuckets, activeVehicles, useStore } from '../store/useStore'
 import type { SavingsMovement } from '../types'
+import { Pencil, Trash } from 'lucide-react'
 
 type Kind = 'entrada' | 'saida' | 'transferencia'
 
@@ -233,7 +234,7 @@ export function Movimentos() {
                   className="shrink-0 rounded-lg p-1.5 text-muted hover:text-negative"
                   aria-label="Apagar movimento"
                 >
-                  ✕
+                  <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </li>
             )
@@ -281,14 +282,14 @@ export function Movimentos() {
                         className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-text"
                         aria-label="Editar movimento"
                       >
-                        ✎
+                        <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
                       </button>
                       <button
                         onClick={() => handleDelete(m.id)}
                         className="rounded-lg p-1.5 text-muted hover:bg-surface-2 hover:text-negative"
                         aria-label="Apagar movimento"
                       >
-                        ✕
+                        <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

@@ -11,8 +11,9 @@ import {
 import { addMonths, calendarMonthKey, fmtDate, fmtEURWhole as fmtEUR, fmtPct, monthRange, monthShort, nowISO, parseAmount, todayISO, uid } from '../lib/format'
 import { InvestmentSimulator } from '../components/InvestmentSimulator'
 import { useStore } from '../store/useStore'
+import { Trash, TriangleAlert } from 'lucide-react'
 
-const PALETTE = ['#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#84cc16', '#f97316']
+const PALETTE = ['#1f8a8a', '#d9573b', '#e8a21c', '#6b4c8a', '#3b7bbf', '#c9507a', '#5f8f3a', '#8a5a3b']
 const axis = { fill: 'var(--muted)', fontSize: 12 }
 const KINDS = ['ETF', 'Ação', 'Fundo', 'Conta poupança', 'Certificado de Aforro', 'Depósito a prazo', 'Outro']
 
@@ -50,7 +51,7 @@ function CheckpointDate({ iso }: { iso?: string }) {
   if (m < STALE_MONTHS) return <span>{fmtDate(iso)}</span>
   return (
     <span className="font-semibold text-warn" title={`Último checkpoint há ${m} meses — convém atualizar`}>
-      ⚠ {fmtDate(iso)}
+      <TriangleAlert size={13} strokeWidth={2} className="mr-1 inline align-[-2px]" aria-hidden="true" />{fmtDate(iso)}
     </span>
   )
 }
@@ -264,7 +265,7 @@ export function Investimentos() {
                           {s.vehicle.archived && <Badge tone="warn">Arquivado</Badge>}
                           {!single && s.undistributed > 0.004 && (
                             <span className="text-xs font-normal text-warn" title="Dinheiro do veículo que ainda não está atribuído a nenhum ativo (ex.: saldo na corretora). Usa Distribuir.">
-                              ⚠ {fmtEUR(s.undistributed)} em saldo livre
+                              <TriangleAlert size={13} strokeWidth={2} className="mr-1 inline align-[-2px]" aria-hidden="true" />{fmtEUR(s.undistributed)} em saldo livre
                             </span>
                           )}
                         </button>
@@ -788,7 +789,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
                         }
                       }}
                     >
-                      🗑
+                      <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   </span>
                 </li>

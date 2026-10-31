@@ -5,6 +5,7 @@ import { useInstallPrompt } from '../lib/installPrompt'
 import { hasAppliedPlan, loadNudgeState, saveNudgeState, shouldShowNudge, snoozeNudge, type NudgeState } from '../lib/installNudge'
 import { detectIosNonSafari, detectMac, detectPlatform, isStandalone, type Platform } from '../lib/platform'
 import { useStore } from '../store/useStore'
+import { Monitor, Smartphone, Star } from 'lucide-react'
 
 function ShareIcon() {
   return (
@@ -226,7 +227,7 @@ export function InstallNudge() {
     return (
       <div role="dialog" aria-label="Ter a app sempre à mão" className="fade-up fixed bottom-6 right-6 z-40 w-80 rounded-2xl border border-border bg-surface p-4 shadow-xl">
         <div className="flex items-start gap-3">
-          <span className="text-2xl leading-none">{canPrompt ? '🖥️' : '⭐'}</span>
+          {canPrompt ? <Monitor size={26} strokeWidth={1.5} className="shrink-0 text-accent-strong" aria-hidden="true" /> : <Star size={26} strokeWidth={1.5} className="shrink-0 text-warn" aria-hidden="true" />}
           <div className="min-w-0">
             <div className="text-sm font-bold">{canPrompt ? 'Instala a Contas como app' : 'Guarda a Contas nos favoritos'}</div>
             <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -253,7 +254,7 @@ export function InstallNudge() {
   return (
     <>
       <div className="mb-3 rounded-xl bg-accent-soft p-3">
-        <div className="text-sm font-semibold text-accent-strong">📲 Adiciona a Contas ao ecrã principal</div>
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-accent-strong"><Smartphone size={16} strokeWidth={1.75} aria-hidden="true" />Adiciona a Contas ao ecrã principal</div>
         <p className="mt-0.5 text-xs text-muted">Abre-a num toque, como qualquer outra app.</p>
         <div className="mt-2 flex gap-2">
           {canPrompt ? (

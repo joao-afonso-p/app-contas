@@ -8,6 +8,8 @@ import { trackEvent } from '../lib/analytics'
 import { parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { BucketKind } from '../types'
+import { LogoMark } from '../components/Logo'
+import { X } from 'lucide-react'
 
 interface DraftIncomeSource {
   id: string
@@ -41,7 +43,7 @@ function RemoveButton({ onClick, label }: { onClick: () => void; label: string }
       aria-label={label}
       className="shrink-0 rounded-lg px-1.5 py-0.5 text-sm text-muted hover:bg-surface-2 hover:text-negative"
     >
-      ✕
+      <X size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
   )
 }
@@ -141,10 +143,8 @@ export function Onboarding() {
     <div className="flex min-h-dvh items-center justify-center bg-bg p-6">
       <div className="fade-up w-full max-w-lg py-6">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-strong text-2xl font-black text-white">
-            €
-          </div>
-          <h1 className="text-2xl font-black">Vamos começar</h1>
+          <LogoMark size={72} className="mx-auto mb-3 text-text" />
+          <h1 className="text-2xl">Vamos começar</h1>
           <p className="mt-1 text-sm text-muted">
             Cria só o que precisas — podes sempre editar tudo depois em Definições. Os valores atuais que
             indicares ficam registados como o saldo no fim do mês passado.
@@ -215,7 +215,7 @@ export function Onboarding() {
                           aria-label={`Remover subcategoria ${name}`}
                           className="hover:text-negative"
                         >
-                          ✕
+                          <X size={13} strokeWidth={2} aria-hidden="true" />
                         </button>
                       </span>
                     ))}
