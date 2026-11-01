@@ -308,7 +308,7 @@ export function Investimentos() {
               })}
             </tbody>
           </table>
-          <div className="flex items-center gap-2 border-t border-border p-3">
+          <div data-coach="inv-add" className="flex items-center gap-2 border-t border-border p-3">
             <Input value={newVehicle} onChange={(e) => setNewVehicle(e.target.value)} placeholder="Novo veículo (ex.: Trade Republic)…" onKeyDown={(e) => e.key === 'Enter' && addVehicle()} />
             <Button variant="soft" className="shrink-0 whitespace-nowrap" onClick={addVehicle} disabled={!newVehicle.trim()}>+ Veículo</Button>
           </div>

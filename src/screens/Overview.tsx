@@ -295,7 +295,7 @@ export function Overview() {
 
       <LateIncomeCard month={accountingMonth} onlyPending />
 
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+      <div data-coach="overview-cards" className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
         <MetricCard
           label="Na conta do banco"

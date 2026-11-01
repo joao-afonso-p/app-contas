@@ -15,6 +15,7 @@ import { Overview } from './screens/Overview'
 import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
 import { Guia } from './screens/Guia'
+import { CoachOverlay, CoachPrompt } from './components/Coach'
 import { InstallNudge } from './components/InstallGuide'
 import { LogoMark, Wordmark } from './components/Logo'
 import { ArrowLeftRight, BookOpen, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
@@ -146,6 +147,7 @@ export function App() {
           {NAV.map((item) => (
             <button
               key={item.id}
+              data-coach={`nav-${item.id}`}
               onClick={() => setScreen(item.id)}
               className={cx(
                 'flex items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors',
@@ -182,6 +184,7 @@ export function App() {
           {NAV.filter((i) => i.mobile).map((item) => (
             <button
               key={item.id}
+              data-coach={`nav-${item.id}`}
               onClick={() => setScreen(item.id)}
               className={cx(
                 'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium',
@@ -194,6 +197,9 @@ export function App() {
           ))}
         </div>
       </nav>
+
+      <CoachPrompt />
+      <CoachOverlay />
     </div>
   )
 }

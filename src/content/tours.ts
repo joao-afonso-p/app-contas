@@ -10,7 +10,7 @@ export interface TourStep {
   text: string
   // Valor do atributo data-coach do elemento a destacar. Se houver vários
   // (menu lateral e barra de baixo), usa-se o que estiver visível.
-  target?: string
+  target?: string | string[]
   // Ecrã que tem de estar aberto neste passo (a visita navega para lá).
   screen?: Screen
 }
@@ -67,9 +67,9 @@ export const TOURS: Tour[] = [
         text: 'Importa o extrato do banco e dá uma categoria a cada gasto. É assim que a Contas compara o planeado com o real.',
       },
       {
-        target: 'nav-guia',
+        target: ['nav-guia', 'nav-definicoes'],
         title: 'O Guia explica tudo',
-        text: 'Tem o essencial e o avançado, com o exemplo de uma pessoa fictícia, a Marta. As palavras sublinhadas têm explicação.',
+        text: 'Tem o essencial e o avançado, com o exemplo de uma pessoa fictícia, a Marta. As palavras sublinhadas têm explicação. No telemóvel, abre-se em Definições.',
       },
       {
         screen: 'planeamento',

@@ -510,7 +510,7 @@ export function Projecoes() {
       <section>
         <SectionTitle
           right={
-            <div className="flex gap-2">
+            <div data-coach="proj-actions" className="flex gap-2">
               <Button variant="ghost" size="sm" onClick={() => setShowMovHistory((v) => !v)}>
                 {showMovHistory ? 'Ocultar histórico' : 'Mostrar histórico'}
               </Button>
