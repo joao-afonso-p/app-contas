@@ -341,7 +341,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'Em janeiro, a Marta vê o aviso de que Lazer está acima do plano há 3 meses seguidos. Em vez de se esforçar mais, decide que 150 € é o valor real e atualiza o plano. Marca Lazer com a estrela para o gráfico abrir sempre nessa categoria.',
+            text: 'Em outubro, a secção Atenção avisa a Marta de que Supermercado está acima do plano há 3 meses seguidos. Ao abrir o detalhe, vê os valores de cada mês (310 €, 305 € e 320 €, contra 280 € planeados). Como os preços subiram mesmo, não tenta gastar menos: atualiza o plano para 310 €, como no exemplo do fim do mês.',
           },
         ],
       },
