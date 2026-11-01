@@ -7,9 +7,10 @@ export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(' ')
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
+// `coach` marca o cartão como alvo de uma visita guiada (ver components/Coach.tsx).
+export function Card({ children, className, coach }: { children: ReactNode; className?: string; coach?: string }) {
   return (
-    <div className={cx('rounded-2xl border border-border bg-surface p-4 shadow-sm', className)}>
+    <div data-coach={coach} className={cx('rounded-2xl border border-border bg-surface p-4 shadow-sm', className)}>
       {children}
     </div>
   )
@@ -91,7 +92,7 @@ export function Button({
       aria-label={ariaLabel}
       title={title}
       className={cx(
-        'rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-40',
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-40',
         variants[variant], sizes[size], className,
       )}
     >

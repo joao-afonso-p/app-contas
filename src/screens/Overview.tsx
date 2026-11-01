@@ -24,6 +24,7 @@ import {
   InsightIcon,
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
+import { UnlockNotices } from '../components/UnlockNotices'
 import { LateIncomeCard } from '../components/LateIncomeCard'
 import { daysSinceMonthStart, daysUntilNextMonth, monthProgress } from '../lib/financialMonth'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
@@ -293,9 +294,11 @@ export function Overview() {
         </Card>
       )}
 
+      <UnlockNotices />
+
       <LateIncomeCard month={accountingMonth} onlyPending />
 
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
+      <div data-coach="overview-cards" className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
         <MetricCard label="Total poupado" value={fmtEUR(totalSaved)} />
         <MetricCard
           label="Na conta do banco"

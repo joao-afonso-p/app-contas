@@ -271,7 +271,7 @@ export function Budgets() {
       )}
 
       {insights.length > 0 && (
-        <Card>
+        <Card coach="analytics-attention">
           <SectionTitle>Atenção</SectionTitle>
           <ul className="flex flex-col gap-2">
             {insights.map((i, idx) => (

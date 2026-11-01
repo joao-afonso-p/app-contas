@@ -273,7 +273,8 @@ export const useStore = create<Store>((set, get) => ({
     if (movements.length) await adapter!.putMany('savingsMovements', movements)
 
     const meta = get().data.meta[0] ?? { id: 'meta' as const }
-    await adapter!.put('meta', { ...meta, onboardingDone: true })
+    // onboardedAt marca o início do desbloqueio progressivo (ver lib/unlock.ts).
+    await adapter!.put('meta', { ...meta, onboardingDone: true, onboardedAt: todayISO() })
   },
 
   async joinSpace(code, migrateLocal) {
