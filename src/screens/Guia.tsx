@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { BookOpen, ChevronDown, Download, Lightbulb } from 'lucide-react'
 import { Badge, Card, cx } from '../components/ui'
 import { FAQ, GLOSSARY, GUIDE, type Block } from '../content/guide'
@@ -70,11 +70,46 @@ export function Guia() {
   const [active, setActive] = useState(TOC[0].id)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
+  // Enquanto a página rola por causa de um clique no índice, o scroll-spy fica em pausa
+  // (senão o destaque saltava por todas as secções pelo caminho).
+  const lockUntil = useRef(0)
+
   // Navegação dentro da página: não toca no hash do URL (que é o ecrã ativo).
   const go = (id: string) => {
     setActive(id)
+    lockUntil.current = Date.now() + 900
     document.getElementById(`guia-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  // Scroll-spy: a secção ativa é a última cujo topo já passou a linha de referência.
+  // No fundo da página fica sempre a última, mesmo que seja curta.
+  useEffect(() => {
+    let frame = 0
+    const update = () => {
+      frame = 0
+      if (Date.now() < lockUntil.current) return
+      const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4
+      let current = TOC[0].id
+      if (atBottom) {
+        current = TOC[TOC.length - 1].id
+      } else {
+        for (const t of TOC) {
+          const el = document.getElementById(`guia-${t.id}`)
+          if (el && el.getBoundingClientRect().top <= 120) current = t.id
+        }
+      }
+      setActive(current)
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    update()
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [])
 
   return (
     <div className="fade-up flex flex-col gap-6">
