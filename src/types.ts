@@ -254,6 +254,16 @@ export interface AppMeta {
   monthStartOverrides?: Record<MonthKey, number>
   // Categoria que abre por defeito no gráfico "Evolução por categoria" do Analytics.
   analyticsDefaultGroupId?: string
+  // Dia (YYYY-MM-DD) em que o onboarding foi concluído. Só existe em contas criadas
+  // depois do desbloqueio progressivo: contas antigas ou importadas ficam sem este campo
+  // e têm tudo desbloqueado desde o início (ver lib/unlock.ts).
+  onboardedAt?: string
+  // false = desativa o desbloqueio progressivo (tudo disponível). undefined = ativo.
+  progressiveUnlock?: boolean
+  // Partes desbloqueadas manualmente com "Desbloquear já" (chaves de LockedFeature).
+  unlockedFeatures?: string[]
+  // Partes cujo aviso "Já podes usar…" no Overview já foi visto ou fechado.
+  unlockNoticesSeen?: string[]
 }
 
 // ---------- Coleções ----------
