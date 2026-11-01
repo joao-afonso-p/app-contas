@@ -122,11 +122,11 @@ export function Planeamento() {
           </span>
           <MonthPicker month={month} onChange={setMonth} minMonth={addMonths(currentMonthKey(), -2)} />
           {isClosed ? (
-            <span className="hidden md:inline-flex">
+            <span data-coach="plan-apply" className="hidden md:inline-flex">
               <Button variant="ghost" size="sm" onClick={() => void reopenPlan(month)}>Editar plano</Button>
             </span>
           ) : (
-            <span title={applyBlockedReason}>
+            <span data-coach="plan-apply" title={applyBlockedReason}>
               <Button size="sm" disabled={!canApply} onClick={() => void applyPlan(month)}>
                 Aplicar plano
               </Button>
@@ -194,7 +194,7 @@ export function Planeamento() {
         No telemóvel o plano é só de leitura. Edita-o no computador.
       </p>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
+      <div data-coach="plan-summary" className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
         <MetricCard
           label="Deixar na conta corrente"
           value={fmtEUR(summary.leaveInCurrent)}
