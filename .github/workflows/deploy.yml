@@ -27,8 +27,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Base path = /nome-do-repo/. Ajusta se o repositório tiver outro nome.
-          VITE_BASE: /${{ github.event.repository.name }}/
+          # Domínio próprio (asminhascontas.com): a app serve-se na raiz.
+          VITE_BASE: /
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}

@@ -82,11 +82,17 @@ vez, isso só permite "roubar" um código ainda não usado, nunca reutilizar um 
 1. Cria um repositório no GitHub e faz push do projeto para o branch `main`.
 2. No repositório: **Settings → Pages → Source: GitHub Actions**.
 3. (Para sincronização) **Settings → Secrets and variables → Actions** → adiciona os 6 secrets `VITE_FIREBASE_*` com os valores do teu `.env`, e opcionalmente `VITE_PREMIUM_CODES` se quiseres dar acesso premium a alguém.
-4. O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) faz build e publica a cada push para `main`. O base path é definido automaticamente como `/<nome-do-repo>/`.
+4. O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) faz build e publica a cada push para `main`. A app serve-se na raiz (`VITE_BASE=/`), por causa do domínio próprio.
 
-A app fica em `https://<utilizador>.github.io/<nome-do-repo>/`.
+A app fica em `https://asminhascontas.com`.
 
-> Firebase → Authentication → Settings → **Authorized domains**: adiciona `<utilizador>.github.io`.
+### Domínio próprio (asminhascontas.com)
+
+1. No DNS do registador: quatro registos `A` para `@` (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`) e um `CNAME` de `www` para `<utilizador>.github.io`.
+2. **Settings → Pages → Custom domain**: `asminhascontas.com`; quando disponível, ativa **Enforce HTTPS**.
+3. Firebase → Authentication → Settings → **Authorized domains**: adiciona `asminhascontas.com` (e `www.asminhascontas.com`).
+
+> **Dados locais:** o IndexedDB e o localStorage são por endereço. Ao passar do `github.io` para o domínio próprio, os dados locais não acompanham. Antes de ativar o custom domain, exporta um backup (Definições → Dados) e importa-o no novo endereço. Espaços sincronizados (Firebase) vêm com o login. Quem instalou a app no ecrã principal tem de a reinstalar a partir do novo endereço.
 
 ## Instalar como app no iPhone
 
