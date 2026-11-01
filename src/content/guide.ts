@@ -119,15 +119,11 @@ export const GUIDE: GuideSection[] = [
         ],
       },
       {
-        title: 'Instalar a app e guardar uma cópia',
+        title: 'Instalar a app',
         blocks: [
           {
             t: 'p',
             text: '**Instala a Contas no ecrã principal** do telemóvel ou do computador e usa sempre essa app. Os dados guardados no browser não passam para a app instalada, por isso instala antes de preencheres.',
-          },
-          {
-            t: 'p',
-            text: 'Em Definições → Dados podes **exportar uma cópia de segurança** num ficheiro. Faz isto de vez em quando e sempre antes de mudares de dispositivo. O ficheiro tem os teus dados financeiros: guarda-o em privado.',
           },
         ],
       },
@@ -268,6 +264,10 @@ export const GUIDE: GuideSection[] = [
               '**Aplica o plano** quando puderes. O botão só abre a partir de 3 dias antes de o mês começar.',
               '**Faz as transferências** no banco: deixa o valor de "Deixar na conta corrente" e transfere o de "Transferir agora para a poupança".',
             ],
+          },
+          {
+            t: 'tip',
+            text: '**Opcional:** aproveita o fim do mês para exportar uma cópia de segurança em Definições → Dados. É um ficheiro com os teus dados financeiros, por isso guarda-o em privado. Também é útil antes de mudares de dispositivo.',
           },
           {
             t: 'example',
