@@ -87,7 +87,12 @@ export function CoachOverlay() {
         scrolledFor.current = stepKey
         el.scrollIntoView({ block: 'center', behavior: 'auto' })
       }
-      setBox(toBox(el))
+      const next = toBox(el)
+      setBox((prev) =>
+        prev && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.height === next.height
+          ? prev
+          : next,
+      )
     }
     update()
     const id = window.setInterval(update, 140)
