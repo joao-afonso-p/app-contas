@@ -24,6 +24,7 @@ import {
   InsightIcon,
 } from '../components/ui'
 import { ChartTooltip } from '../components/ChartParts'
+import { UnlockNotices } from '../components/UnlockNotices'
 import { LateIncomeCard } from '../components/LateIncomeCard'
 import { daysSinceMonthStart, daysUntilNextMonth, monthProgress } from '../lib/financialMonth'
 import { allocationSummary, round2 } from '../lib/calc/allocation'
@@ -292,6 +293,8 @@ export function Overview() {
           </ul>
         </Card>
       )}
+
+      <UnlockNotices />
 
       <LateIncomeCard month={accountingMonth} onlyPending />
 
