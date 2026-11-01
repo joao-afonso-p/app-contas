@@ -52,7 +52,7 @@ export function SubcategoryAnalytics({
       />
       {effective !== 'all' && selectedHasSubs === false && (
         <p className="mt-2 text-xs text-muted">
-          Esta categoria ainda não tem subcategorias nos gastos — cria-as em Definições → Subcategorias e
+          Esta categoria ainda não tem subcategorias nos gastos. Cria-as em Definições → Subcategorias e
           escolhe-as na lista de Gastos.
         </p>
       )}

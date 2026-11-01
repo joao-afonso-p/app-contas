@@ -14,9 +14,10 @@ import { Projecoes } from './screens/Projecoes'
 import { Overview } from './screens/Overview'
 import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
+import { Guia } from './screens/Guia'
 import { InstallNudge } from './components/InstallGuide'
 import { LogoMark, Wordmark } from './components/Logo'
-import { ArrowLeftRight, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
 
 const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, mobile: true },
@@ -26,6 +27,7 @@ const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean }[] = 
   { id: 'budgets', label: 'Analytics', icon: ScanSearch, mobile: false },
   { id: 'investimentos', label: 'Investimento', icon: Sprout, mobile: false },
   { id: 'projecoes', label: 'Projeções', icon: TrendingUp, mobile: false },
+  { id: 'guia', label: 'Guia', icon: BookOpen, mobile: false },
   { id: 'definicoes', label: 'Definições', icon: Settings, mobile: true },
 ]
 
@@ -39,6 +41,7 @@ const SCREENS: Record<Screen, () => React.JSX.Element> = {
   overview: Overview,
   definicoes: Definicoes,
   historico: Historico,
+  guia: Guia,
 }
 
 export function App() {

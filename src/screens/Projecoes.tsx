@@ -33,7 +33,7 @@ export function Projecoes() {
   const removePlannedMovement = useStore((s) => s.removePlannedMovement)
   const put = useStore((s) => s.put)
 
-  const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '—'
+  const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
 
   const horizon = data.meta[0]?.projectionHorizon ?? 18
   const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
@@ -329,7 +329,7 @@ export function Projecoes() {
                               </p>
                               <p className="mt-1.5 text-muted">
                                 Quando acontecerem, regista-os nos Movimentos e marca-os como feitos (✓) em
-                                Movimentos previstos — assim não contam a dobrar.
+                                Movimentos previstos. Assim não contam a dobrar.
                               </p>
                             </InfoHint>
                           )}
@@ -551,7 +551,7 @@ export function Projecoes() {
                         <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
                         <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
                           <span className="flex items-center gap-1.5">
-                            <span className="min-w-0 truncate">{m.description || '—'}</span>
+                            <span className="min-w-0 truncate">{m.description || '–'}</span>
                             {isTransfer && <Badge tone="accent">Transferência</Badge>}
                           </span>
                         </td>
@@ -570,7 +570,7 @@ export function Projecoes() {
                             className="group rounded-lg p-1 align-middle hover:bg-surface-2"
                             aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
                             aria-pressed={!!m.done}
-                            title={m.done ? 'Feito — clica para voltar a por fazer' : 'Marcar como feito (já aconteceu)'}
+                            title={m.done ? 'Feito (clica para voltar a por fazer)' : 'Marcar como feito (já aconteceu)'}
                           >
                             <span
                               className={cx(
@@ -780,7 +780,7 @@ export function Projecoes() {
 function renderSuggestion(suggestion: number | null, current: number, target: number, deadline: MonthKey): ReactNode {
   if (suggestion === null) {
     if (current >= target) return <span className="text-positive">Objetivo atingido ✓</span>
-    return <span className="text-warn">Prazo passado ({monthLabel(deadline)}) — objetivo ainda não atingido.</span>
+    return <span className="text-warn">Prazo passado ({monthLabel(deadline)}): objetivo ainda não atingido.</span>
   }
   if (suggestion === 0) return <span className="text-positive">Objetivo atingido ✓</span>
   return (

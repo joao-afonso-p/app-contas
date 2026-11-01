@@ -170,7 +170,7 @@ export function Historico() {
 
       <p className="text-xs text-muted">
         Valores reais registados nos planeamentos mensais e nos movimentos de poupança até {monthShort(accountingMonth)}.
-        Consulta apenas — para editar, usa o Planeamento.
+        Consulta apenas. Para editar, usa o Planeamento.
       </p>
     </div>
   )

@@ -309,7 +309,7 @@ export function Money({ value, className, compact, whole }: { value: number; cla
 // Célula de edição inline de valores €: mostra formatado, edita em texto livre
 // (aceita vírgula decimal), grava em blur/Enter, Esc cancela.
 export function MoneyCell({
-  value, onChange, className, placeholder = '—', disabled, onSelect, onEditStart, selected,
+  value, onChange, className, placeholder = '–', disabled, onSelect, onEditStart, selected,
 }: {
   value: number | undefined
   onChange: (v: number) => void

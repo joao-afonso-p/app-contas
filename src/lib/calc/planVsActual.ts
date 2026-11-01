@@ -138,7 +138,7 @@ export function buildMonthReport(input: ReportInput): MonthReport {
       acc.set(sid, round2((acc.get(sid) ?? 0) + t.amount))
     }
     return [...acc.entries()]
-      .map(([id, spent]) => ({ id, name: id ? (subName.get(id) ?? '—') : 'Sem subcategoria', spent }))
+      .map(([id, spent]) => ({ id, name: id ? (subName.get(id) ?? '–') : 'Sem subcategoria', spent }))
       .sort((a, b) => b.spent - a.spent)
   }
   const sum = (txs: Transaction[]) => round2(txs.reduce((s, t) => s + t.amount, 0))
@@ -248,7 +248,7 @@ export function computeInsights(reports: MonthReport[]): Insight[] {
     } else if (r.aheadOfPace) {
       out.push({
         kind: 'pace', groupId: r.group.id,
-        text: `${r.group.name}: já gastaste ${Math.round(r.pct * 100)}% do plano — acima do ritmo do mês.`,
+        text: `${r.group.name}: já gastaste ${Math.round(r.pct * 100)}% do plano, acima do ritmo do mês.`,
       })
     }
   }
@@ -276,7 +276,7 @@ export function computeInsights(reports: MonthReport[]): Insight[] {
         const culprits = topSubsText([...acc.values()], total)
         out.push({
           kind: 'recurring', groupId: r.group.id,
-          text: `${r.group.name} está acima do plano há 3 meses seguidos${culprits ? `, sobretudo por causa de ${culprits}` : ''} — talvez valha a pena rever o valor planeado.`,
+          text: `${r.group.name} está acima do plano há 3 meses seguidos${culprits ? `, sobretudo por causa de ${culprits}` : ''}. Talvez valha a pena rever o valor planeado.`,
         })
       }
     }
@@ -285,7 +285,7 @@ export function computeInsights(reports: MonthReport[]): Insight[] {
   if (cur.unassigned.length > 0) {
     out.push({
       kind: 'unassigned',
-      text: `${cur.unassigned.length} gasto${cur.unassigned.length === 1 ? '' : 's'} sem categoria do plano (${fmtEUR(cur.unassignedTotal)}) — não contam em nenhuma despesa planeada.`,
+      text: `${cur.unassigned.length} gasto${cur.unassigned.length === 1 ? '' : 's'} sem categoria do plano (${fmtEUR(cur.unassignedTotal)}): não contam em nenhuma despesa planeada.`,
     })
   }
   return out

@@ -29,7 +29,7 @@ export function MoveDeviceGuide() {
         </li>
       </ol>
       <ul className="mt-3 list-disc space-y-1 pl-4 leading-relaxed">
-        <li>O ficheiro contém os teus dados financeiros — guarda-o em privado e apaga-o quando já não for preciso.</li>
+        <li>O ficheiro contém os teus dados financeiros. Guarda-o em privado e apaga-o quando já não for preciso.</li>
         <li>É uma fotografia do momento: alterações feitas no dispositivo antigo depois de exportar não vão incluídas.</li>
         <li>Importar substitui tudo o que estiver no dispositivo onde importas.</li>
       </ul>
@@ -189,7 +189,7 @@ export function BackupSettings() {
   return (
     <div className="mb-4 border-b border-border pb-4">
       <p className="mb-3 text-sm text-muted">
-        Guarda uma cópia de segurança de todos os teus dados num ficheiro — útil para mudares de dispositivo ou
+        Guarda uma cópia de segurança de todos os teus dados num ficheiro, útil para mudares de dispositivo ou
         teres uma cópia de reserva.
       </p>
       <div className="flex flex-wrap items-start gap-2">

@@ -41,6 +41,7 @@ export type Screen =
   | 'overview'
   | 'definicoes'
   | 'historico'
+  | 'guia'
 
 export type Mode = 'local' | 'space'
 type Status = 'boot' | 'welcome' | 'ready' | 'error'
@@ -589,7 +590,7 @@ export const useStore = create<Store>((set, get) => ({
       date: todayISO(),
       bucketId,
       amount: -Math.abs(amount),
-      description: description || `Pagamento parcial — ${bucket.name}`,
+      description: description || `Pagamento parcial: ${bucket.name}`,
     })
     if (bucket.targetAmount) {
       const updated: SavingsBucket = {

@@ -81,7 +81,7 @@ export function Welcome() {
         <Card>
           <h2 className="font-bold">Criar um espaço novo</h2>
           <p className="mb-3 mt-1 text-sm text-muted">
-            Se tens um código de acesso, cria já um espaço sincronizado novo — depois é só partilhares o
+            Se tens um código de acesso, cria já um espaço sincronizado novo. Depois é só partilhares o
             código gerado com a outra pessoa.
             {!firebaseAvailable && ' (Indisponível: falta configurar o Firebase no .env)'}
           </p>

@@ -170,7 +170,7 @@ export function SavingsAnalytics({
       <Card>
         <div className="mb-1 text-sm font-semibold">Taxa de poupança: planeada vs. real</div>
         <p className="mb-3 text-xs text-muted">
-          Planeada = (poupança + débitos automáticos) ÷ income. Real = (income − gasto real do orçamento) ÷ income —
+          Planeada = (poupança + débitos automáticos) ÷ income. Real = (income − gasto real do orçamento) ÷ income:
           o que realmente sobrou. Se a real fica abaixo da planeada, gastaste mais do que o plano previa.
           O mês em curso ainda está incompleto.
         </p>
@@ -282,7 +282,7 @@ export function SavingsAnalytics({
             <p className="mt-2 text-[11px] text-muted">
               Valores planeados em cada mês (as transferências fazem-se quando aplicas o plano). Em cada balde,
               o verde vai do mais claro (a menor contribuição) ao mais escuro (a maior).
-              {hasAuto && ' "Débitos automáticos" é o dinheiro que sai direto da conta para investimentos (ex.: PPR), definido em Planeamento — não passa pelos baldes.'}
+              {hasAuto && ' "Débitos automáticos" é o dinheiro que sai direto da conta para investimentos (ex.: PPR), definido em Planeamento. Não passa pelos baldes.'}
             </p>
           </>
         )}

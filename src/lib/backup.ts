@@ -47,7 +47,7 @@ export function parseBackup(text: string): DataSet {
     throw new Error('A cópia de segurança está danificada (versão em falta).')
   }
   if (raw.version > BACKUP_VERSION) {
-    throw new Error('Esta cópia de segurança foi criada numa versão mais recente da app — atualiza a página e tenta outra vez.')
+    throw new Error('Esta cópia de segurança foi criada numa versão mais recente da app. Atualiza a página e tenta outra vez.')
   }
   if (!isObject(raw.data)) {
     throw new Error('A cópia de segurança está danificada (sem dados).')

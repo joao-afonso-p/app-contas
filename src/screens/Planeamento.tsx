@@ -191,14 +191,14 @@ export function Planeamento() {
       )}
 
       <p className="-mt-3 text-xs text-muted md:hidden">
-        No telemóvel o plano é só de leitura — edita-o no computador.
+        No telemóvel o plano é só de leitura. Edita-o no computador.
       </p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:gap-4">
         <MetricCard
           label="Deixar na conta corrente"
           value={fmtEUR(summary.leaveInCurrent)}
-          title="Total das despesas do mês — fica na conta corrente"
+          title="Total das despesas do mês (fica na conta corrente)"
         />
         <MetricCard
           label="Transferir agora para a poupança"
@@ -381,20 +381,20 @@ function LineSection({
                     type="button"
                     onClick={() => setOpenWarn(openWarn === doc.id ? null : doc.id)}
                     aria-expanded={openWarn === doc.id}
-                    aria-label={`${doc.name}: acima do plano há 3 meses — ver detalhes`}
-                    title="Acima do plano há 3 meses — toca para ver"
+                    aria-label={`${doc.name}: acima do plano há 3 meses, ver detalhes`}
+                    title="Acima do plano há 3 meses, toca para ver"
                     className="shrink-0 rounded-full bg-warn-soft px-2 py-0.5 text-xs font-semibold text-warn"
                   >
                     <TriangleAlert size={13} strokeWidth={2} className="mr-1 inline align-[-2px]" aria-hidden="true" />3 meses acima ▾
                   </button>
                 )}
                 {doc.residual && (
-                  <span title="Arquivada, mas ainda com valor neste mês — põe a 0 (ou passa para outra linha). Podes reativá-la em Definições.">
+                  <span title="Arquivada, mas ainda com valor neste mês: põe a 0 (ou passa para outra linha). Podes reativá-la em Definições.">
                     <Badge tone="warn">Arquivada</Badge>
                   </span>
                 )}
                 {showRentBadge && doc.isRent && (
-                  <span title="Chega depois da transferência do mês — transfere-se quando entrar">
+                  <span title="Chega depois da transferência do mês: transfere-se quando entrar">
                     <Badge>{timingLabel(doc.expectedDay)}</Badge>
                   </span>
                 )}
@@ -544,7 +544,7 @@ function SavingsSection({
     } else if (actionType === 'full') {
       const saldo = bucketBalance(balanceTable, actionBucket.id, month)
       void (async () => {
-        await goalPartialPayment(actionBucket.id, saldo, descDraft.trim() || `Pagamento total — ${actionBucket.name}`)
+        await goalPartialPayment(actionBucket.id, saldo, descDraft.trim() || `Pagamento total: ${actionBucket.name}`)
         await goalComplete(actionBucket.id)
       })()
     } else if (actionType === 'postpone') {
@@ -585,7 +585,7 @@ function SavingsSection({
                     <span className="truncate text-sm">{bucket.name}</span>
                     {isGoal && <Badge tone="goal">Objetivo</Badge>}
                     {bucket.residual && (
-                      <span title="Balde arquivado/concluído, mas ainda com valor neste mês — põe a 0 para deixar de contar.">
+                      <span title="Balde arquivado/concluído, mas ainda com valor neste mês: põe a 0 para deixar de contar.">
                         <Badge tone="warn">Arquivado</Badge>
                       </span>
                     )}
@@ -717,7 +717,7 @@ function AutoInvestmentSection({
         Débitos automáticos
       </SectionTitle>
       <p className="mb-2 text-xs text-muted">
-        Dinheiro debitado automaticamente da conta direto para um veículo de investimento (ex. PPR) — não passa pela poupança partilhada.
+        Dinheiro debitado automaticamente da conta direto para um veículo de investimento (ex. PPR). Não passa pela poupança partilhada.
       </p>
       <ul className="divide-y divide-border">
         {vehicles.map((vehicle) => (

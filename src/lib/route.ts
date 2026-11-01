@@ -3,7 +3,7 @@ import type { Screen } from '../store/useStore'
 // O ecrã ativo vive no hash do URL ("#/gastos"): o refresh volta ao mesmo
 // ecrã e o botão "voltar" do browser/telemóvel navega entre ecrãs.
 export const SCREEN_IDS: readonly Screen[] = [
-  'planeamento', 'movimentos', 'gastos', 'budgets', 'investimentos', 'projecoes', 'overview', 'definicoes', 'historico',
+  'planeamento', 'movimentos', 'gastos', 'budgets', 'investimentos', 'projecoes', 'overview', 'definicoes', 'historico', 'guia',
 ]
 
 export function screenFromHash(hash: string): Screen | null {

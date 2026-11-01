@@ -46,11 +46,11 @@ const STALE_MONTHS = 6 // mesmo limite do aviso no resumo do topo
 
 // Data do último checkpoint; a laranja com ⚠ se já passaram 6 meses ou mais.
 function CheckpointDate({ iso }: { iso?: string }) {
-  if (!iso) return <span>—</span>
+  if (!iso) return <span>–</span>
   const m = monthsSince(iso)
   if (m < STALE_MONTHS) return <span>{fmtDate(iso)}</span>
   return (
-    <span className="font-semibold text-warn" title={`Último checkpoint há ${m} meses — convém atualizar`}>
+    <span className="font-semibold text-warn" title={`Último checkpoint há ${m} meses, convém atualizar`}>
       <TriangleAlert size={13} strokeWidth={2} className="mr-1 inline align-[-2px]" aria-hidden="true" />{fmtDate(iso)}
     </span>
   )
@@ -216,8 +216,8 @@ export function Investimentos() {
         />
         <MetricCard
           label="Último checkpoint"
-          value={lastCp ? fmtDate(lastCp) : '—'}
-          hint={lastCp ? (stale !== null && stale >= STALE_MONTHS ? `há ${stale} meses — convém atualizar` : stale === 0 ? 'este mês' : `há ${stale} ${stale === 1 ? 'mês' : 'meses'}`) : 'ainda sem checkpoints: o ganho conta como 0'}
+          value={lastCp ? fmtDate(lastCp) : '–'}
+          hint={lastCp ? (stale !== null && stale >= STALE_MONTHS ? `há ${stale} meses, convém atualizar` : stale === 0 ? 'este mês' : `há ${stale} ${stale === 1 ? 'mês' : 'meses'}`) : 'ainda sem checkpoints: o ganho conta como 0'}
           tone={stale !== null && stale >= STALE_MONTHS ? 'warn' : 'default'}
         />
       </div>
@@ -273,7 +273,7 @@ export function Investimentos() {
                       <td className="tnum px-2 text-right" title={s.contributed < -0.004 ? 'Já resgataste mais do que investiste: a diferença é lucro realizado' : undefined}>{fmtEUR(Math.max(0, s.contributed))}</td>
                       <td className="tnum px-2 text-right font-semibold">{fmtEUR(s.value)}</td>
                       <td className={cx('tnum px-2 text-right', gainTone(s.gain))}>{signed(s.gain)}</td>
-                      <td className={cx('tnum px-2 text-right', gainTone(s.gain))}>{s.pct !== null ? fmtPct(s.pct) : '—'}</td>
+                      <td className={cx('tnum px-2 text-right', gainTone(s.gain))}>{s.pct !== null ? fmtPct(s.pct) : '–'}</td>
                       <td className="px-2 text-xs text-muted"><CheckpointDate iso={s.lastCheckpoint} /></td>
                       <td className="whitespace-nowrap px-4 text-right">
                         <span className="inline-flex items-center gap-1">
@@ -497,13 +497,13 @@ export function Investimentos() {
                         <td className="tnum text-right">{fmtEUR(r.h.value)}</td>
                         <td className="text-right"><RateInput key={`${r.h.key}:${r.h.expectedRate}`} holding={r.h} /></td>
                         <td className="text-right">
-                          {projContrib ? <MonthlyInput key={`${r.h.key}:${r.h.monthlyContribution}`} holding={r.h} median={r.median} /> : <span className="text-muted">—</span>}
+                          {projContrib ? <MonthlyInput key={`${r.h.key}:${r.h.monthlyContribution}`} holding={r.h} median={r.median} /> : <span className="text-muted">–</span>}
                         </td>
                         <td className="text-right">
-                          {projContrib ? <GrowthInput key={`${r.h.key}:${r.h.contributionGrowth}`} holding={r.h} /> : <span className="text-muted">—</span>}
+                          {projContrib ? <GrowthInput key={`${r.h.key}:${r.h.contributionGrowth}`} holding={r.h} /> : <span className="text-muted">–</span>}
                         </td>
                         {[5, 10, 20].map((y) => (
-                          <td key={y} className="tnum text-right">{r.active ? fmtEUR(projFuture(r, y)) : '—'}</td>
+                          <td key={y} className="tnum text-right">{r.active ? fmtEUR(projFuture(r, y)) : '–'}</td>
                         ))}
                       </tr>
                       {expanded && (
@@ -665,7 +665,7 @@ function HoldingRow({
         <td className="tnum px-2 text-right" title={h.contributed < -0.004 ? 'Já resgataste mais do que investiste: a diferença é lucro realizado' : undefined}>{fmtEUR(Math.max(0, h.contributed))}</td>
         <td className="tnum px-2 text-right">{fmtEUR(h.value)}</td>
         <td className={cx('tnum px-2 text-right', gainTone(h.gain))}>{signed(h.gain)}</td>
-        <td className={cx('tnum px-2 text-right', gainTone(h.gain))}>{h.pct !== null ? fmtPct(h.pct) : '—'}</td>
+        <td className={cx('tnum px-2 text-right', gainTone(h.gain))}>{h.pct !== null ? fmtPct(h.pct) : '–'}</td>
         <td className="px-2 text-xs text-muted"><CheckpointDate iso={h.lastCheckpoint} /></td>
         <td className="whitespace-nowrap px-4 text-right">
           <span className="inline-flex items-center gap-1">
@@ -695,7 +695,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
         ? `Distribuído para ${data.investmentAssets.find((a) => a.id === e.assetId)?.name ?? 'ativo'}`
         : `Recebido de ${data.investmentAssets.find((a) => a.id === e.assetId)?.name ?? 'ativo'}`,
     })),
-    ...h.checkpoints.map((c) => ({ id: c.id, date: c.date, kind: 'cp' as const, text: `Checkpoint${c.note ? ` — ${c.note}` : ''}`, amount: c.value })),
+    ...h.checkpoints.map((c) => ({ id: c.id, date: c.date, kind: 'cp' as const, text: `Checkpoint${c.note ? `: ${c.note}` : ''}`, amount: c.value })),
   ].sort((a, b) => b.date.localeCompare(a.date))
   const derived = h.flows.filter((f) => f.kind === 'auto' || f.kind === 'movement' || f.kind === 'initial')
 
@@ -719,7 +719,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
             )}
             <div className="mt-3 text-muted">
               Rentabilidade anual estimada:{' '}
-              <span className="font-semibold text-text">{h.annualized !== null ? fmtPct(h.annualized) : '—'}</span>
+              <span className="font-semibold text-text">{h.annualized !== null ? fmtPct(h.annualized) : '–'}</span>
               <div className="mt-0.5">{h.annualized === null ? 'precisa de 2 checkpoints com pelo menos 3 meses de intervalo' : 'entre o primeiro e o último checkpoint, descontando entradas'}</div>
             </div>
             {(asset || h.vehicleId) && (
@@ -798,7 +798,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
             {derived.length > 0 && (
               <p className="mt-2 text-muted">
                 Mais {derived.length} entrada{derived.length === 1 ? '' : 's'} automática{derived.length === 1 ? '' : 's'} (débitos do plano, movimentos
-                {derived.some((f) => f.kind === 'initial') ? ', saldo inicial' : ''}) — total {fmtEUR(round2(derived.reduce((s, f) => s + f.amount, 0)))}.
+                {derived.some((f) => f.kind === 'initial') ? ', saldo inicial' : ''}), total {fmtEUR(round2(derived.reduce((s, f) => s + f.amount, 0)))}.
               </p>
             )}
           </div>
@@ -811,7 +811,7 @@ function HoldingDetail({ holding: h }: { holding: Holding }) {
 function entryText(source: string, amount: number, note?: string): string {
   const base = source === 'transfer' ? (amount < 0 ? 'Transferência (saída)' : 'Transferência (entrada)')
     : source === 'distribute' ? (amount < 0 ? 'Movido para o saldo livre' : 'Do saldo livre') : amount < 0 ? 'Resgate' : 'Depósito'
-  return note ? `${base} — ${note}` : base
+  return note ? `${base}: ${note}` : base
 }
 
 function InvestModals({
@@ -855,7 +855,7 @@ function InvestModals({
   if (modal.type === 'checkpoint') {
     const h = modal.holding
     return (
-      <Modal open onClose={onClose} title={`Checkpoint — ${vehicleName(summaries, h)}`}>
+      <Modal open onClose={onClose} title={`Checkpoint: ${vehicleName(summaries, h)}`}>
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted">Regista quanto vale agora (valor real da conta/ativo). Atual estimado: {fmtEUR(h.value)}.</p>
           <div className="grid grid-cols-2 gap-3">
@@ -882,7 +882,7 @@ function InvestModals({
     const h = modal.holding
     const buckets = data.savingsBuckets.filter((b) => !b.archived).sort((a, b) => a.order - b.order)
     return (
-      <Modal open onClose={onClose} title={`Movimento direto — ${vehicleName(summaries, h)}`}>
+      <Modal open onClose={onClose} title={`Movimento direto: ${vehicleName(summaries, h)}`}>
         <div className="flex flex-col gap-3">
           <p className="text-xs text-muted">
             Dinheiro que entra ou sai sem vir de um balde (ex.: depósito direto da conta à ordem na corretora, ou resgate para fora).
@@ -902,7 +902,7 @@ function InvestModals({
             <div>
               <label className="mb-1 block text-xs text-muted">Para onde vai o dinheiro?</label>
               <Select value={pick} onChange={(e) => setPick(e.target.value)} className="w-full">
-                <option value="">— escolher —</option>
+                <option value="">Escolher</option>
                 {h.asset && <option value="__free">Saldo livre (fica no veículo)</option>}
                 {buckets.map((b) => <option key={b.id} value={b.id}>Balde: {b.name}</option>)}
                 <option value="__account">Conta à ordem (sem balde)</option>
@@ -953,14 +953,14 @@ function InvestModals({
     const s = modal.summary
     const targets = s.holdings.filter((h) => h.asset && !h.asset.archived)
     return (
-      <Modal open onClose={onClose} title={`Distribuir — ${s.vehicle.name}`}>
+      <Modal open onClose={onClose} title={`Distribuir: ${s.vehicle.name}`}>
         <div className="flex flex-col gap-3">
-          <p className="text-xs text-muted">Saldo livre: <strong className="text-text">{fmtEUR(s.undistributed)}</strong>. Escolhe quanto vai para cada ativo — o total do veículo não muda.</p>
+          <p className="text-xs text-muted">Saldo livre: <strong className="text-text">{fmtEUR(s.undistributed)}</strong>. Escolhe quanto vai para cada ativo. O total do veículo não muda.</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted">Ativo</label>
               <Select value={pick} onChange={(e) => setPick(e.target.value)} className="w-full">
-                <option value="">— escolher —</option>
+                <option value="">Escolher</option>
                 {targets.map((h) => <option key={h.key} value={h.key}>{h.name}</option>)}
               </Select>
             </div>
@@ -986,7 +986,7 @@ function InvestModals({
   // asset
   const vehicle = data.investmentVehicles.find((v) => v.id === modal.vehicleId)
   return (
-    <Modal open onClose={onClose} title={`Novo ativo — ${vehicle?.name ?? ''}`}>
+    <Modal open onClose={onClose} title={`Novo ativo: ${vehicle?.name ?? ''}`}>
       <div className="flex flex-col gap-3">
         <p className="text-xs text-muted">Ex.: um ETF ou ação dentro da Degiro/XTB, ou a conta poupança e os certificados dentro da Amélia.</p>
         <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome (ex.: IWDA, Conta poupança)" />

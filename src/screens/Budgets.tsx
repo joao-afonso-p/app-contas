@@ -255,7 +255,7 @@ export function Budgets() {
         <Card className="flex flex-wrap items-center gap-2 border-warn/40 bg-warn-soft/40">
           <Link size={16} strokeWidth={1.75} className="shrink-0 text-warn" aria-hidden="true" />
           <span className="flex-1 text-sm text-text">
-            {`${orphanExpenses.length} ${orphanExpenses.length === 1 ? 'despesa apagada ainda tem' : 'despesas apagadas ainda têm'} valor planeado em meses passados (${fmtEUR(orphanExpenses.reduce((s, o) => s + o.total, 0))}). Esse valor não entra nas comparações por categoria — junta-o a uma despesa ativa.`}
+            {`${orphanExpenses.length} ${orphanExpenses.length === 1 ? 'despesa apagada ainda tem' : 'despesas apagadas ainda têm'} valor planeado em meses passados (${fmtEUR(orphanExpenses.reduce((s, o) => s + o.total, 0))}). Esse valor não entra nas comparações por categoria. Junta-o a uma despesa ativa.`}
           </span>
           <Button size="sm" variant="soft" onClick={() => setScreen('definicoes')}>Corrigir</Button>
         </Card>
@@ -264,7 +264,7 @@ export function Budgets() {
       {!report.hasPlan && (report.spentInPlan > 0 || !noPlanData) && (
         <Card className="flex flex-wrap items-center gap-2">
           <span className="flex-1 text-sm text-muted">
-            Não há despesas planeadas para este mês — sem plano não há com o que comparar. Define-as em Planeamento.
+            Não há despesas planeadas para este mês. Sem plano não há com o que comparar. Define-as em Planeamento.
           </span>
           <Button size="sm" variant="soft" onClick={() => setScreen('planeamento')}>Ir para Planeamento</Button>
         </Card>
@@ -368,7 +368,7 @@ export function Budgets() {
             </ul>
           </Card>
           <p className="mt-2 text-xs text-muted">
-            Estes gastos não contam contra o orçamento do mês — são pagos pela poupança ou ainda não têm categoria.
+            Estes gastos não contam contra o orçamento do mês: são pagos pela poupança ou ainda não têm categoria.
           </p>
         </section>
       )}
@@ -546,7 +546,7 @@ function TxList({ txs }: { txs: Transaction[] }) {
         <li key={t.id} className="flex items-center justify-between gap-3 text-xs">
           <span className="min-w-0 truncate text-muted">
             <span className="tnum mr-2">{fmtDate(t.date)}</span>
-            <span className="text-text">{t.nome || t.description || '—'}</span>
+            <span className="text-text">{t.nome || t.description || '–'}</span>
           </span>
           <span className="tnum shrink-0 font-medium">{fmtEUR(t.amount)}</span>
         </li>
