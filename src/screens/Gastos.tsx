@@ -18,6 +18,7 @@ import {
 } from '../lib/format'
 import { useSessionState } from '../lib/sessionState'
 import { makeDuplicateDetector } from '../lib/calc/dedupe'
+import { findMovementMatches } from '../lib/calc/matchMovements'
 import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
 import { Link, Pencil, Trash, TriangleAlert } from 'lucide-react'
@@ -31,6 +32,12 @@ interface PreviewRow {
   optionKey: string // `${groupId}|${subcategoryId}` ('' = sem categoria)
   suggested: string
   duplicate: boolean
+  // Movimento de poupança que o utilizador confirmou ser este gasto (nunca é automático).
+  movementId?: string
+  // Valores anteriores à ligação, para "Desligar" repor.
+  beforeLink?: { nome: string; optionKey: string }
+  // "Não é este": deixa de sugerir movimentos para esta linha.
+  matchDismissed?: boolean
 }
 
 const keyOf = (groupId?: string, subId?: string) => (groupId ? `${groupId}|${subId ?? ''}` : '')
@@ -46,6 +53,7 @@ export function Gastos() {
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
   const addTransactions = useStore((s) => s.addTransactions)
+  const addTransactionsLinked = useStore((s) => s.addTransactionsLinked)
   const saveTransaction = useStore((s) => s.saveTransaction)
   const setTransactionCategory = useStore((s) => s.setTransactionCategory)
   const deleteTransaction = useStore((s) => s.deleteTransaction)
@@ -321,24 +329,54 @@ export function Gastos() {
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   }
 
+  // ---------- Ligar linhas do extrato a movimentos de poupança já registados ----------
+  // Só sugere (mesmo valor, ±MATCH_WINDOW_DAYS dias). Ligar é sempre escolha do utilizador.
+  const linkedMovementIds = new Set(rows.map((r) => r.movementId).filter((id): id is string => Boolean(id)))
+  const movementById = (id: string) => data.savingsMovements.find((m) => m.id === id)
+
+  const linkRow = (index: number, movementId: string) => {
+    const m = movementById(movementId)
+    const r = rows[index]
+    if (!m || !r) return
+    const { groupId: g, subId } = splitKey(r.optionKey)
+    updateRow(index, {
+      movementId,
+      beforeLink: { nome: r.nome, optionKey: r.optionKey },
+      // Gasto pago pela poupança: categoria = o balde do movimento (a subcategoria
+      // só se mantém se já era desse balde). O título do movimento passa a nome.
+      nome: m.description,
+      optionKey: keyOf(m.bucketId, g === m.bucketId ? subId : undefined),
+    })
+  }
+  const unlinkRow = (index: number) => {
+    const r = rows[index]
+    if (!r?.beforeLink) return
+    updateRow(index, { movementId: undefined, nome: r.beforeLink.nome, optionKey: r.beforeLink.optionKey, beforeLink: undefined })
+  }
+
   const doImport = () => {
     const included = rows.filter((r) => r.included)
     if (included.length === 0) return
-    void addTransactions(included.map((r) => {
+    void addTransactionsLinked(included.map((r) => {
       const { groupId: g, subId: sub } = splitKey(r.optionKey)
       return {
-        date: r.date,
-        categoryId: '',
-        amount: r.amount,
-        nome: r.nome || undefined,
-        description: r.description,
-        ...txCategoryFields(data, g, sub),
+        tx: {
+          date: r.date,
+          categoryId: '',
+          amount: r.amount,
+          nome: r.nome || undefined,
+          description: r.description,
+          ...txCategoryFields(data, g, sub),
+        },
+        movementId: r.movementId,
       }
     }))
 
     // Aprendizagem: cria regras para linhas cuja categoria escolhida difere da sugestão.
+    // Linhas ligadas a um movimento ficam de fora (a categoria veio do balde, não do texto).
     const existingKeywords = new Set(data.categoryRules.map((rule) => normalizeDesc(rule.keyword)))
     for (const r of included) {
+      if (r.movementId) continue
       if (r.optionKey && r.optionKey !== r.suggested) {
         const words = normalizeDesc(r.description).split(' ').filter((w) => w.length > 2)
         const keyword = words.slice(0, 2).join(' ')
@@ -361,6 +399,15 @@ export function Gastos() {
   const moveBuckets = data.savingsBuckets.filter((b) => !b.archived).sort((a, b) => a.order - b.order)
   const movementOf = (t: Transaction) => data.savingsMovements.find((m) => m.transactionId === t.id)
   const bucketNameOf = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
+  // Movimentos criados a partir do gasto saem com ele; os que já existiam e foram
+  // ligados na importação do extrato mantêm-se (só se desligam).
+  const deleteMessage = (transactionId: string) => {
+    const linked = data.savingsMovements.filter((m) => m.transactionId === transactionId)
+    if (linked.length === 0) return 'Apagar este gasto?'
+    return linked.every((m) => m.linkedAfter)
+      ? 'Apagar este gasto? O movimento de poupança ligado mantém-se.'
+      : 'Apagar este gasto? A saída correspondente na poupança também é removida.'
+  }
   const openMove = (t: Transaction) => {
     setMoveFor(t)
     setMoveStep(1)
@@ -563,9 +610,7 @@ export function Gastos() {
                   </button>
                   <button
                     onClick={() => {
-                      const linked = data.savingsMovements.some((m) => m.transactionId === t.id)
-                      const msg = linked ? 'Apagar este gasto? A saída correspondente na poupança também é removida.' : 'Apagar este gasto?'
-                      if (window.confirm(msg)) void deleteTransaction(t.id)
+                      if (window.confirm(deleteMessage(t.id))) void deleteTransaction(t.id)
                     }}
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-negative"
                     aria-label="Apagar gasto"
@@ -687,9 +732,7 @@ export function Gastos() {
                 variant="danger"
                 className="mr-auto"
                 onClick={() => {
-                  const linked = data.savingsMovements.some((m) => m.transactionId === editingId)
-                  const msg = linked ? 'Apagar este gasto? A saída correspondente na poupança também é removida.' : 'Apagar este gasto?'
-                  if (window.confirm(msg)) { void deleteTransaction(editingId); setAddOpen(false) }
+                  if (window.confirm(deleteMessage(editingId))) { void deleteTransaction(editingId); setAddOpen(false) }
                 }}
               >
                 Apagar
@@ -939,8 +982,14 @@ export function Gastos() {
         ) : (
           <div className="flex flex-col gap-3">
             <div className="flex max-h-[50dvh] flex-col divide-y divide-border overflow-y-auto rounded-xl border border-border">
-              {rows.map((r, i) => (
-                <div key={`${r.date}-${i}`} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+              {rows.map((r, i) => {
+                const linked = r.movementId ? movementById(r.movementId) : undefined
+                const matches = r.included && !r.movementId && !r.matchDismissed
+                  ? findMovementMatches(r, data.savingsMovements, linkedMovementIds).slice(0, 3)
+                  : []
+                return (
+                <div key={`${r.date}-${i}`} className="flex flex-col gap-2 p-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <input
                       type="checkbox"
@@ -971,7 +1020,37 @@ export function Gastos() {
                     ))}
                   </Select>
                 </div>
-              ))}
+                {linked && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-accent-soft px-3 py-2 text-xs">
+                    <span className="min-w-0 text-text">
+                      <Link size={13} strokeWidth={1.75} className="mr-1 inline align-text-bottom text-accent-strong" aria-hidden="true" />
+                      {`Ligado ao movimento «${linked.description}» (${bucketNameOf(linked.bucketId)}, ${fmtDate(linked.date)})`}
+                    </span>
+                    <Button variant="ghost" size="sm" onClick={() => unlinkRow(i)}>Desligar</Button>
+                  </div>
+                )}
+                {matches.length > 0 && (
+                  <div className="flex flex-col gap-1.5 rounded-xl bg-surface-2 px-3 py-2 text-xs">
+                    <div className="font-semibold text-text">
+                      {matches.length === 1 ? 'Possível movimento de poupança com o mesmo valor:' : 'Possíveis movimentos de poupança com o mesmo valor:'}
+                    </div>
+                    {matches.map(({ movement: m, daysApart }) => (
+                      <div key={m.id} className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="min-w-0 text-muted">
+                          <span className="font-medium text-text">{m.description}</span>
+                          {` · ${bucketNameOf(m.bucketId)} · ${fmtDate(m.date)}${daysApart === 0 ? '' : ` (${daysApart} ${daysApart === 1 ? 'dia' : 'dias'} de diferença)`}`}
+                        </span>
+                        <Button size="sm" variant="soft" onClick={() => linkRow(i, m.id)}>É este</Button>
+                      </div>
+                    ))}
+                    <div>
+                      <Button size="sm" variant="ghost" onClick={() => updateRow(i, { matchDismissed: true })}>Não é nenhum destes</Button>
+                    </div>
+                  </div>
+                )}
+                </div>
+                )
+              })}
             </div>
             {includedSemCategoria > 0 && (
               <p className="text-xs text-muted">
