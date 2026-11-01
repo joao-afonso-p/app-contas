@@ -363,7 +363,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A Marta quer ir a Itália em julho e cria o objetivo "Itália, 1 800 € até julho". Acrescenta também o seguro anual do carro, 480 € em março, com "+ Movimento". A projeção mostra que o balde Carro desce em março mas continua positivo, por isso ela não precisa de mexer na entrada mensal.',
+            text: 'A Marta quer ir a Itália em julho de 2027 e já tem o balde Férias, um objetivo de 1 800 €. Em Projeções vê que, ao ritmo de 150 € por mês, atinge os 1 800 € em janeiro, bem antes de julho. Acrescenta também o seguro anual do carro, 480 € em março, com "+ Movimento". A projeção mostra que o balde Carro desce em março mas continua positivo, por isso ela não precisa de mexer na entrada mensal.',
           },
         ],
       },
