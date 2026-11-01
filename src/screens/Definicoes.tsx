@@ -20,6 +20,7 @@ import { allocationBlock, firstPlanMonth, isAutoBucketMovement, monthStartConfig
 import { clearOpenAiKey, getOpenAiKey, setOpenAiKey } from '../lib/apiKey'
 import type { BucketKind, CollectionName, MonthKey, SavingsBucket, TransactionCategory } from '../types'
 import { X } from 'lucide-react'
+import { FirstStepsSection } from '../components/FirstSteps'
 
 type EditableList = {
   title: string
@@ -193,6 +194,8 @@ export function Definicoes() {
       <LegacyCategoriesSection />
 
       <OpenAiSection />
+
+      <FirstStepsSection />
 
       <section>
         <SectionTitle>Sobre</SectionTitle>
