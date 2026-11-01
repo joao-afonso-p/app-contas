@@ -234,6 +234,18 @@ export const GUIDE: GuideSection[] = [
             t: 'example',
             text: 'A Marta pagou 180 € ao dentista com dinheiro da poupança. Põe como categoria o balde Geral, usa "Criar movimento de poupança" e o saldo do balde Geral desce 180 €. O orçamento de Saúde não é afetado.',
           },
+          {
+            t: 'p',
+            text: 'Se fizeres o contrário (tiras o dinheiro da poupança primeiro e só importas o extrato dias depois), a app ajuda. Ao importar, procura um movimento de poupança com **exatamente o mesmo valor** até 7 dias antes ou depois. Se encontrar, mostra-o na linha e tu escolhes "É este" ou "Não é nenhum destes". **A app nunca liga nada sozinha.**',
+          },
+          {
+            t: 'p',
+            text: 'Ao confirmar, o gasto fica ligado a esse movimento: usa o balde como categoria, herda o título que deste ao movimento e já não precisas de "Criar movimento de poupança". Se apagares o gasto, o movimento mantém-se.',
+          },
+          {
+            t: 'example',
+            text: 'A Marta tirou 42,80 € do balde Geral para uma prenda de Natal e registou o movimento "Prenda mãe". Uma semana depois importa o extrato e a linha "LOJA XPTO 42,80" mostra "Possível movimento: Prenda mãe". Ela confirma, e o gasto passa a chamar-se "Prenda mãe".',
+          },
         ],
       },
       {
