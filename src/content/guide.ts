@@ -150,15 +150,24 @@ export const GUIDE: GuideSection[] = [
         blocks: [
           {
             t: 'p',
-            text: 'O **Overview** responde a isso num olhar: Total poupado, Na conta do banco, Investidos e Taxa de poupança do mês. Por baixo vês cada balde e a evolução ao longo do tempo.',
+            text: 'O **Overview** responde a isso num olhar. Por baixo vês cada balde e a evolução ao longo do tempo. No topo estão quatro valores:',
+          },
+          {
+            t: 'list',
+            items: [
+              '**Total poupado**: tudo o que juntaste, ou seja, o dinheiro na conta poupança mais o que está investido.',
+              '**[[na conta do banco|Na conta do banco]]**: só a parte que deve estar na tua **conta poupança** (a soma dos baldes). Não inclui investimentos.',
+              '**Investidos**: o que está nos veículos de investimento.',
+              '**Taxa de poupança** do mês: a parte do rendimento que vai para poupança e investimento.',
+            ],
           },
           {
             t: 'p',
-            text: 'O valor "Na conta do banco" é o que a app espera ver na conta. Se for diferente do banco, o ícone de ajuda explica porquê (por exemplo, uma renda que ainda não chegou).',
+            text: 'Se "Na conta do banco" for diferente do saldo da tua conta poupança, o ícone de ajuda explica porquê (por exemplo, uma renda que ainda não chegou).',
           },
           {
             t: 'example',
-            text: 'A meio do mês, a Marta abre o Overview. Vê Total poupado 8 400 €, Na conta do banco 1 130 € e Investidos 4 120 €. Compara com o banco e o valor bate, por isso não há nada a fazer.',
+            text: 'A meio do mês, a Marta abre o Overview. Vê Total poupado 8 400 €, que é Na conta do banco 4 280 € mais Investidos 4 120 €. Abre a app do banco, vê que a conta poupança tem 4 280 € e o valor bate, por isso não há nada a fazer.',
           },
         ],
       },
@@ -238,7 +247,7 @@ export const GUIDE: GuideSection[] = [
               '**Classifica** os gastos sem categoria. O aviso no topo diz quantos faltam.',
               '**Vê a secção "Atenção"** no Overview: avisa quando uma categoria está acima do ritmo do mês ou quando há gastos por classificar.',
               '**Confirma rendas que chegaram depois do salário**: em "A transferir quando chegar", usa "Já transferi" quando passares o valor para a poupança.',
-              '**Compara o saldo** "Na conta do banco" com o banco. Se houver diferença, procura o gasto ou movimento em falta.',
+              '**Compara** o valor "Na conta do banco" com o saldo da tua conta poupança. Se houver diferença, procura o gasto ou movimento em falta.',
             ],
           },
           {
@@ -428,7 +437,7 @@ export const FAQ: { q: string; a: string }[] = [
     a: 'Há duas razões possíveis. A [[alocação]] tem de estar em 100%, sem diferença. E só podes aplicar o plano a partir de 3 dias antes de o mês financeiro começar, e depois de aplicares os meses anteriores.',
   },
   {
-    q: 'O saldo "Na conta do banco" não bate com o banco.',
+    q: 'O valor "Na conta do banco" não bate com o saldo da minha conta poupança.',
     a: 'Procura um gasto por importar, um movimento por registar ou um rendimento que ainda não chegou (o ícone de ajuda no cartão lista o que está pendente). Se for um erro antigo, podes forçar o saldo de um balde no Overview.',
   },
   {
@@ -495,6 +504,11 @@ export const GLOSSARY: { id: string; term: string; def: string }[] = [
     id: 'mês financeiro',
     term: 'Mês financeiro',
     def: 'O período que a app trata como "um mês". Por defeito é o mês do calendário, mas pode começar noutro dia (por exemplo no dia em que recebes o salário).',
+  },
+  {
+    id: 'na conta do banco',
+    term: 'Na conta do banco',
+    def: 'No Overview, a soma dos baldes de poupança: o valor que deve estar na tua conta poupança do banco, sem contar com os investimentos.',
   },
   {
     id: 'objetivo',
