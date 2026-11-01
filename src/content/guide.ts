@@ -163,7 +163,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A meio do mês, a Marta abre o Overview. Vê Total poupado 8 400 €, que é Na conta do banco 4 280 € mais Investidos 4 120 €. Abre a app do banco, vê que a conta poupança tem 4 280 € e o valor bate, por isso não há nada a fazer.',
+            text: 'A meio do mês, a Marta abre o Overview. Vê Total poupado 13 580 €, que é Na conta do banco 9 460 € mais Investidos 4 120 €. Abre a app do banco, vê que a conta poupança tem 9 460 € e o valor bate, por isso não há nada a fazer.',
           },
         ],
       },
@@ -363,7 +363,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A Marta quer ir a Itália em julho e cria o objetivo "Itália, 1 800 € até julho". Acrescenta também o seguro anual do carro, 480 € em março, com "+ Movimento". A projeção mostra que o balde Carro fica negativo em março, por isso ela aumenta a entrada mensal nesse balde.',
+            text: 'A Marta quer ir a Itália em julho e cria o objetivo "Itália, 1 800 € até julho". Acrescenta também o seguro anual do carro, 480 € em março, com "+ Movimento". A projeção mostra que o balde Carro desce em março mas continua positivo, por isso ela não precisa de mexer na entrada mensal.',
           },
         ],
       },
@@ -385,7 +385,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'O PPR da Marta é um veículo. No último dia de cada mês, ela abre a app do banco, vê que o PPR vale 4 120 € e regista um checkpoint com esse valor. A Contas calcula o ganho desde o início e a taxa anual.',
+            text: 'O PPR da Marta é um veículo. No último dia de cada mês, ela abre a app do banco, vê que o PPR vale 4 205 € e regista um checkpoint com esse valor. A Contas calcula o ganho desde o início e a taxa anual.',
           },
         ],
       },

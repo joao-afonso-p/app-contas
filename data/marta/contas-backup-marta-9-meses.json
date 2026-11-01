@@ -1,0 +1,2898 @@
+{
+  "app": "contas",
+  "version": 1,
+  "exportedAt": "2026-11-01T09:00:00.000Z",
+  "data": {
+    "incomeSources": [
+      {
+        "id": "inc-salario",
+        "name": "Salário",
+        "isRent": false,
+        "archived": false,
+        "order": 0
+      },
+      {
+        "id": "inc-renda",
+        "name": "Renda do quarto",
+        "isRent": true,
+        "expectedDay": 8,
+        "archived": false,
+        "order": 1
+      }
+    ],
+    "expenseCategories": [
+      {
+        "id": "exp-casa",
+        "name": "Casa",
+        "archived": false,
+        "order": 0,
+        "fixed": true
+      },
+      {
+        "id": "exp-supermercado",
+        "name": "Supermercado",
+        "archived": false,
+        "order": 1
+      },
+      {
+        "id": "exp-lazer",
+        "name": "Lazer",
+        "archived": false,
+        "order": 2
+      },
+      {
+        "id": "exp-transportes",
+        "name": "Transportes",
+        "archived": false,
+        "order": 3
+      },
+      {
+        "id": "exp-seguros",
+        "name": "Seguros",
+        "archived": false,
+        "order": 4,
+        "fixed": true
+      },
+      {
+        "id": "exp-saude",
+        "name": "Saúde",
+        "archived": false,
+        "order": 5
+      }
+    ],
+    "savingsBuckets": [
+      {
+        "id": "bkt-emergencia",
+        "name": "Fundo de emergência",
+        "kind": "fixed",
+        "archived": false,
+        "order": 0
+      },
+      {
+        "id": "bkt-ferias",
+        "name": "Férias",
+        "kind": "goal",
+        "archived": false,
+        "order": 1,
+        "targetAmount": 1800,
+        "targetDate": "2027-07",
+        "status": "active"
+      },
+      {
+        "id": "bkt-carro",
+        "name": "Carro",
+        "kind": "fixed",
+        "archived": false,
+        "order": 2
+      },
+      {
+        "id": "bkt-geral",
+        "name": "Geral",
+        "kind": "fixed",
+        "archived": false,
+        "order": 3
+      }
+    ],
+    "monthlyPlans": [
+      {
+        "id": "2026-02",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-03",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-04",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-05",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-06",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-07",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-08",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-09",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-10",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 280,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 150
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": true,
+        "lateTransferred": {
+          "inc-renda": true
+        }
+      },
+      {
+        "id": "2026-11",
+        "income": {
+          "inc-salario": 1800,
+          "inc-renda": 300
+        },
+        "expenses": {
+          "exp-casa": 650,
+          "exp-supermercado": 310,
+          "exp-lazer": 120,
+          "exp-transportes": 90,
+          "exp-seguros": 60,
+          "exp-saude": 40
+        },
+        "savings": {
+          "bkt-emergencia": 300,
+          "bkt-ferias": 150,
+          "bkt-carro": 160,
+          "bkt-geral": 120
+        },
+        "autoInvestments": {
+          "veh-ppr": 100
+        },
+        "closed": false
+      }
+    ],
+    "savingsMovements": [
+      {
+        "id": "mv-tx-0184",
+        "date": "2026-03-12",
+        "bucketId": "bkt-carro",
+        "amount": -380.0,
+        "description": "Pneus",
+        "transactionId": "tx-0184",
+        "createdAt": "2026-03-12T20:05:00.000Z"
+      },
+      {
+        "id": "mv-tx-0185",
+        "date": "2026-06-21",
+        "bucketId": "bkt-ferias",
+        "amount": -220.0,
+        "description": "Escapadinha no Douro",
+        "transactionId": "tx-0185",
+        "createdAt": "2026-06-21T20:05:00.000Z"
+      },
+      {
+        "id": "mv-tx-0186",
+        "date": "2026-09-17",
+        "bucketId": "bkt-geral",
+        "amount": -180.0,
+        "description": "Dentista",
+        "transactionId": "tx-0186",
+        "createdAt": "2026-09-17T20:05:00.000Z"
+      },
+      {
+        "id": "mv-init-emergencia",
+        "date": "2026-01-01",
+        "bucketId": "bkt-emergencia",
+        "amount": 2400,
+        "description": "Saldo inicial",
+        "createdAt": "2026-01-01T09:00:00.000Z"
+      },
+      {
+        "id": "mv-init-ferias",
+        "date": "2026-01-01",
+        "bucketId": "bkt-ferias",
+        "amount": 300,
+        "description": "Saldo inicial",
+        "createdAt": "2026-01-01T09:00:00.000Z"
+      },
+      {
+        "id": "mv-init-carro",
+        "date": "2026-01-01",
+        "bucketId": "bkt-carro",
+        "amount": 500,
+        "description": "Saldo inicial",
+        "createdAt": "2026-01-01T09:00:00.000Z"
+      },
+      {
+        "id": "mv-init-geral",
+        "date": "2026-01-01",
+        "bucketId": "bkt-geral",
+        "amount": 200,
+        "description": "Saldo inicial",
+        "createdAt": "2026-01-01T09:00:00.000Z"
+      },
+      {
+        "id": "mv-tr-out",
+        "date": "2026-09-24",
+        "bucketId": "bkt-carro",
+        "amount": -100,
+        "description": "Transferência: Carro → Fundo de emergência",
+        "transferGroupId": "tg-1",
+        "createdAt": "2026-09-24T19:00:00.000Z"
+      },
+      {
+        "id": "mv-tr-in",
+        "date": "2026-09-24",
+        "bucketId": "bkt-emergencia",
+        "amount": 100,
+        "description": "Transferência: Carro → Fundo de emergência",
+        "transferGroupId": "tg-1",
+        "createdAt": "2026-09-24T19:00:00.000Z"
+      }
+    ],
+    "transactions": [
+      {
+        "id": "tx-0001",
+        "date": "2026-02-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-02-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0002",
+        "date": "2026-02-05",
+        "categoryId": "",
+        "amount": 72.1,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-02-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0003",
+        "date": "2026-02-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-02-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0004",
+        "date": "2026-02-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-02-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0005",
+        "date": "2026-02-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-02-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0006",
+        "date": "2026-02-04",
+        "categoryId": "",
+        "amount": 73.17,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-02-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0007",
+        "date": "2026-02-11",
+        "categoryId": "",
+        "amount": 109.21,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-02-11T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0008",
+        "date": "2026-02-17",
+        "categoryId": "",
+        "amount": 14.57,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-02-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0009",
+        "date": "2026-02-21",
+        "categoryId": "",
+        "amount": 6.7,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-02-21T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0010",
+        "date": "2026-02-28",
+        "categoryId": "",
+        "amount": 58.75,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-02-28T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0011",
+        "date": "2026-02-04",
+        "categoryId": "",
+        "amount": 16.07,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-02-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0012",
+        "date": "2026-02-10",
+        "categoryId": "",
+        "amount": 57.61,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-02-10T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0013",
+        "date": "2026-02-27",
+        "categoryId": "",
+        "amount": 30.82,
+        "description": "COMPRA UBER EATS",
+        "nome": "Uber Eats",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-02-27T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0014",
+        "date": "2026-02-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-02-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0015",
+        "date": "2026-02-09",
+        "categoryId": "",
+        "amount": 17.23,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-02-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0016",
+        "date": "2026-02-23",
+        "categoryId": "",
+        "amount": 33.97,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-02-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0017",
+        "date": "2026-02-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-02-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0018",
+        "date": "2026-02-13",
+        "categoryId": "",
+        "amount": 28.5,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-02-13T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0019",
+        "date": "2026-03-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-03-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0020",
+        "date": "2026-03-05",
+        "categoryId": "",
+        "amount": 65.4,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-03-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0021",
+        "date": "2026-03-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-03-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0022",
+        "date": "2026-03-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-03-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0023",
+        "date": "2026-03-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-03-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0024",
+        "date": "2026-03-12",
+        "categoryId": "",
+        "amount": 25.01,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-12T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0025",
+        "date": "2026-03-13",
+        "categoryId": "",
+        "amount": 4.38,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-13T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0026",
+        "date": "2026-03-17",
+        "categoryId": "",
+        "amount": 82.16,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0027",
+        "date": "2026-03-24",
+        "categoryId": "",
+        "amount": 97.42,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-24T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0028",
+        "date": "2026-03-26",
+        "categoryId": "",
+        "amount": 27.98,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-26T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0029",
+        "date": "2026-03-28",
+        "categoryId": "",
+        "amount": 38.15,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-03-28T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0030",
+        "date": "2026-03-03",
+        "categoryId": "",
+        "amount": 65.34,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-03-03T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0031",
+        "date": "2026-03-12",
+        "categoryId": "",
+        "amount": 25.51,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-03-12T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0032",
+        "date": "2026-03-14",
+        "categoryId": "",
+        "amount": 5.12,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-03-14T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0033",
+        "date": "2026-03-15",
+        "categoryId": "",
+        "amount": 2.03,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-03-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0034",
+        "date": "2026-03-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-03-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0035",
+        "date": "2026-03-09",
+        "categoryId": "",
+        "amount": 40.23,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-03-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0036",
+        "date": "2026-03-23",
+        "categoryId": "",
+        "amount": 8.17,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-03-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0037",
+        "date": "2026-03-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-03-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0038",
+        "date": "2026-03-13",
+        "categoryId": "",
+        "amount": 21.19,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-03-13T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0039",
+        "date": "2026-03-17",
+        "categoryId": "",
+        "amount": 20.01,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-03-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0040",
+        "date": "2026-04-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-04-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0041",
+        "date": "2026-04-05",
+        "categoryId": "",
+        "amount": 60.2,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-04-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0042",
+        "date": "2026-04-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-04-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0043",
+        "date": "2026-04-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-04-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0044",
+        "date": "2026-04-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-04-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0045",
+        "date": "2026-04-01",
+        "categoryId": "",
+        "amount": 16.02,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-01T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0046",
+        "date": "2026-04-08",
+        "categoryId": "",
+        "amount": 26.26,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-08T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0047",
+        "date": "2026-04-16",
+        "categoryId": "",
+        "amount": 129.17,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0048",
+        "date": "2026-04-17",
+        "categoryId": "",
+        "amount": 59.46,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0049",
+        "date": "2026-04-19",
+        "categoryId": "",
+        "amount": 20.04,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-19T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0050",
+        "date": "2026-04-26",
+        "categoryId": "",
+        "amount": 17.14,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-26T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0051",
+        "date": "2026-04-28",
+        "categoryId": "",
+        "amount": 0.26,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-04-28T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0052",
+        "date": "2026-04-16",
+        "categoryId": "",
+        "amount": 41.13,
+        "description": "COMPRA UBER EATS",
+        "nome": "Uber Eats",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-04-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0053",
+        "date": "2026-04-18",
+        "categoryId": "",
+        "amount": 24.75,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-04-18T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0054",
+        "date": "2026-04-22",
+        "categoryId": "",
+        "amount": 25.84,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-04-22T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0055",
+        "date": "2026-04-23",
+        "categoryId": "",
+        "amount": 34.58,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-04-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0056",
+        "date": "2026-04-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-04-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0057",
+        "date": "2026-04-09",
+        "categoryId": "",
+        "amount": 32.93,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-04-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0058",
+        "date": "2026-04-23",
+        "categoryId": "",
+        "amount": 21.67,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-04-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0059",
+        "date": "2026-04-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-04-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0060",
+        "date": "2026-04-14",
+        "categoryId": "",
+        "amount": 22.0,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-04-14T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0061",
+        "date": "2026-05-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-05-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0062",
+        "date": "2026-05-05",
+        "categoryId": "",
+        "amount": 55.8,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-05-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0063",
+        "date": "2026-05-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-05-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0064",
+        "date": "2026-05-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-05-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0065",
+        "date": "2026-05-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-05-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0066",
+        "date": "2026-05-01",
+        "categoryId": "",
+        "amount": 150.16,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-01T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0067",
+        "date": "2026-05-02",
+        "categoryId": "",
+        "amount": 21.19,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0068",
+        "date": "2026-05-05",
+        "categoryId": "",
+        "amount": 24.37,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-05T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0069",
+        "date": "2026-05-09",
+        "categoryId": "",
+        "amount": 19.13,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0070",
+        "date": "2026-05-10",
+        "categoryId": "",
+        "amount": 48.46,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-10T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0071",
+        "date": "2026-05-27",
+        "categoryId": "",
+        "amount": 20.89,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-05-27T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0072",
+        "date": "2026-05-14",
+        "categoryId": "",
+        "amount": 5.51,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-05-14T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0073",
+        "date": "2026-05-18",
+        "categoryId": "",
+        "amount": 42.02,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-05-18T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0074",
+        "date": "2026-05-22",
+        "categoryId": "",
+        "amount": 4.36,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-05-22T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0075",
+        "date": "2026-05-26",
+        "categoryId": "",
+        "amount": 59.91,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-05-26T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0076",
+        "date": "2026-05-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-05-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0077",
+        "date": "2026-05-09",
+        "categoryId": "",
+        "amount": 21.21,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-05-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0078",
+        "date": "2026-05-23",
+        "categoryId": "",
+        "amount": 24.79,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-05-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0079",
+        "date": "2026-05-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-05-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0080",
+        "date": "2026-05-06",
+        "categoryId": "",
+        "amount": 17.44,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-05-06T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0081",
+        "date": "2026-05-15",
+        "categoryId": "",
+        "amount": 18.16,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-05-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0082",
+        "date": "2026-06-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-06-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0083",
+        "date": "2026-06-05",
+        "categoryId": "",
+        "amount": 52.3,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-06-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0084",
+        "date": "2026-06-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-06-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0085",
+        "date": "2026-06-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-06-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0086",
+        "date": "2026-06-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-06-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0087",
+        "date": "2026-06-03",
+        "categoryId": "",
+        "amount": 4.6,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-03T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0088",
+        "date": "2026-06-04",
+        "categoryId": "",
+        "amount": 25.61,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0089",
+        "date": "2026-06-07",
+        "categoryId": "",
+        "amount": 17.75,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-07T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0090",
+        "date": "2026-06-09",
+        "categoryId": "",
+        "amount": 86.82,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0091",
+        "date": "2026-06-12",
+        "categoryId": "",
+        "amount": 12.48,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-12T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0092",
+        "date": "2026-06-16",
+        "categoryId": "",
+        "amount": 97.7,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0093",
+        "date": "2026-06-21",
+        "categoryId": "",
+        "amount": 34.04,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-06-21T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0094",
+        "date": "2026-06-12",
+        "categoryId": "",
+        "amount": 0.85,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-06-12T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0095",
+        "date": "2026-06-21",
+        "categoryId": "",
+        "amount": 24.51,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-06-21T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0096",
+        "date": "2026-06-22",
+        "categoryId": "",
+        "amount": 26.0,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-06-22T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0097",
+        "date": "2026-06-25",
+        "categoryId": "",
+        "amount": 82.84,
+        "description": "COMPRA UCI CINEMAS NORTESHOPPING",
+        "nome": "Cinema",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-06-25T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0098",
+        "date": "2026-06-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-06-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0099",
+        "date": "2026-06-09",
+        "categoryId": "",
+        "amount": 44.72,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-06-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0100",
+        "date": "2026-06-23",
+        "categoryId": "",
+        "amount": 7.58,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-06-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0101",
+        "date": "2026-06-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-06-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0102",
+        "date": "2026-06-08",
+        "categoryId": "",
+        "amount": 10.75,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-06-08T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0103",
+        "date": "2026-06-16",
+        "categoryId": "",
+        "amount": 36.55,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-06-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0104",
+        "date": "2026-07-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-07-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0105",
+        "date": "2026-07-05",
+        "categoryId": "",
+        "amount": 58.9,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-07-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0106",
+        "date": "2026-07-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-07-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0107",
+        "date": "2026-07-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-07-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0108",
+        "date": "2026-07-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-07-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0109",
+        "date": "2026-07-03",
+        "categoryId": "",
+        "amount": 100.28,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-03T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0110",
+        "date": "2026-07-05",
+        "categoryId": "",
+        "amount": 27.65,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-05T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0111",
+        "date": "2026-07-06",
+        "categoryId": "",
+        "amount": 7.09,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-06T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0112",
+        "date": "2026-07-14",
+        "categoryId": "",
+        "amount": 31.35,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-14T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0113",
+        "date": "2026-07-19",
+        "categoryId": "",
+        "amount": 98.4,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-19T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0114",
+        "date": "2026-07-22",
+        "categoryId": "",
+        "amount": 11.73,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-07-22T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0115",
+        "date": "2026-07-02",
+        "categoryId": "",
+        "amount": 57.91,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-07-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0116",
+        "date": "2026-07-12",
+        "categoryId": "",
+        "amount": 47.98,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-07-12T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0117",
+        "date": "2026-07-27",
+        "categoryId": "",
+        "amount": 12.11,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-07-27T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0118",
+        "date": "2026-07-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-07-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0119",
+        "date": "2026-07-09",
+        "categoryId": "",
+        "amount": 39.0,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-07-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0120",
+        "date": "2026-07-23",
+        "categoryId": "",
+        "amount": 18.8,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-07-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0121",
+        "date": "2026-07-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-07-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0122",
+        "date": "2026-07-11",
+        "categoryId": "",
+        "amount": 19.9,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-07-11T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0123",
+        "date": "2026-08-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-08-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0124",
+        "date": "2026-08-05",
+        "categoryId": "",
+        "amount": 64.7,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-08-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0125",
+        "date": "2026-08-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-08-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0126",
+        "date": "2026-08-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-08-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0127",
+        "date": "2026-08-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-08-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0128",
+        "date": "2026-08-04",
+        "categoryId": "",
+        "amount": 50.43,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0129",
+        "date": "2026-08-11",
+        "categoryId": "",
+        "amount": 5.52,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-11T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0130",
+        "date": "2026-08-15",
+        "categoryId": "",
+        "amount": 137.8,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0131",
+        "date": "2026-08-16",
+        "categoryId": "",
+        "amount": 8.96,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0132",
+        "date": "2026-08-19",
+        "categoryId": "",
+        "amount": 61.06,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-19T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0133",
+        "date": "2026-08-28",
+        "categoryId": "",
+        "amount": 46.23,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-08-28T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0134",
+        "date": "2026-08-02",
+        "categoryId": "",
+        "amount": 7.42,
+        "description": "COMPRA RESTAURANTE O PEIXE",
+        "nome": "Restaurante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-08-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0135",
+        "date": "2026-08-06",
+        "categoryId": "",
+        "amount": 81.84,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-08-06T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0136",
+        "date": "2026-08-07",
+        "categoryId": "",
+        "amount": 16.95,
+        "description": "COMPRA UCI CINEMAS NORTESHOPPING",
+        "nome": "Cinema",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-08-07T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0137",
+        "date": "2026-08-21",
+        "categoryId": "",
+        "amount": 16.19,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-08-21T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0138",
+        "date": "2026-08-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-08-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0139",
+        "date": "2026-08-09",
+        "categoryId": "",
+        "amount": 1.68,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-08-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0140",
+        "date": "2026-08-23",
+        "categoryId": "",
+        "amount": 48.32,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-08-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0141",
+        "date": "2026-08-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-08-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0142",
+        "date": "2026-08-05",
+        "categoryId": "",
+        "amount": 21.71,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-08-05T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0143",
+        "date": "2026-08-21",
+        "categoryId": "",
+        "amount": 9.29,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-08-21T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0144",
+        "date": "2026-09-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-09-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0145",
+        "date": "2026-09-05",
+        "categoryId": "",
+        "amount": 70.3,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-09-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0146",
+        "date": "2026-09-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-09-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0147",
+        "date": "2026-09-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-09-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0148",
+        "date": "2026-09-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-09-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0149",
+        "date": "2026-09-05",
+        "categoryId": "",
+        "amount": 89.4,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-05T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0150",
+        "date": "2026-09-06",
+        "categoryId": "",
+        "amount": 38.39,
+        "description": "COMPRA MERCADO DO BOLHAO",
+        "nome": "Mercado do Bolhão",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-06T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0151",
+        "date": "2026-09-17",
+        "categoryId": "",
+        "amount": 7.9,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0152",
+        "date": "2026-09-22",
+        "categoryId": "",
+        "amount": 3.7,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-22T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0153",
+        "date": "2026-09-25",
+        "categoryId": "",
+        "amount": 35.27,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-25T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0154",
+        "date": "2026-09-26",
+        "categoryId": "",
+        "amount": 130.34,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-09-26T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0155",
+        "date": "2026-09-15",
+        "categoryId": "",
+        "amount": 47.14,
+        "description": "COMPRA UCI CINEMAS NORTESHOPPING",
+        "nome": "Cinema",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-09-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0156",
+        "date": "2026-09-16",
+        "categoryId": "",
+        "amount": 20.98,
+        "description": "COMPRA UBER EATS",
+        "nome": "Uber Eats",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-09-16T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0157",
+        "date": "2026-09-25",
+        "categoryId": "",
+        "amount": 8.51,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-09-25T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0158",
+        "date": "2026-09-27",
+        "categoryId": "",
+        "amount": 32.27,
+        "description": "COMPRA CAFE MAJESTIC",
+        "nome": "Café",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-09-27T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0159",
+        "date": "2026-09-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-09-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0160",
+        "date": "2026-09-09",
+        "categoryId": "",
+        "amount": 36.43,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-09-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0161",
+        "date": "2026-09-23",
+        "categoryId": "",
+        "amount": 16.97,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-09-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0162",
+        "date": "2026-09-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-09-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0163",
+        "date": "2026-09-04",
+        "categoryId": "",
+        "amount": 32.63,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-09-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0164",
+        "date": "2026-09-17",
+        "categoryId": "",
+        "amount": 6.07,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-09-17T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0165",
+        "date": "2026-10-01",
+        "categoryId": "",
+        "amount": 480.0,
+        "description": "PREST HABITACAO BPI",
+        "nome": "Prestação",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-10-01T20:00:00.000Z",
+        "subcategoryId": "sub-casa-prestacao"
+      },
+      {
+        "id": "tx-0166",
+        "date": "2026-10-05",
+        "categoryId": "",
+        "amount": 78.4,
+        "description": "EDP COMERCIAL DD",
+        "nome": "Eletricidade",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-10-05T20:00:00.000Z",
+        "subcategoryId": "sub-casa-eletricidade"
+      },
+      {
+        "id": "tx-0167",
+        "date": "2026-10-10",
+        "categoryId": "",
+        "amount": 24.0,
+        "description": "AGUAS DO PORTO DD",
+        "nome": "Água",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-10-10T20:00:00.000Z",
+        "subcategoryId": "sub-casa-agua"
+      },
+      {
+        "id": "tx-0168",
+        "date": "2026-10-12",
+        "categoryId": "",
+        "amount": 38.0,
+        "description": "MEO FIBRA DD",
+        "nome": "Internet",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-10-12T20:00:00.000Z",
+        "subcategoryId": "sub-casa-internet"
+      },
+      {
+        "id": "tx-0169",
+        "date": "2026-10-03",
+        "categoryId": "",
+        "amount": 35.0,
+        "description": "CONDOMINIO RUA DO BOLHAO",
+        "nome": "Condomínio",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-casa",
+        "createdAt": "2026-10-03T20:00:00.000Z",
+        "subcategoryId": "sub-casa-condominio"
+      },
+      {
+        "id": "tx-0170",
+        "date": "2026-10-01",
+        "categoryId": "",
+        "amount": 108.28,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-01T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0171",
+        "date": "2026-10-03",
+        "categoryId": "",
+        "amount": 25.42,
+        "description": "COMPRA PINGO DOCE PORTO",
+        "nome": "Pingo Doce",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-03T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0172",
+        "date": "2026-10-04",
+        "categoryId": "",
+        "amount": 15.11,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-04T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0173",
+        "date": "2026-10-07",
+        "categoryId": "",
+        "amount": 62.77,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-07T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0174",
+        "date": "2026-10-08",
+        "categoryId": "",
+        "amount": 76.33,
+        "description": "COMPRA LIDL PORTO",
+        "nome": "Lidl",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-08T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0175",
+        "date": "2026-10-27",
+        "categoryId": "",
+        "amount": 32.09,
+        "description": "COMPRA CONTINENTE MATOSINHOS",
+        "nome": "Continente",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-supermercado",
+        "createdAt": "2026-10-27T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0176",
+        "date": "2026-10-09",
+        "categoryId": "",
+        "amount": 91.07,
+        "description": "COMPRA UCI CINEMAS NORTESHOPPING",
+        "nome": "Cinema",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-10-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0177",
+        "date": "2026-10-20",
+        "categoryId": "",
+        "amount": 2.0,
+        "description": "COMPRA FNAC PORTO",
+        "nome": "Fnac",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-10-20T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0178",
+        "date": "2026-10-23",
+        "categoryId": "",
+        "amount": 21.93,
+        "description": "COMPRA UBER EATS",
+        "nome": "Uber Eats",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-lazer",
+        "createdAt": "2026-10-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0179",
+        "date": "2026-10-02",
+        "categoryId": "",
+        "amount": 40.0,
+        "description": "ANDANTE PASSE MENSAL",
+        "nome": "Andante",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-10-02T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0180",
+        "date": "2026-10-09",
+        "categoryId": "",
+        "amount": 46.11,
+        "description": "GALP PORTO",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-10-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0181",
+        "date": "2026-10-23",
+        "categoryId": "",
+        "amount": 3.49,
+        "description": "BP MATOSINHOS",
+        "nome": "Gasolina",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-transportes",
+        "createdAt": "2026-10-23T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0182",
+        "date": "2026-10-15",
+        "categoryId": "",
+        "amount": 60.0,
+        "description": "FIDELIDADE SEGURO AUTO",
+        "nome": "Seguro auto",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-seguros",
+        "createdAt": "2026-10-15T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0183",
+        "date": "2026-10-09",
+        "categoryId": "",
+        "amount": 26.4,
+        "description": "FARMACIA SANTA CATARINA",
+        "nome": "Farmácia",
+        "repoePoupanca": false,
+        "reposto": false,
+        "planCategoryId": "exp-saude",
+        "createdAt": "2026-10-09T20:00:00.000Z"
+      },
+      {
+        "id": "tx-0184",
+        "date": "2026-03-12",
+        "categoryId": "",
+        "amount": 380.0,
+        "description": "PNEUS ROLDAO AUTO",
+        "nome": "Pneus",
+        "repoePoupanca": true,
+        "reposto": false,
+        "planCategoryId": "bkt-carro",
+        "createdAt": "2026-03-12T20:00:00.000Z",
+        "fonteBucketId": "bkt-carro"
+      },
+      {
+        "id": "tx-0185",
+        "date": "2026-06-21",
+        "categoryId": "",
+        "amount": 220.0,
+        "description": "HOTEL QUINTA DO DOURO",
+        "nome": "Escapadinha",
+        "repoePoupanca": true,
+        "reposto": false,
+        "planCategoryId": "bkt-ferias",
+        "createdAt": "2026-06-21T20:00:00.000Z",
+        "fonteBucketId": "bkt-ferias"
+      },
+      {
+        "id": "tx-0186",
+        "date": "2026-09-17",
+        "categoryId": "",
+        "amount": 180.0,
+        "description": "CLINICA DENTARIA PORTO",
+        "nome": "Dentista",
+        "repoePoupanca": true,
+        "reposto": false,
+        "planCategoryId": "bkt-geral",
+        "createdAt": "2026-09-17T20:00:00.000Z",
+        "fonteBucketId": "bkt-geral"
+      }
+    ],
+    "transactionCategories": [],
+    "subcategories": [
+      {
+        "id": "sub-casa-prestacao",
+        "parentId": "exp-casa",
+        "name": "Prestação da casa",
+        "archived": false,
+        "order": 0
+      },
+      {
+        "id": "sub-casa-eletricidade",
+        "parentId": "exp-casa",
+        "name": "Eletricidade",
+        "archived": false,
+        "order": 1
+      },
+      {
+        "id": "sub-casa-agua",
+        "parentId": "exp-casa",
+        "name": "Água",
+        "archived": false,
+        "order": 2
+      },
+      {
+        "id": "sub-casa-internet",
+        "parentId": "exp-casa",
+        "name": "Internet",
+        "archived": false,
+        "order": 3
+      },
+      {
+        "id": "sub-casa-condominio",
+        "parentId": "exp-casa",
+        "name": "Condomínio",
+        "archived": false,
+        "order": 4
+      }
+    ],
+    "categoryRules": [
+      {
+        "id": "rule-0",
+        "keyword": "pingo doce",
+        "categoryId": "",
+        "planCategoryId": "exp-supermercado"
+      },
+      {
+        "id": "rule-1",
+        "keyword": "continente",
+        "categoryId": "",
+        "planCategoryId": "exp-supermercado"
+      },
+      {
+        "id": "rule-2",
+        "keyword": "lidl",
+        "categoryId": "",
+        "planCategoryId": "exp-supermercado"
+      },
+      {
+        "id": "rule-3",
+        "keyword": "galp",
+        "categoryId": "",
+        "planCategoryId": "exp-transportes"
+      },
+      {
+        "id": "rule-4",
+        "keyword": "farmacia",
+        "categoryId": "",
+        "planCategoryId": "exp-saude"
+      },
+      {
+        "id": "rule-5",
+        "keyword": "andante",
+        "categoryId": "",
+        "planCategoryId": "exp-transportes"
+      }
+    ],
+    "budgets": [],
+    "projectionPlans": [],
+    "balanceOverrides": [],
+    "plannedMovements": [],
+    "investmentVehicles": [
+      {
+        "id": "veh-ppr",
+        "name": "PPR",
+        "archived": false,
+        "order": 0,
+        "initialBalance": 3220,
+        "expectedRate": 3
+      }
+    ],
+    "investmentAssets": [],
+    "assetEntries": [],
+    "valueCheckpoints": [
+      {
+        "id": "cp-00",
+        "date": "2026-01-31",
+        "vehicleId": "veh-ppr",
+        "value": 3220,
+        "note": "Início"
+      },
+      {
+        "id": "cp-01",
+        "date": "2026-02-28",
+        "vehicleId": "veh-ppr",
+        "value": 3328
+      },
+      {
+        "id": "cp-02",
+        "date": "2026-03-31",
+        "vehicleId": "veh-ppr",
+        "value": 3436
+      },
+      {
+        "id": "cp-03",
+        "date": "2026-04-30",
+        "vehicleId": "veh-ppr",
+        "value": 3544
+      },
+      {
+        "id": "cp-04",
+        "date": "2026-05-31",
+        "vehicleId": "veh-ppr",
+        "value": 3653
+      },
+      {
+        "id": "cp-05",
+        "date": "2026-06-30",
+        "vehicleId": "veh-ppr",
+        "value": 3763
+      },
+      {
+        "id": "cp-06",
+        "date": "2026-07-31",
+        "vehicleId": "veh-ppr",
+        "value": 3873
+      },
+      {
+        "id": "cp-07",
+        "date": "2026-08-31",
+        "vehicleId": "veh-ppr",
+        "value": 3983
+      },
+      {
+        "id": "cp-08",
+        "date": "2026-09-30",
+        "vehicleId": "veh-ppr",
+        "value": 4094
+      },
+      {
+        "id": "cp-09",
+        "date": "2026-10-31",
+        "vehicleId": "veh-ppr",
+        "value": 4205
+      }
+    ],
+    "meta": [
+      {
+        "id": "meta",
+        "onboardingDone": true
+      }
+    ]
+  }
+}
