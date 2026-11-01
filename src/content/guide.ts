@@ -267,7 +267,6 @@ export const GUIDE: GuideSection[] = [
               '**Prepara o plano seguinte** em Planeamento: ajusta rendimentos, despesas e poupanças. A alocação tem de chegar a 100% para poderes aplicar.',
               '**Aplica o plano** quando puderes. O botão só abre a partir de 3 dias antes de o mês começar.',
               '**Faz as transferências** no banco: deixa o valor de "Deixar na conta corrente" e transfere o de "Transferir agora para a poupança".',
-              '**Exporta uma cópia de segurança** em Definições → Dados.',
             ],
           },
           {
