@@ -16,9 +16,12 @@ import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
 import { Guia } from './screens/Guia'
 import { CoachOverlay, CoachPrompt } from './components/Coach'
+import { LockedScreen } from './screens/Locked'
+import { featureStatus, isLockedFeature } from './lib/unlock'
+import { todayISO } from './lib/format'
 import { InstallNudge } from './components/InstallGuide'
 import { LogoMark, Wordmark } from './components/Logo'
-import { ArrowLeftRight, BookOpen, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, Lock, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
 
 const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, mobile: true },
@@ -131,6 +134,9 @@ export function App() {
   if (onboarding) return <Onboarding />
 
   const Active = SCREENS[screen]
+  const metaDoc = data.meta[0]
+  const today = todayISO()
+  const isLocked = (id: Screen) => isLockedFeature(id) && featureStatus(metaDoc, id, today).locked
 
   return (
     <div className="flex min-h-dvh">
@@ -158,6 +164,7 @@ export function App() {
             >
               <item.icon size={18} strokeWidth={1.75} className="shrink-0" aria-hidden="true" />
               {item.label}
+              {isLocked(item.id) && <Lock size={13} strokeWidth={1.75} className="ml-auto shrink-0 opacity-60" aria-label="Ainda fechado" />}
             </button>
           ))}
         </nav>
@@ -174,7 +181,7 @@ export function App() {
       <main className="min-w-0 flex-1 pb-24 md:pb-6">
         <div className="pt-safe mx-auto max-w-6xl px-4 pb-4 md:px-6 md:pb-6">
           <InstallNudge />
-          <Active />
+          {isLockedFeature(screen) && isLocked(screen) ? <LockedScreen feature={screen} /> : <Active />}
         </div>
       </main>
 
