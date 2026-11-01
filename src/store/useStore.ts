@@ -102,6 +102,9 @@ interface Store {
   setPlannedMovementDone(m: PlannedMovement, done: boolean): Promise<void>
   removePlannedMovement(m: PlannedMovement): Promise<void>
   addTransactions(ts: Omit<Transaction, 'id'>[]): Promise<void>
+  // Igual a addTransactions, mas cada gasto pode vir já ligado a um movimento de
+  // poupança existente (escolha do utilizador na importação do extrato).
+  addTransactionsLinked(items: { tx: Omit<Transaction, 'id'>; movementId?: string }[]): Promise<void>
   // Grava um gasto (novo ou existente) com categoria principal (despesa do plano
   // ou balde de poupança) + subcategoria opcional. Se a categoria for um balde,
   // cria/atualiza a saída correspondente na poupança; se deixar de ser, remove-a.
@@ -481,6 +484,25 @@ export const useStore = create<Store>((set, get) => ({
     await adapter!.putMany('transactions', docs)
   },
 
+  async addTransactionsLinked(items) {
+    const { data } = get()
+    const used = new Set<string>()
+    const docs: Transaction[] = []
+    const links: SavingsMovement[] = []
+    for (const { tx, movementId } of items) {
+      const doc: Transaction = { ...tx, id: uid(), createdAt: nowISO() }
+      docs.push(doc)
+      // Só liga se o movimento ainda existir, continuar livre e não for usado por outra linha.
+      const m = movementId && !used.has(movementId) ? data.savingsMovements.find((x) => x.id === movementId) : undefined
+      if (m && !m.transactionId) {
+        used.add(m.id)
+        links.push({ ...m, transactionId: doc.id, linkedAfter: true })
+      }
+    }
+    await adapter!.putMany('transactions', docs)
+    if (links.length) await adapter!.putMany('savingsMovements', links)
+  },
+
   async saveTransaction(fields, existingId) {
     const { data } = get()
     const existing = existingId ? data.transactions.find((t) => t.id === existingId) : undefined
@@ -507,7 +529,8 @@ export const useStore = create<Store>((set, get) => ({
         await writeTransaction(data, existing, date ? { date } : {}, groupId, subcategoryId)
       } else if (date) {
         await adapter!.put('transactions', { ...existing, date })
-        for (const m of data.savingsMovements.filter((x) => x.transactionId === id)) {
+        // Movimentos registados à mão e ligados depois mantêm a sua própria data.
+        for (const m of data.savingsMovements.filter((x) => x.transactionId === id && !x.linkedAfter)) {
           await adapter!.put('savingsMovements', { ...m, date })
         }
       }
@@ -545,7 +568,15 @@ export const useStore = create<Store>((set, get) => ({
   async deleteTransaction(transactionId) {
     const linked = get().data.savingsMovements.filter((m) => m.transactionId === transactionId)
     await adapter!.remove('transactions', transactionId)
-    for (const m of linked) await adapter!.remove('savingsMovements', m.id)
+    for (const m of linked) {
+      if (m.linkedAfter) {
+        // Movimento que já existia antes do gasto: nunca se apaga, só se desliga.
+        const { transactionId: _t, linkedAfter: _l, ...rest } = m
+        await adapter!.put('savingsMovements', rest)
+      } else {
+        await adapter!.remove('savingsMovements', m.id)
+      }
+    }
   },
 
   // Confirmar reposição cria automaticamente a saída do balde de origem;

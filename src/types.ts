@@ -78,6 +78,9 @@ export interface SavingsMovement {
   transferGroupId?: string
   // Gerado automaticamente ao confirmar a reposição de um gasto (Transaction.id).
   transactionId?: string
+  // O movimento já existia (registado à mão) e foi ligado depois a um gasto
+  // importado do extrato. Ao apagar o gasto, o movimento mantém-se (só se desliga).
+  linkedAfter?: boolean
   // Entrada criada ao resgatar dinheiro de um veículo/ativo para este balde (AssetEntry.id).
   assetEntryId?: string
   // Timestamp de criação (ISO datetime) — não mostrado na UI, só para desempate de sort.
