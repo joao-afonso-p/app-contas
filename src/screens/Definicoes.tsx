@@ -3,7 +3,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { ArchiveBlockedModal } from '../components/ArchiveBlocked'
-import { BackupSettings } from '../components/Backup'
+import { BackupSettings, ExportOnlySettings } from '../components/Backup'
 import { InstallSettingsSection } from '../components/InstallGuide'
 import { RentExplanation } from '../components/RentInfo'
 import { IncomeTiming } from '../components/IncomeTiming'
@@ -148,6 +148,15 @@ export function Definicoes() {
           )}
         </Card>
       </section>
+
+      {mode === 'space' && (
+        <section>
+          <SectionTitle>Dados</SectionTitle>
+          <Card>
+            <ExportOnlySettings />
+          </Card>
+        </section>
+      )}
 
       {mode === 'local' && (
         <section>

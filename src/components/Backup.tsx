@@ -37,11 +37,10 @@ export function MoveDeviceGuide() {
   )
 }
 
+// Funciona em contas locais e sincronizadas: exporta o que a app tem carregado.
 export function ExportBackupButton() {
   const data = useStore((s) => s.data)
-  const mode = useStore((s) => s.mode)
   const [error, setError] = useState('')
-  if (mode !== 'local') return null
 
   const doExport = async () => {
     setError('')
@@ -181,6 +180,22 @@ export function ImportBackupCard() {
       <ImportBackupFlow />
       <MoveDeviceGuide />
     </Card>
+  )
+}
+
+// Contas sincronizadas: só exportar (cópia de reserva). Importar substituiria os
+// dados partilhados do espaço, por isso continua a ser só para contas locais.
+export function ExportOnlySettings() {
+  return (
+    <div>
+      <p className="mb-3 text-sm text-muted">
+        Os teus dados estão sincronizados, mas podes guardar uma cópia de segurança num ficheiro, por precaução.
+      </p>
+      <ExportBackupButton />
+      <p className="mt-3 text-xs text-muted">
+        O ficheiro contém os teus dados financeiros. Guarda-o em privado e apaga-o quando já não for preciso.
+      </p>
+    </div>
   )
 }
 
