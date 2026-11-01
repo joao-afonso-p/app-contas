@@ -91,7 +91,7 @@ export const GUIDE: GuideSection[] = [
               '**Despesas** (1 240 €): Casa 650 €, Supermercado 280 €, Lazer 120 €, Transportes 90 €, Seguros 60 €, Saúde 40 €.',
               '**Baldes de poupança** (760 €): Fundo de emergência 300 €, Férias 150 € (objetivo de 1 800 € até julho), Carro 160 €, Geral 150 €.',
               '**Investimento** (100 €): débito automático para um PPR.',
-              'Somando tudo dá 2 100 €, ou seja, a alocação está em 100%. A app mostra "Deixar na conta corrente: 1 240 €" e "Transferir agora para a poupança: 460 €" (os 760 € de poupança menos os 300 € da renda, que ainda não chegou).',
+              'Somando tudo dá 2 100 €, ou seja, a alocação está em 100%. A app mostra "Deixar na conta corrente: 1 240 €" e "Transferir agora para a poupança: 460 €" (os 760 € de poupança menos os 300 € da renda, que ainda não chegou). Quando a renda cair, por volta do dia 8, a Marta transfere esses 300 € para a poupança nesse mesmo dia, e a poupança do mês fica com os 760 € completos.',
             ],
           },
         ],
@@ -271,7 +271,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A 29 de outubro, a Marta revê o Analytics. Nos últimos três meses gastou em Supermercado 310 €, 305 € e 320 €, sempre acima dos 280 € planeados. Não é descuido: os preços subiram mesmo, por isso é o plano que está desatualizado. Em Planeamento sobe Supermercado para 310 € em novembro e baixa o balde Geral de 150 € para 120 €, para a alocação continuar em 100%. Aplica o plano e transfere 430 € para a poupança (730 € de poupança menos os 300 € da renda).',
+            text: 'A 29 de outubro, a Marta revê o Analytics. Nos últimos três meses gastou em Supermercado 310 €, 305 € e 320 €, sempre acima dos 280 € planeados. Não é descuido: os preços subiram mesmo, por isso é o plano que está desatualizado. Em Planeamento sobe Supermercado para 310 € em novembro e baixa o balde Geral de 150 € para 120 €, para a alocação continuar em 100%. Aplica o plano e transfere 430 € para a poupança nesse dia (730 € de poupança menos os 300 € da renda). Os 300 € que faltam só os transfere quando a renda cair, por volta do dia 8.',
           },
         ],
       },
@@ -280,7 +280,7 @@ export const GUIDE: GuideSection[] = [
         blocks: [
           {
             t: 'p',
-            text: 'Se um rendimento (por exemplo uma renda) só chega depois do salário, marca-o como "Chega depois" em "Quando chega?". Esse valor **não entra na transferência de agora**: transferes só o resto e, quando ele chegar, passas-o para a poupança.',
+            text: 'Se um rendimento (por exemplo uma renda) só chega depois do salário, marca-o como "Chega depois" em "Quando chega?". Esse valor **não entra na transferência de agora**: transferes só o resto e, **quando ele chegar, transferes esse valor para a poupança logo nesse dia**, para a poupança ficar completa.',
           },
           {
             t: 'p',
@@ -288,7 +288,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A renda do quarto (300 €) chegou no dia 8. A Marta passa os 300 € para a poupança no banco e toca em "Já transferi", em "A transferir quando chegar". O cartão fica marcado como "Transferido".',
+            text: 'A renda do quarto (300 €) cai no dia 8. Nesse mesmo dia, a Marta transfere os 300 € para a poupança no banco e toca em "Já transferi", em "A transferir quando chegar". O cartão fica marcado como "Transferido" e a poupança do mês fica completa: 430 € transferidos no fim do mês anterior mais 300 € agora, ou seja, 730 €.',
           },
         ],
       },
@@ -482,7 +482,7 @@ export const GLOSSARY: { id: string; term: string; def: string }[] = [
   {
     id: 'chega depois',
     term: 'Chega depois',
-    def: 'Rendimento que entra depois do salário. Não conta para a transferência de agora, mas conta para os 100% da alocação.',
+    def: 'Rendimento que entra depois do salário. Não conta para a transferência de agora, mas conta para os 100% da alocação. Quando chega, transferes esse valor para a poupança nesse mesmo dia.',
   },
   {
     id: 'checkpoint',
