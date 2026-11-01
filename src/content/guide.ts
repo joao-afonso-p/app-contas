@@ -119,6 +119,23 @@ export const GUIDE: GuideSection[] = [
         ],
       },
       {
+        title: 'Visita guiada e partes que abrem aos poucos',
+        blocks: [
+          {
+            t: 'p',
+            text: 'Quando terminas a configuração, a Contas mostra-te onde está cada coisa numa **visita guiada** curta. Podes sair quando quiseres e repeti-la em Definições → Primeiros passos. As partes novas também oferecem uma visita de menos de um minuto, na primeira vez que as abres.',
+          },
+          {
+            t: 'p',
+            text: 'Para começares com calma, três partes abrem aos poucos numa conta nova: **Investimento** ao fim de cerca de 1 mês, **Analytics** ao fim de cerca de 2 e **Projeções** ao fim de cerca de 3. Quando uma abre, a Contas avisa-te no Overview.',
+          },
+          {
+            t: 'tip',
+            text: 'Não queres esperar? Em cada parte fechada há o botão "Desbloquear já". Em Definições → Primeiros passos podes desbloquear tudo, ou desativar o desbloqueio progressivo. Contas que já estavam em uso ficam sempre com tudo aberto.',
+          },
+        ],
+      },
+      {
         title: 'Instalar a app',
         blocks: [
           {
