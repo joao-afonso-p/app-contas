@@ -81,13 +81,13 @@ export const GUIDE: GuideSection[] = [
         blocks: [
           {
             t: 'p',
-            text: 'Para mostrar a app a funcionar, este guia segue uma pessoa fictícia. A **Marta** tem 34 anos, vive no Porto e recebe 1 800 € de salário líquido por mês. Aluga um quarto da casa e recebe 300 € de renda, por volta do dia 8. Vais ver o caso dela em quadros como o seguinte, ao longo do guia.',
+            text: 'Para mostrar a app a funcionar, este guia segue uma pessoa fictícia. A **Marta** tem 34 anos, vive no Porto e recebe 1 800 € de salário líquido por mês. Tem um quarto da sua casa arrendado a outra pessoa, que lhe paga 300 € de renda por mês, por volta do dia 8. Vais ver o caso dela em quadros como o seguinte, ao longo do guia.',
           },
           {
             t: 'example',
             text: 'O plano mensal da Marta:',
             items: [
-              '**Rendimentos** (2 100 €): Salário 1 800 € (chega com o salário) e Renda do quarto 300 € ([[chega depois|chega depois]]).',
+              '**Rendimentos** (2 100 €): Salário 1 800 € e Renda do quarto 300 € (marcada como "[[chega depois]]", porque entra depois do salário).',
               '**Despesas** (1 240 €): Casa 650 €, Supermercado 280 €, Lazer 120 €, Transportes 90 €, Seguros 60 €, Saúde 40 €.',
               '**Baldes de poupança** (760 €): Fundo de emergência 300 €, Férias 150 € (objetivo de 1 800 € até julho), Carro 160 €, Geral 150 €.',
               '**Investimento** (100 €): débito automático para um PPR.',

@@ -268,12 +268,12 @@ export function Onboarding() {
           {step === 'rendimentos' && (
             <>
               <Bubble
-                sub="Salário, rendas, trabalho extra. Para cada um, diz se chega com o salário ou depois. Assim, a Contas sabe quanto transferir para a poupança no dia em que recebes."
+                sub="Salário, rendas, trabalho extra. Cada fonte conta, por defeito, como dinheiro que entra no dia em que recebes. Só tens de marcar \"chega depois\" se entrar mais tarde (por exemplo, uma renda). Assim, a Contas sabe quanto transferir para a poupança no dia do salário."
               >
                 De onde entra dinheiro todos os meses?
               </Bubble>
               <MartaExample>
-                Tem o <strong>Salário</strong>, que chega com o salário, e a <strong>Renda do quarto</strong>, que chega depois (por volta do dia 8).
+                Tem o <strong>Salário</strong>, sem mais nada a marcar. E tem a <strong>Renda do quarto</strong>: arrenda um quarto da casa dela a outra pessoa e recebe 300 € por mês, por volta do dia 8, depois do salário. Por isso marca "chega depois".
               </MartaExample>
               <Card>
                 {incomeSources.length > 0 && (
