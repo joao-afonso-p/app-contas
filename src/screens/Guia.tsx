@@ -310,10 +310,10 @@ export function Guia() {
             <section id="guia-glossario" className="scroll-mt-6">
               <Card className="p-5">
                 <h2 className="mb-3 font-display text-xl font-medium">Glossário</h2>
-                <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                <dl className="sm:columns-2 sm:gap-x-8">
                   {GLOSSARY_SORTED.map((g) => (
-                    <div key={g.id}>
-                      <dt className="text-sm font-semibold text-text">{g.term}</dt>
+                    <div key={g.id} className="mb-4 break-inside-avoid">
+                      <dt className="mb-0.5 text-sm font-semibold text-text">{g.term}</dt>
                       <dd className="text-sm leading-relaxed text-muted">{g.def}</dd>
                     </div>
                   ))}
