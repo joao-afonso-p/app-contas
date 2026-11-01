@@ -271,7 +271,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'example',
-            text: 'A 29 de outubro, a Marta revê o Analytics: gastou 160 € em Lazer, contra 120 € planeados. Em Planeamento sobe Lazer para 150 € em novembro e baixa o balde Geral de 150 € para 120 €, para a alocação continuar em 100%. Aplica o plano e transfere 430 € para a poupança (730 € de poupança menos os 300 € da renda).',
+            text: 'A 29 de outubro, a Marta revê o Analytics. Nos últimos três meses gastou em Supermercado 310 €, 305 € e 320 €, sempre acima dos 280 € planeados. Não é descuido: os preços subiram mesmo, por isso é o plano que está desatualizado. Em Planeamento sobe Supermercado para 310 € em novembro e baixa o balde Geral de 150 € para 120 €, para a alocação continuar em 100%. Aplica o plano e transfere 430 € para a poupança (730 € de poupança menos os 300 € da renda).',
           },
         ],
       },
