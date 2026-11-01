@@ -268,7 +268,7 @@ export function Onboarding() {
           {step === 'rendimentos' && (
             <>
               <Bubble
-                sub="Salário, rendas, trabalho extra. Cada fonte conta, por defeito, como dinheiro que entra no dia em que recebes. Só tens de marcar \"chega depois\" se entrar mais tarde (por exemplo, uma renda). Assim, a Contas sabe quanto transferir para a poupança no dia do salário."
+                sub={'Salário, rendas, trabalho extra. Cada fonte conta, por defeito, como dinheiro que entra no dia em que recebes. Só tens de marcar "chega depois" se entrar mais tarde (por exemplo, uma renda). Assim, a Contas sabe quanto transferir para a poupança no dia do salário.'}
               >
                 De onde entra dinheiro todos os meses?
               </Bubble>
