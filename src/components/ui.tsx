@@ -92,7 +92,7 @@ export function Button({
       aria-label={ariaLabel}
       title={title}
       className={cx(
-        'rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-40',
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all active:scale-[0.98] disabled:opacity-40',
         variants[variant], sizes[size], className,
       )}
     >
