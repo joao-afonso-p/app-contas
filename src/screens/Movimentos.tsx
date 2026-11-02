@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSessionState } from '../lib/sessionState'
 import { Badge, Button, EmptyState, Input, Modal, Select, cx } from '../components/ui'
-import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, monthShort, parseAmount, todayISO } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO } from '../lib/format'
 import { activeBuckets, activeVehicles, useStore } from '../store/useStore'
 import { activeAccountingMonth } from '../lib/calc/balances'
-import { applyPlannedLink, plannedOptions, revertPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
+import { plannedOptions, revertPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
 import { featureStatus } from '../lib/unlock'
-import { PlannedLinkBadge, PlannedLinkPicker } from '../components/PlannedLink'
+import { PlannedLinkBadge, PlannedLinkConfirm, PlannedLinkField } from '../components/PlannedLink'
 import type { SavingsMovement } from '../types'
 import { Pencil, Trash } from 'lucide-react'
 
@@ -22,6 +22,7 @@ interface MovementForm {
   toVehicle: boolean
   vehicleId: string
   // Ligação opcional a um movimento previsto das Projeções ('' = sem ligação).
+  linkPlanned: boolean
   plannedId: string
   plannedEffect: LinkEffect
 }
@@ -35,6 +36,7 @@ const emptyForm = (): MovementForm => ({
   description: '',
   toVehicle: false,
   vehicleId: '',
+  linkPlanned: false,
   plannedId: '',
   plannedEffect: 'part',
 })
@@ -77,7 +79,10 @@ export function Movimentos() {
     return { main: main.map(undo), later: later.map(undo) }
   }, [data.plannedMovements, baseMonth, editingMovement])
   const linkAllowed = projecoesOpen && form.kind === 'saida' && !form.toVehicle
-  const hasPlannedChoices = plannedChoices.main.length + plannedChoices.later.length > 0
+  const plannedList = useMemo(() => [...plannedChoices.main, ...plannedChoices.later], [plannedChoices])
+  const hasPlannedChoices = plannedList.length > 0
+  // Pop-up mínimo (parte ou total) que abre ao guardar um movimento ligado.
+  const [confirmLink, setConfirmLink] = useState<{ plannedId: string; spent: number } | null>(null)
 
   const movements = useMemo(
     () =>
@@ -117,6 +122,7 @@ export function Movimentos() {
         description: m.description,
         toVehicle: false,
         vehicleId: '',
+        linkPlanned: false,
         plannedId: '',
         plannedEffect: 'part',
       })
@@ -132,6 +138,7 @@ export function Movimentos() {
         description: m.description,
         toVehicle: !!m.vehicleId,
         vehicleId: m.vehicleId ?? '',
+        linkPlanned: Boolean(m.plannedLink),
         plannedId: m.plannedLink?.plannedMovementId ?? '',
         plannedEffect: m.plannedLink?.effect ?? 'part',
       })
@@ -183,27 +190,30 @@ export function Movimentos() {
     const vehicleId = form.kind === 'saida' && form.toVehicle && form.vehicleId ? form.vehicleId : undefined
 
     // Ligação a um movimento previsto: só em saídas que não vão para investimento.
-    const target = linkAllowed && form.plannedId ? [...plannedChoices.main, ...plannedChoices.later].find((p) => p.id === form.plannedId) : undefined
-    if (target) {
-      const out = applyPlannedLink(target, parsed, form.plannedEffect)
-      const name = target.description || 'Sem descrição'
-      const msg = form.plannedEffect === 'close'
-        ? `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto passa de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e fica CONCLUÍDO: deixa de contar nas projeções.\n\nConfirmas?`
-        : `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto desce de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e continua aberto.${out.clamped ? '\n\nAtenção: gastaste mais do que restava, por isso o previsto fica a 0 €.' : ''}\n\nConfirmas?`
-      if (!window.confirm(msg)) return
+    if (linkAllowed && form.linkPlanned) {
+      if (!form.plannedId || !plannedList.some((p) => p.id === form.plannedId)) {
+        setError('Escolhe o movimento previsto, ou desliga a opção de ligar.')
+        return
+      }
+      setConfirmLink({ plannedId: form.plannedId, spent: parsed }) // o resto acontece em persist()
+      return
     }
+    persist(parsed * sign, vehicleId)
+  }
 
+  const persist = (amount: number, vehicleId: string | undefined, link?: { plannedMovementId: string; effect: LinkEffect }) => {
     void saveSimpleMovement({
       id: editingId ?? undefined,
       fields: {
         date: form.date,
         bucketId: form.bucketId,
-        amount: parsed * sign,
+        amount,
         description: form.description.trim(),
         vehicleId,
       },
-      link: target ? { plannedMovementId: target.id, effect: form.plannedEffect } : undefined,
+      link,
     })
+    setConfirmLink(null)
     setModalOpen(false)
   }
 
@@ -477,14 +487,13 @@ export function Movimentos() {
           )}
 
           {linkAllowed && hasPlannedChoices && (
-            <PlannedLinkPicker
-              main={plannedChoices.main}
-              later={plannedChoices.later}
+            <PlannedLinkField
+              options={plannedList}
+              checked={form.linkPlanned}
+              onCheck={(linkPlanned) => setForm((f) => ({ ...f, linkPlanned }))}
               selectedId={form.plannedId}
-              effect={form.plannedEffect}
-              spent={(() => { const v = parseAmount(form.amount); return v !== null && v > 0 ? v : null })()}
+              onSelect={(plannedId) => setForm((f) => ({ ...f, plannedId }))}
               bucketName={bucketName}
-              onChange={(plannedId, plannedEffect) => setForm((f) => ({ ...f, plannedId, plannedEffect }))}
             />
           )}
 
@@ -511,6 +520,17 @@ export function Movimentos() {
           </Button>
         </div>
       </Modal>
+
+      {confirmLink && (
+        <PlannedLinkConfirm
+          planned={plannedList.find((p) => p.id === confirmLink.plannedId)!}
+          spent={confirmLink.spent}
+          initialEffect={form.plannedEffect}
+          bucketName={bucketName}
+          onCancel={() => setConfirmLink(null)}
+          onConfirm={(effect) => persist(-confirmLink.spent, undefined, { plannedMovementId: confirmLink.plannedId, effect })}
+        />
+      )}
     </div>
   )
 }
