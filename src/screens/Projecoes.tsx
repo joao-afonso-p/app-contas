@@ -21,7 +21,7 @@ import {
   activeBuckets, firstPlanMonth, useStore,
 } from '../store/useStore'
 import type { MonthKey, PlannedMovement, SavingsBucket } from '../types'
-import { Check, ChevronDown, ChevronRight, Pencil, Trash } from 'lucide-react'
+import { Check, Minus, Pencil, Plus, Trash } from 'lucide-react'
 
 const HORIZONS = [12, 18, 24, 36]
 
@@ -600,6 +600,7 @@ export function Projecoes() {
                         <td className="px-3 py-1.5 text-sm font-medium text-text">{bucketName(m.bucketId)}</td>
                         <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
                           <span className="flex items-center gap-1.5">
+                            <span className="min-w-0 truncate">{m.description || '–'}</span>
                             {entries.length > 0 && (
                               <button
                                 type="button"
@@ -607,12 +608,11 @@ export function Projecoes() {
                                 aria-expanded={expanded}
                                 aria-label={expanded ? 'Esconder as entradas deste movimento' : 'Ver as entradas deste movimento'}
                                 title={`${entries.length} ${entries.length === 1 ? 'entrada' : 'entradas'} ligada${entries.length === 1 ? '' : 's'}`}
-                                className="-ml-1 inline-flex shrink-0 items-center rounded-md p-0.5 text-accent-strong hover:bg-accent-soft"
+                                className="inline-flex shrink-0 items-center rounded-md p-0.5 text-accent-strong hover:bg-accent-soft"
                               >
-                                {expanded ? <ChevronDown size={14} strokeWidth={2} aria-hidden="true" /> : <ChevronRight size={14} strokeWidth={2} aria-hidden="true" />}
+                                {expanded ? <Minus size={12} strokeWidth={2.5} aria-hidden="true" /> : <Plus size={12} strokeWidth={2.5} aria-hidden="true" />}
                               </button>
                             )}
-                            <span className="min-w-0 truncate">{m.description || '–'}</span>
                             {isTransfer && <Badge tone="accent">Transferência</Badge>}
                           </span>
                         </td>
