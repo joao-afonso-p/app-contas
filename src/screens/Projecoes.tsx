@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Badge, Button, Card, EmptyState, InfoHint, Input, Modal, Money, ProgressBar, SectionTitle, Select, cx,
 } from '../components/ui'
@@ -7,8 +7,10 @@ import {
   GridContainer, GridHeaderCell, GridRow, GridSelectionBar, GridTopBar, useProjectionGrid, type GridRowDef,
 } from '../components/ProjectionGrid'
 import {
-  addMonths, currentMonthKey, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
+  addMonths, currentMonthKey, fmtDate, fmtEUR, fmtPct, monthLabel, monthRange, monthShort, parseAmount, uid,
 } from '../lib/format'
+import { linkedEntries, plannedOriginalAmount } from '../lib/calc/plannedLink'
+import { usePlannedFocus } from '../lib/plannedFocus'
 import { allocationState, allocationSummary } from '../lib/calc/allocation'
 import { withResidual } from '../lib/calc/archive'
 import { activeAccountingMonth, bucketBalance, goalProgress, totalBalance, type BalanceTable } from '../lib/calc/balances'
@@ -19,7 +21,7 @@ import {
   activeBuckets, firstPlanMonth, useStore,
 } from '../store/useStore'
 import type { MonthKey, PlannedMovement, SavingsBucket } from '../types'
-import { Check, Pencil, Trash } from 'lucide-react'
+import { Check, Minus, Pencil, Plus, Trash } from 'lucide-react'
 
 const HORIZONS = [12, 18, 24, 36]
 
@@ -165,6 +167,43 @@ export function Projecoes() {
   // ---------- Toggles de visibilidade ----------
   const [showAllGoals, setShowAllGoals] = useState(false)
   const [showMovHistory, setShowMovHistory] = useState(false)
+  // Movimentos previstos com várias entradas: quais estão abertos e qual destacar
+  // (vem de um movimento real ligado, ver components/PlannedLink.tsx).
+  const [openPlanned, setOpenPlanned] = useState<Set<string>>(new Set())
+  const [highlightId, setHighlightId] = useState<string | null>(null)
+  const focusId = usePlannedFocus((s) => s.plannedId)
+  const clearFocus = usePlannedFocus((s) => s.clear)
+  const entriesByPlanned = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof linkedEntries>>()
+    for (const m of data.savingsMovements) {
+      const id = m.plannedLink?.plannedMovementId
+      if (id) map.set(id, [...(map.get(id) ?? []), m])
+    }
+    for (const [id, list] of map) map.set(id, linkedEntries(list, id))
+    return map
+  }, [data.savingsMovements])
+  const togglePlanned = (id: string) => setOpenPlanned((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+
+  // Chegou com um pedido para ver um previsto: abre-o, mostra-o (mesmo se já feito) e centra-o.
+  useEffect(() => {
+    if (!focusId) return
+    const target = data.plannedMovements.find((p) => p.id === focusId)
+    clearFocus()
+    if (!target) return
+    if (plannedMovementHiddenReason(target, baseMonth)) setShowMovHistory(true)
+    setOpenPlanned((prev) => new Set(prev).add(focusId))
+    setHighlightId(focusId)
+    // Espera que a linha exista no DOM (o histórico pode ter acabado de abrir).
+    // (Sem cleanup: limpar o pedido acima volta a correr este efeito e cancelaria os temporizadores.)
+    window.setTimeout(() => {
+      document.getElementById(`pm-${focusId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }, 80)
+    window.setTimeout(() => setHighlightId(null), 3500)
+  }, [focusId, data.plannedMovements, baseMonth, clearFocus])
 
   const openNewMovement = () => {
     setEditingMovId(null)
@@ -539,8 +578,18 @@ export function Projecoes() {
                   {visibleMovements.map((m) => {
                     const isTransfer = !!m.transferGroupId
                     const hiddenReason = plannedMovementHiddenReason(m, baseMonth)
+                    const entries = entriesByPlanned.get(m.id) ?? []
+                    const expanded = entries.length > 0 && openPlanned.has(m.id)
                     return (
-                      <tr key={m.id} className={cx('odd:bg-surface-2/40', isTransfer && 'border-l-4 border-l-accent')}>
+                      <Fragment key={m.id}>
+                      <tr
+                        id={`pm-${m.id}`}
+                        className={cx(
+                          'odd:bg-surface-2/40 transition-colors',
+                          isTransfer && 'border-l-4 border-l-accent',
+                          highlightId === m.id && 'bg-accent-soft outline outline-2 -outline-offset-2 outline-accent',
+                        )}
+                      >
                         <td className="tnum whitespace-nowrap px-3 py-1.5 text-xs text-muted">
                           <span className="flex items-center gap-1.5">
                             {monthShort(m.month)}
@@ -552,6 +601,18 @@ export function Projecoes() {
                         <td className="max-w-[160px] px-3 py-1.5 text-xs text-muted" title={m.description}>
                           <span className="flex items-center gap-1.5">
                             <span className="min-w-0 truncate">{m.description || '–'}</span>
+                            {entries.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => togglePlanned(m.id)}
+                                aria-expanded={expanded}
+                                aria-label={expanded ? 'Esconder as entradas deste movimento' : 'Ver as entradas deste movimento'}
+                                title={`${entries.length} ${entries.length === 1 ? 'entrada' : 'entradas'} ligada${entries.length === 1 ? '' : 's'}`}
+                                className="inline-flex shrink-0 items-center rounded-md p-0.5 text-accent-strong hover:bg-accent-soft"
+                              >
+                                {expanded ? <Minus size={12} strokeWidth={2.5} aria-hidden="true" /> : <Plus size={12} strokeWidth={2.5} aria-hidden="true" />}
+                              </button>
+                            )}
                             {isTransfer && <Badge tone="accent">Transferência</Badge>}
                           </span>
                         </td>
@@ -565,45 +626,73 @@ export function Projecoes() {
                           {fmtEUR(m.amount)}
                         </td>
                         <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                          <button
-                            onClick={() => void setPlannedMovementDone(m, !m.done)}
-                            className="group rounded-lg p-1 align-middle hover:bg-surface-2"
-                            aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
-                            aria-pressed={!!m.done}
-                            title={m.done ? 'Feito (clica para voltar a por fazer)' : 'Marcar como feito (já aconteceu)'}
-                          >
-                            <span
-                              className={cx(
-                                'inline-flex h-4 w-4 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none transition-colors',
-                                m.done
-                                  ? 'border-positive bg-positive text-white'
-                                  : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
-                              )}
+                          <div className="flex items-center justify-end">
+                            <button
+                              onClick={() => void setPlannedMovementDone(m, !m.done)}
+                              className="group rounded-lg p-1 hover:bg-surface-2"
+                              aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
+                              aria-pressed={!!m.done}
+                              title={m.done ? 'Feito (clica para voltar a por fazer)' : 'Marcar como feito (já aconteceu)'}
                             >
-                              <Check size={10} strokeWidth={3.5} aria-hidden="true" />
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => openEditMovement(m)}
-                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
-                            aria-label="Editar movimento"
-                          >
-                            <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const msg = isTransfer
-                                ? 'Apagar esta transferência prevista (as duas pernas)?'
-                                : 'Apagar este movimento previsto?'
-                              if (window.confirm(msg)) void removePlannedMovement(m)
-                            }}
-                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
-                            aria-label="Apagar movimento"
-                          >
-                            <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
-                          </button>
+                              <span
+                                className={cx(
+                                  'inline-flex h-4 w-4 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none transition-colors',
+                                  m.done
+                                    ? 'border-positive bg-positive text-white'
+                                    : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
+                                )}
+                              >
+                                <Check size={10} strokeWidth={3.5} aria-hidden="true" />
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => openEditMovement(m)}
+                              className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
+                              aria-label="Editar movimento"
+                            >
+                              <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const msg = isTransfer
+                                  ? 'Apagar esta transferência prevista (as duas pernas)?'
+                                  : 'Apagar este movimento previsto?'
+                                if (window.confirm(msg)) void removePlannedMovement(m)
+                              }}
+                              className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
+                              aria-label="Apagar movimento"
+                            >
+                              <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
+                      {expanded && (
+                        <tr className="bg-surface-2/60">
+                          <td colSpan={5} className="px-3 py-2">
+                            <div className="ml-4 flex flex-col gap-1 border-l-2 border-accent pl-3 text-xs">
+                              <div className="flex justify-between gap-3 text-muted">
+                                <span>Valor original</span>
+                                <span className="tnum font-medium text-text">{fmtEUR(Math.abs(plannedOriginalAmount(m, entries)))}</span>
+                              </div>
+                              {entries.map((e) => (
+                                <div key={e.id} className="flex items-baseline justify-between gap-3">
+                                  <span className="min-w-0 truncate text-muted">
+                                    {`${fmtDate(e.date)} · ${e.description || 'Sem descrição'}`}
+                                    {e.plannedLink?.effect === 'close' && <span className="ml-1 text-accent-strong">(fechou)</span>}
+                                  </span>
+                                  <span className="tnum shrink-0 font-medium text-negative">{fmtEUR(e.amount)}</span>
+                                </div>
+                              ))}
+                              <div className="flex justify-between gap-3 border-t border-border pt-1 text-muted">
+                                <span>{m.done ? 'Concluído com' : 'Ainda previsto'}</span>
+                                <span className="tnum font-semibold text-text">{fmtEUR(Math.abs(m.amount))}</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     )
                   })}
                 </tbody>

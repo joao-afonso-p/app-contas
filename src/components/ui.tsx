@@ -132,8 +132,8 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 }
 
 export function Badge({
-  children, tone = 'neutral',
-}: { children: ReactNode; tone?: 'neutral' | 'accent' | 'goal' | 'warn' | 'negative' }) {
+  children, tone = 'neutral', className,
+}: { children: ReactNode; tone?: 'neutral' | 'accent' | 'goal' | 'warn' | 'negative'; className?: string }) {
   const tones = {
     neutral: 'bg-surface-2 text-muted',
     accent: 'bg-accent-soft text-accent-strong',
@@ -142,7 +142,7 @@ export function Badge({
     negative: 'bg-negative/10 text-negative',
   }
   return (
-    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', tones[tone])}>
+    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', tones[tone], className)}>
       {children}
     </span>
   )
@@ -168,8 +168,8 @@ export function ProgressBar({
 }
 
 export function Modal({
-  open, onClose, title, children, wide,
-}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  open, onClose, title, children, wide, action,
+}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; action?: ReactNode }) {
   if (!open) return null
   return createPortal(
     <div
@@ -185,7 +185,10 @@ export function Modal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+          <div className="flex items-center gap-1">
+            {action}
+            <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+          </div>
         </div>
         {children}
       </div>
@@ -197,8 +200,8 @@ export function Modal({
 // Ícone ⓘ que abre uma pequena explicação ao clicar/tocar (o `title` nativo
 // não aparece em mobile). Fecha ao clicar fora, Esc, scroll ou resize.
 export function InfoHint({
-  children, label = 'Mais informação', className,
-}: { children: ReactNode; label?: string; className?: string }) {
+  children, label = 'Mais informação', className, icon,
+}: { children: ReactNode; label?: string; className?: string; icon?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -250,13 +253,14 @@ export function InfoHint({
         aria-label={label}
         aria-expanded={open}
         className={cx(
-          'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border',
-          'text-[10px] font-bold leading-none text-muted transition-colors hover:bg-surface-2 hover:text-text',
-          open && 'bg-surface-2 text-text',
+          icon
+            ? 'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-accent-strong transition-colors hover:bg-accent-soft'
+            : 'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border text-[10px] font-bold leading-none text-muted transition-colors hover:bg-surface-2 hover:text-text',
+          open && (icon ? 'bg-accent-soft' : 'bg-surface-2 text-text'),
           className,
         )}
       >
-        i
+        {icon ?? 'i'}
       </button>
       {open && pos &&
         createPortal(

@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSessionState } from '../lib/sessionState'
 import { Badge, Button, EmptyState, Input, Modal, Select, cx } from '../components/ui'
-import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, monthShort, parseAmount, todayISO } from '../lib/format'
 import { activeBuckets, activeVehicles, useStore } from '../store/useStore'
+import { activeAccountingMonth } from '../lib/calc/balances'
+import { applyPlannedLink, plannedOptions, revertPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
+import { featureStatus } from '../lib/unlock'
+import { PlannedLinkBadge, PlannedLinkField } from '../components/PlannedLink'
 import type { SavingsMovement } from '../types'
 import { Pencil, Trash } from 'lucide-react'
 
@@ -17,6 +21,10 @@ interface MovementForm {
   description: string
   toVehicle: boolean
   vehicleId: string
+  // Ligação opcional a um movimento previsto das Projeções ('' = sem ligação).
+  linkPlanned: boolean
+  plannedId: string
+  plannedEffect: LinkEffect | '' // '' = ainda não escolheu "parte" ou "total"
 }
 
 const emptyForm = (): MovementForm => ({
@@ -28,16 +36,19 @@ const emptyForm = (): MovementForm => ({
   description: '',
   toVehicle: false,
   vehicleId: '',
+  linkPlanned: false,
+  plannedId: '',
+  plannedEffect: '',
 })
 
 const draftAmount = (value: number) => String(Math.abs(value)).replace('.', ',')
 
 export function Movimentos() {
   const data = useStore((s) => s.data)
-  const addMovement = useStore((s) => s.addMovement)
+  const saveSimpleMovement = useStore((s) => s.saveSimpleMovement)
+  const deleteMovement = useStore((s) => s.deleteMovement)
   const addTransfer = useStore((s) => s.addTransfer)
   const put = useStore((s) => s.put)
-  const remove = useStore((s) => s.remove)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +65,25 @@ export function Movimentos() {
 
   const buckets = useMemo(() => activeBuckets(data), [data])
   const vehicles = useMemo(() => activeVehicles(data), [data])
+
+  // Ligar a movimentos previstos: só com as Projeções desbloqueadas (à mão ou pelo tempo).
+  const projecoesOpen = !featureStatus(data.meta[0], 'projecoes', todayISO()).locked
+  const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
+  const editingMovement = editingId ? data.savingsMovements.find((m) => m.id === editingId) : undefined
+  const plannedChoices = useMemo(() => {
+    const keepId = editingMovement?.plannedLink?.plannedMovementId
+    const { main, later } = plannedOptions(data.plannedMovements, baseMonth, keepId)
+    // Ao editar, o previsto ligado mostra-se como estaria sem este movimento.
+    const link = editingMovement?.plannedLink
+    const undo = (p: (typeof main)[number]) => (link && p.id === link.plannedMovementId ? revertPlannedLink(p, link) : p)
+    return { main: main.map(undo), later: later.map(undo) }
+  }, [data.plannedMovements, baseMonth, editingMovement])
+  // Aparece em qualquer saída. "Ligar ao previsto" e "Saída para investimento" excluem-se:
+  // ativar um desativa o outro (ver os dois onChange abaixo).
+  const linkVisible = projecoesOpen && form.kind === 'saida'
+  const linkAllowed = linkVisible && !form.toVehicle
+  const plannedList = useMemo(() => [...plannedChoices.main, ...plannedChoices.later], [plannedChoices])
+  const hasPlannedChoices = plannedList.length > 0
 
   const movements = useMemo(
     () =>
@@ -93,6 +123,9 @@ export function Movimentos() {
         description: m.description,
         toVehicle: false,
         vehicleId: '',
+        linkPlanned: false,
+        plannedId: '',
+        plannedEffect: '',
       })
       setEditingId(null)
       setEditingTransferGroupId(m.transferGroupId)
@@ -106,6 +139,9 @@ export function Movimentos() {
         description: m.description,
         toVehicle: !!m.vehicleId,
         vehicleId: m.vehicleId ?? '',
+        linkPlanned: Boolean(m.plannedLink),
+        plannedId: m.plannedLink?.plannedMovementId ?? '',
+        plannedEffect: m.plannedLink?.effect ?? '',
       })
       setEditingId(m.id)
       setEditingTransferGroupId(null)
@@ -153,29 +189,49 @@ export function Movimentos() {
     }
     const sign = form.kind === 'entrada' ? 1 : -1
     const vehicleId = form.kind === 'saida' && form.toVehicle && form.vehicleId ? form.vehicleId : undefined
-    if (editingId) {
-      void put('savingsMovements', {
-        id: editingId,
-        date: form.date,
-        bucketId: form.bucketId,
-        amount: parsed * sign,
-        description: form.description.trim(),
-        vehicleId,
-      })
-    } else {
-      void addMovement({
-        date: form.date,
-        bucketId: form.bucketId,
-        amount: parsed * sign,
-        description: form.description.trim(),
-        vehicleId,
-      })
+
+    // Ligação a um movimento previsto: só em saídas que não vão para investimento.
+    let link: { plannedMovementId: string; effect: LinkEffect } | undefined
+    if (linkAllowed && form.linkPlanned) {
+      const target = plannedList.find((p) => p.id === form.plannedId)
+      if (!target) {
+        setError('Escolhe o movimento previsto, ou desliga a opção de ligar.')
+        return
+      }
+      if (!form.plannedEffect) {
+        setError('Indica se esta saída é só uma parte do previsto ou o valor total.')
+        return
+      }
+      const out = applyPlannedLink(target, parsed, form.plannedEffect)
+      const name = target.description || 'Sem descrição'
+      const msg = form.plannedEffect === 'close'
+        ? `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto passa de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e fica CONCLUÍDO: deixa de contar nas projeções.\n\nConfirmas?`
+        : `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto desce de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e continua aberto.${out.clamped ? '\n\nAtenção: gastaste mais do que restava, por isso o previsto fica a 0 €.' : ''}\n\nConfirmas?`
+      if (!window.confirm(msg)) return
+      link = { plannedMovementId: target.id, effect: form.plannedEffect }
     }
+
+    void saveSimpleMovement({
+      id: editingId ?? undefined,
+      fields: {
+        date: form.date,
+        bucketId: form.bucketId,
+        amount: parsed * sign,
+        description: form.description.trim(),
+        vehicleId,
+      },
+      link,
+    })
     setModalOpen(false)
   }
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Apagar este movimento?')) void remove('savingsMovements', id)
+    const m = data.savingsMovements.find((x) => x.id === id)
+    const planned = m?.plannedLink ? data.plannedMovements.find((p) => p.id === m.plannedLink!.plannedMovementId) : undefined
+    const msg = planned
+      ? `Apagar este movimento? O valor volta ao movimento previsto «${planned.description || 'Sem descrição'}»${m?.plannedLink?.closed ? ', que reabre' : ''}.`
+      : 'Apagar este movimento?'
+    if (window.confirm(msg)) void deleteMovement(id)
   }
 
   const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
@@ -226,6 +282,7 @@ export function Movimentos() {
                   </div>
                   <div className="text-xs text-muted">{fmtDate(m.date)} · {bucket?.name ?? '–'}</div>
                 </button>
+                <PlannedLinkBadge movement={m} />
                 <span className={cx('tnum shrink-0 text-sm font-semibold', m.amount >= 0 ? 'text-positive' : 'text-negative')}>
                   {m.amount >= 0 ? '+' : ''}{fmtEUR(m.amount)}
                 </span>
@@ -265,6 +322,7 @@ export function Movimentos() {
                       <span className="flex items-center gap-1.5">
                         <span className="min-w-0 truncate">{m.description || 'Sem descrição'}</span>
                         {isTransfer && <Badge tone="accent">Transferência</Badge>}
+                        <PlannedLinkBadge movement={m} />
                       </span>
                     </td>
                     <td
@@ -397,13 +455,22 @@ export function Movimentos() {
           )}
 
           {form.kind === 'saida' && (
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 p-3">
-              <label className="flex items-center gap-2 text-sm">
+            <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
+              <label className={cx('flex items-center gap-2 text-sm', vehicles.length === 0 ? 'opacity-60' : 'cursor-pointer')}>
                 <input
                   type="checkbox"
+                  className="peer sr-only"
                   checked={form.toVehicle}
                   disabled={vehicles.length === 0}
-                  onChange={(e) => setForm((f) => ({ ...f, toVehicle: e.target.checked }))}
+                  onChange={(e) => setForm((f) => ({ ...f, toVehicle: e.target.checked, linkPlanned: e.target.checked ? false : f.linkPlanned }))}
+                />
+                {/* Mesmo indicador redondo das opções de ligação às Projeções. */}
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'h-3.5 w-3.5 shrink-0 rounded-full border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-accent',
+                    form.toVehicle ? 'border-accent-strong bg-accent-strong' : 'border-border',
+                  )}
                 />
                 Saída para investimento
               </label>
@@ -425,6 +492,21 @@ export function Movimentos() {
                 )
               )}
             </div>
+          )}
+
+          {linkVisible && hasPlannedChoices && (
+            <PlannedLinkField
+              options={plannedList}
+              checked={form.linkPlanned}
+              // Escolher um ou o outro: ativar este desativa "Saída para investimento".
+              onCheck={(linkPlanned) => setForm((f) => ({ ...f, linkPlanned, toVehicle: linkPlanned ? false : f.toVehicle }))}
+              selectedId={form.plannedId}
+              onSelect={(plannedId) => setForm((f) => ({ ...f, plannedId }))}
+              effect={form.plannedEffect}
+              onEffect={(plannedEffect) => setForm((f) => ({ ...f, plannedEffect }))}
+              spent={(() => { const v = parseAmount(form.amount); return v !== null && v > 0 ? v : null })()}
+              bucketName={bucketName}
+            />
           )}
 
           <div>
@@ -450,6 +532,7 @@ export function Movimentos() {
           </Button>
         </div>
       </Modal>
+
     </div>
   )
 }

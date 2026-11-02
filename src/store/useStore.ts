@@ -9,6 +9,7 @@ import { allocationSummary, cumulativeAutoInvestmentTotals, round2 } from '../li
 import { activeOnly, allocatedMonths, SECTION_OF } from '../lib/calc/archive'
 import { txCategoryFields } from '../lib/calc/categories'
 import { planMerge } from '../lib/calc/mergeExpenses'
+import { applyPlannedLink, revertPlannedLink } from '../lib/calc/plannedLink'
 import type {
   AnyDoc,
   AppMeta,
@@ -20,6 +21,7 @@ import type {
   InvestmentVehicle,
   MonthKey,
   MonthlyPlan,
+  PlannedLink,
   PlannedMovement,
   ProjectionPlan,
   SavingsBucket,
@@ -96,6 +98,16 @@ interface Store {
 
   // Movimentos e gastos
   addMovement(m: Omit<SavingsMovement, 'id'>): Promise<void>
+  // Grava uma entrada/saída simples (nova ou existente). Numa saída pode ligar-se
+  // a um movimento previsto das Projeções: reduz-lhe o valor ('part') ou ajusta-o
+  // ao valor real e fecha-o ('close'). Ao editar, o efeito anterior é desfeito primeiro.
+  saveSimpleMovement(input: {
+    id?: string
+    fields: { date: string; bucketId: string; amount: number; description: string; vehicleId?: string }
+    link?: { plannedMovementId: string; effect: PlannedLink['effect'] }
+  }): Promise<void>
+  // Apaga um movimento e, se estava ligado a um previsto, devolve-lhe o valor (e reabre-o se o tinha fechado).
+  deleteMovement(id: string): Promise<void>
   addTransfer(p: { date: string; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
   addPlannedTransfer(p: { month: MonthKey; fromBucketId: string; toBucketId: string; amount: number; description: string }): Promise<void>
   // Atuam nas duas pernas quando é uma transferência prevista.
@@ -442,6 +454,51 @@ export const useStore = create<Store>((set, get) => ({
 
   addMovement: (m) => adapter!.put('savingsMovements', { ...m, id: uid(), createdAt: nowISO() }),
 
+  async saveSimpleMovement({ id, fields, link }) {
+    const { data } = get()
+    const existing = id ? data.savingsMovements.find((m) => m.id === id) : undefined
+    const pending = new Map<string, PlannedMovement>()
+    const plannedById = (pid: string) => pending.get(pid) ?? data.plannedMovements.find((p) => p.id === pid)
+
+    // 1. Desfaz o efeito anterior no previsto (se este movimento já estava ligado).
+    if (existing?.plannedLink) {
+      const old = plannedById(existing.plannedLink.plannedMovementId)
+      if (old) pending.set(old.id, revertPlannedLink(old, existing.plannedLink))
+    }
+
+    // 2. Aplica a nova ligação (só em saídas, e só se o previsto ainda existir).
+    let plannedLink: PlannedLink | undefined
+    const target = link && fields.amount < 0 ? plannedById(link.plannedMovementId) : undefined
+    if (link && target) {
+      const out = applyPlannedLink(target, fields.amount, link.effect)
+      pending.set(target.id, out.planned)
+      plannedLink = { plannedMovementId: target.id, effect: link.effect, delta: out.delta, closed: out.closed }
+    }
+
+    const doc: SavingsMovement = {
+      ...(existing ?? { createdAt: nowISO() }),
+      id: existing?.id ?? uid(),
+      date: fields.date,
+      bucketId: fields.bucketId,
+      amount: fields.amount,
+      description: fields.description,
+      vehicleId: fields.vehicleId,
+      plannedLink,
+    }
+    await adapter!.put('savingsMovements', doc)
+    if (pending.size) await adapter!.putMany('plannedMovements', [...pending.values()])
+  },
+
+  async deleteMovement(id) {
+    const { data } = get()
+    const m = data.savingsMovements.find((x) => x.id === id)
+    if (m?.plannedLink) {
+      const pm = data.plannedMovements.find((p) => p.id === m.plannedLink!.plannedMovementId)
+      if (pm) await adapter!.put('plannedMovements', revertPlannedLink(pm, m.plannedLink))
+    }
+    await adapter!.remove('savingsMovements', id)
+  },
+
   async addTransfer({ date, fromBucketId, toBucketId, amount, description }) {
     const buckets = get().data.savingsBuckets
     const fromName = buckets.find((b) => b.id === fromBucketId)?.name ?? '?'
@@ -475,7 +532,16 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   async removePlannedMovement(m) {
-    const legs = plannedMovementGroup(get().data.plannedMovements, m)
+    const { data } = get()
+    const legs = plannedMovementGroup(data.plannedMovements, m)
+    // Movimentos reais ligados a este previsto ficam (nada se apaga), só perdem a ligação.
+    const ids = new Set(legs.map((l) => l.id))
+    for (const mv of data.savingsMovements) {
+      if (mv.plannedLink && ids.has(mv.plannedLink.plannedMovementId)) {
+        const { plannedLink: _unlinked, ...rest } = mv
+        await adapter!.put('savingsMovements', rest)
+      }
+    }
     await Promise.all(legs.map((l) => adapter!.remove('plannedMovements', l.id)))
   },
 
