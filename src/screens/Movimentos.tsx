@@ -437,13 +437,22 @@ export function Movimentos() {
           )}
 
           {form.kind === 'saida' && (
-            <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 p-3">
-              <label className="flex items-center gap-2 text-sm">
+            <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
+              <label className={cx('flex items-center gap-2 text-sm', vehicles.length === 0 ? 'opacity-60' : 'cursor-pointer')}>
                 <input
                   type="checkbox"
+                  className="peer sr-only"
                   checked={form.toVehicle}
                   disabled={vehicles.length === 0}
                   onChange={(e) => setForm((f) => ({ ...f, toVehicle: e.target.checked }))}
+                />
+                {/* Mesmo indicador redondo das opções de ligação às Projeções. */}
+                <span
+                  aria-hidden="true"
+                  className={cx(
+                    'h-3.5 w-3.5 shrink-0 rounded-full border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-accent',
+                    form.toVehicle ? 'border-accent-strong bg-accent-strong' : 'border-border',
+                  )}
                 />
                 Saída para investimento
               </label>
