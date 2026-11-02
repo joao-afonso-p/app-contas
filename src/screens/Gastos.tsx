@@ -21,7 +21,7 @@ import { makeDuplicateDetector } from '../lib/calc/dedupe'
 import { findMovementMatches } from '../lib/calc/matchMovements'
 import { isAutoBucketMovement, useStore } from '../store/useStore'
 import type { CategoryRule, Transaction } from '../types'
-import { Link, Pencil, Trash, TriangleAlert } from 'lucide-react'
+import { ArrowLeftRight, Link, Pencil, Trash, TriangleAlert } from 'lucide-react'
 
 interface PreviewRow {
   date: string
@@ -418,6 +418,7 @@ export function Gastos() {
       : 'Apagar este gasto? A saída correspondente na poupança também é removida.'
   }
   const openMove = (t: Transaction) => {
+    if (movementOf(t)) return // já ligado a um movimento: não se cria outro
     setMoveFor(t)
     setMoveStep(1)
     setMoveBucket('')
@@ -562,10 +563,15 @@ export function Gastos() {
                     onSelect={(gid, sid) => changeCategory(t.id, gid, sid)}
                     onCreateSubcategory={createSubcategory}
                   />
-                  {movementOf(t) && <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>}
+                  {movementOf(t) && (
+                    <Badge tone="accent">
+                      <ArrowLeftRight size={11} strokeWidth={2} aria-hidden="true" />
+                      {bucketNameOf(movementOf(t)!.bucketId)}
+                    </Badge>
+                  )}
                 </div>
               </div>
-              {/* Computador: colunas fixas (data | categoria | título | valor | ↔ | ações), para tudo ficar alinhado. */}
+              {/* Computador: colunas fixas (data | categoria | título | valor | movimento | ações), para tudo ficar alinhado. */}
               <div className="hidden items-center gap-3 py-3 md:flex">
                 <input
                   type="checkbox"
@@ -602,7 +608,8 @@ export function Gastos() {
                   {movementOf(t) ? (
                     <span title="Já tem movimento de poupança" className="flex min-w-0 max-w-full">
                       <Badge tone="accent" className="min-w-0 max-w-full">
-                        <span className="truncate">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</span>
+                        <ArrowLeftRight size={11} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+                        <span className="truncate">{bucketNameOf(movementOf(t)!.bucketId)}</span>
                       </Badge>
                     </span>
                   ) : (
@@ -612,7 +619,7 @@ export function Gastos() {
                       aria-label="Criar movimento de poupança"
                       title="Criar movimento de poupança"
                     >
-                      ↔
+                      <ArrowLeftRight size={15} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -736,7 +743,10 @@ export function Gastos() {
             if (!t) return null
             const mv = movementOf(t)
             return mv ? (
-              <p className="text-xs text-muted">↔ Movimento criado no balde {bucketNameOf(mv.bucketId)}.</p>
+              <p className="flex items-center gap-1.5 text-xs text-muted">
+                <ArrowLeftRight size={13} strokeWidth={1.75} aria-hidden="true" />
+                Movimento ligado no balde {bucketNameOf(mv.bucketId)}.
+              </p>
             ) : (
               <Button variant="ghost" size="sm" onClick={() => openMove(t)}>Criar movimento de poupança</Button>
             )
@@ -799,7 +809,10 @@ export function Gastos() {
                 {mv && (
                   <>
                     <dt className="text-muted">Poupança</dt>
-                    <dd className="break-words text-text">{`↔ ${bucketNameOf(mv.bucketId)}${mv.description ? ` · ${mv.description}` : ''}`}</dd>
+                    <dd className="flex items-start gap-1.5 break-words text-text">
+                      <ArrowLeftRight size={14} strokeWidth={1.75} aria-hidden="true" className="mt-0.5 shrink-0 text-accent-strong" />
+                      <span className="min-w-0">{`${bucketNameOf(mv.bucketId)}${mv.description ? ` · ${mv.description}` : ''}`}</span>
+                    </dd>
                   </>
                 )}
               </dl>
