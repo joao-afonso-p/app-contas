@@ -556,17 +556,29 @@ export function Gastos() {
                   {movementOf(t) && <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>}
                 </div>
               </div>
-              <div className="hidden flex-col gap-2 py-3 md:flex md:flex-row md:items-center md:justify-between">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(t.id)}
-                    onChange={() => toggleOne(t.id)}
-                    aria-label="Selecionar gasto"
-                    className="h-4 w-4 shrink-0"
+              {/* Computador: colunas fixas (data | título | categoria | valor | ↔ | ações), para os títulos e as categorias ficarem alinhados. */}
+              <div className="hidden items-center gap-3 py-3 md:flex">
+                <input
+                  type="checkbox"
+                  checked={selected.has(t.id)}
+                  onChange={() => toggleOne(t.id)}
+                  aria-label="Selecionar gasto"
+                  className="h-4 w-4 shrink-0"
+                />
+                <span className="tnum w-20 shrink-0 text-xs text-muted">{fmtDate(t.date)}</span>
+                <div className="min-w-0 flex-1">
+                  <InlineName
+                    display={t.nome || t.description}
+                    initial={t.nome ?? ''}
+                    onSave={(v) => void put('transactions', { ...t, nome: v.trim() || undefined })}
                   />
-                  <span className="tnum w-20 shrink-0 text-xs text-muted">{fmtDate(t.date)}</span>
+                  {t.nome && t.description && (
+                    <div className="truncate text-xs text-muted" title={t.description}>{t.description}</div>
+                  )}
+                </div>
+                <div className="w-48 shrink-0 lg:w-56">
                   <CategoryPicker
+                    fill
                     groups={groups}
                     subcategories={data.subcategories}
                     value={resolve(t)}
@@ -574,22 +586,14 @@ export function Gastos() {
                     onSelect={(gid, sid) => changeCategory(t.id, gid, sid)}
                     onCreateSubcategory={createSubcategory}
                   />
-                  <div className="min-w-0">
-                    <InlineName
-                      display={t.nome || t.description}
-                      initial={t.nome ?? ''}
-                      onSave={(v) => void put('transactions', { ...t, nome: v.trim() || undefined })}
-                    />
-                    {t.nome && t.description && (
-                      <div className="truncate text-xs text-muted" title={t.description}>{t.description}</div>
-                    )}
-                  </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
-                  <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
+                <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
+                <div className="flex w-[5.5rem] shrink-0 justify-end">
                   {movementOf(t) ? (
-                    <span title="Já tem movimento de poupança">
-                      <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>
+                    <span title="Já tem movimento de poupança" className="flex min-w-0 max-w-full">
+                      <Badge tone="accent" className="min-w-0 max-w-full">
+                        <span className="truncate">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</span>
+                      </Badge>
                     </span>
                   ) : (
                     <button
@@ -601,6 +605,8 @@ export function Gastos() {
                       ↔
                     </button>
                   )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     onClick={() => openEdit(t)}
                     className="shrink-0 rounded-lg px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"

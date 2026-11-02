@@ -132,8 +132,8 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
 }
 
 export function Badge({
-  children, tone = 'neutral',
-}: { children: ReactNode; tone?: 'neutral' | 'accent' | 'goal' | 'warn' | 'negative' }) {
+  children, tone = 'neutral', className,
+}: { children: ReactNode; tone?: 'neutral' | 'accent' | 'goal' | 'warn' | 'negative'; className?: string }) {
   const tones = {
     neutral: 'bg-surface-2 text-muted',
     accent: 'bg-accent-soft text-accent-strong',
@@ -142,7 +142,7 @@ export function Badge({
     negative: 'bg-negative/10 text-negative',
   }
   return (
-    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', tones[tone])}>
+    <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold', tones[tone], className)}>
       {children}
     </span>
   )

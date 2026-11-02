@@ -13,6 +13,7 @@ export function CategoryPicker({
   fallbackLabel,
   onSelect,
   onCreateSubcategory,
+  fill,
 }: {
   groups: Group[]
   subcategories: Subcategory[]
@@ -22,6 +23,8 @@ export function CategoryPicker({
   onSelect: (groupId: string, subcategoryId?: string) => void
   // Cria uma subcategoria nova e devolve o id (para a selecionar logo).
   onCreateSubcategory?: (parentId: string, name: string) => string
+  // Ocupa a largura do contentor (colunas alinhadas): o nome longo corta com «…» e mostra-se inteiro ao passar o rato.
+  fill?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [parent, setParent] = useState<Group | null>(null)
@@ -92,17 +95,22 @@ export function CategoryPicker({
   )
 
   return (
-    <div ref={ref} className="relative shrink-0">
+    <div ref={ref} className={cx('relative', fill ? 'min-w-0' : 'shrink-0')}>
       <button
         type="button"
         onClick={() => (open ? close() : setOpen(true))}
         aria-label={current ? `Categoria: ${label}` : 'Atribuir categoria'}
-        className="rounded-full transition-opacity hover:opacity-80"
+        title={fill ? (current ? label : fallbackLabel) : undefined}
+        className={cx('rounded-full transition-opacity hover:opacity-80', fill && 'flex max-w-full')}
       >
         {current ? (
-          <Badge tone={current.kind === 'bucket' ? 'goal' : undefined}>{label}</Badge>
+          <Badge tone={current.kind === 'bucket' ? 'goal' : undefined} className={fill ? 'min-w-0 max-w-full' : undefined}>
+            {fill ? <span className="truncate">{label}</span> : label}
+          </Badge>
         ) : (
-          <Badge tone="warn" >{fallbackLabel ? `${fallbackLabel} · associar` : '+ categoria'}</Badge>
+          <Badge tone="warn" className={fill ? 'min-w-0 max-w-full' : undefined}>
+            {fill ? <span className="truncate">{fallbackLabel ? `${fallbackLabel} · associar` : '+ categoria'}</span> : (fallbackLabel ? `${fallbackLabel} · associar` : '+ categoria')}
+          </Badge>
         )}
       </button>
 
