@@ -65,6 +65,18 @@ export interface MonthlyPlan {
 
 // ---------- Movimentos de poupança ----------
 
+// O que um movimento real fez ao movimento previsto a que está ligado.
+// 'part': gastou uma parte (o previsto desce esse valor e continua aberto).
+// 'close': é o valor total (o previsto ajusta-se ao valor real e fica feito).
+export interface PlannedLink {
+  plannedMovementId: string
+  effect: 'part' | 'close'
+  // Variação aplicada ao `amount` do previsto (com sinal), para se poder reverter.
+  delta: number
+  // Este movimento fechou o previsto (ao reverter, o previsto reabre).
+  closed: boolean
+}
+
 export interface SavingsMovement {
   id: string
   date: string // "YYYY-MM-DD"
@@ -78,6 +90,8 @@ export interface SavingsMovement {
   transferGroupId?: string
   // Gerado automaticamente ao confirmar a reposição de um gasto (Transaction.id).
   transactionId?: string
+  // Ligação opcional a um movimento previsto das Projeções (ver lib/calc/plannedLink.ts).
+  plannedLink?: PlannedLink
   // O movimento já existia (registado à mão) e foi ligado depois a um gasto
   // importado do extrato. Ao apagar o gasto, o movimento mantém-se (só se desliga).
   linkedAfter?: boolean
