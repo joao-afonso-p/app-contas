@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useRef, useState } from 'react'
 import {
   Badge, Button, Card, EmptyState, Input, MetricCard, Modal, Money, SectionTitle, Select, Spinner, cx,
 } from '../components/ui'
@@ -47,6 +47,11 @@ const splitKey = (key: string) => {
 }
 
 const LIST_PAGE = 150
+
+// Texto longo do banco (ex.: «DD Servicos Municipalizados de Agua e Saneamento 99984945085»)
+// corta-se a um máximo de caracteres, para as linhas ficarem uniformes. O cartão mostra tudo.
+const MAX_TEXT = 48
+const clipText = (text: string): string => (text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT).trimEnd()}…` : text)
 
 export function Gastos() {
   const data = useStore((s) => s.data)
@@ -161,6 +166,10 @@ export function Gastos() {
   const [nome, setNome] = useState('')
   const [description, setDescription] = useState('')
   const [addError, setAddError] = useState('')
+
+  // Cartão com todos os detalhes de um gasto (só leitura; o botão Editar abre a edição).
+  const [viewId, setViewId] = useState<string | null>(null)
+  const viewing = viewId ? data.transactions.find((t) => t.id === viewId) : undefined
 
   const openEdit = (t: Transaction) => {
     setEditingId(t.id)
@@ -556,7 +565,7 @@ export function Gastos() {
                   {movementOf(t) && <Badge tone="accent">{`↔ ${bucketNameOf(movementOf(t)!.bucketId)}`}</Badge>}
                 </div>
               </div>
-              {/* Computador: colunas fixas (data | título | categoria | valor | ↔ | ações), para os títulos e as categorias ficarem alinhados. */}
+              {/* Computador: colunas fixas (data | categoria | título | valor | ↔ | ações), para tudo ficar alinhado. */}
               <div className="hidden items-center gap-3 py-3 md:flex">
                 <input
                   type="checkbox"
@@ -566,17 +575,7 @@ export function Gastos() {
                   className="h-4 w-4 shrink-0"
                 />
                 <span className="tnum w-20 shrink-0 text-xs text-muted">{fmtDate(t.date)}</span>
-                <div className="min-w-0 flex-1">
-                  <InlineName
-                    display={t.nome || t.description}
-                    initial={t.nome ?? ''}
-                    onSave={(v) => void put('transactions', { ...t, nome: v.trim() || undefined })}
-                  />
-                  {t.nome && t.description && (
-                    <div className="truncate text-xs text-muted" title={t.description}>{t.description}</div>
-                  )}
-                </div>
-                <div className="w-48 shrink-0 lg:w-56">
+                <div className="w-44 shrink-0">
                   <CategoryPicker
                     fill
                     groups={groups}
@@ -587,6 +586,17 @@ export function Gastos() {
                     onCreateSubcategory={createSubcategory}
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setViewId(t.id)}
+                  title="Ver detalhes"
+                  className="group min-w-0 flex-1 text-left"
+                >
+                  <div className="truncate text-sm font-medium text-text group-hover:text-accent-strong">{clipText(t.nome || t.description)}</div>
+                  {t.nome && t.description && (
+                    <div className="truncate text-xs text-muted">{clipText(t.description)}</div>
+                  )}
+                </button>
                 <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
                 <div className="flex w-[5.5rem] shrink-0 justify-end">
                   {movementOf(t) ? (
@@ -748,6 +758,54 @@ export function Gastos() {
             <Button onClick={submitAdd}>Guardar</Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Cartão de detalhes do gasto (só leitura) */}
+      <Modal
+        open={viewing !== undefined}
+        onClose={() => setViewId(null)}
+        title="Gasto"
+        action={viewing && (
+          <button
+            type="button"
+            onClick={() => { const t = viewing; setViewId(null); openEdit(t) }}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-accent-strong hover:bg-accent-soft"
+          >
+            <Pencil size={13} strokeWidth={1.75} aria-hidden="true" />
+            Editar
+          </button>
+        )}
+      >
+        {viewing && (() => {
+          const mv = movementOf(viewing)
+          const label = labelFor(resolve(viewing), data)
+          return (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0 break-words text-base font-semibold text-text">{viewing.nome || viewing.description}</div>
+                <Money value={-viewing.amount} className="shrink-0 text-base font-bold" />
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+                <dt className="text-muted">Data</dt>
+                <dd className="text-text">{fmtDate(viewing.date)}</dd>
+                <dt className="text-muted">Categoria</dt>
+                <dd className="text-text">{label || 'Sem categoria'}</dd>
+                {viewing.nome && viewing.description && (
+                  <>
+                    <dt className="text-muted">Descrição</dt>
+                    <dd className="break-words text-text">{viewing.description}</dd>
+                  </>
+                )}
+                {mv && (
+                  <>
+                    <dt className="text-muted">Poupança</dt>
+                    <dd className="break-words text-text">{`↔ ${bucketNameOf(mv.bucketId)}${mv.description ? ` · ${mv.description}` : ''}`}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )
+        })()}
       </Modal>
 
       {/* Modal: criar movimento de poupança a partir de um gasto */}
@@ -1076,49 +1134,3 @@ export function Gastos() {
   )
 }
 
-// Edição inline do nome: clicar no texto torna-o editável, Enter/blur grava,
-// Esc cancela. Edita apenas o `nome` (mesmo quando mostra a descrição por o
-// nome estar vazio). O botão ✎ continua a permitir editar tudo.
-function InlineName({
-  display, initial, onSave,
-}: { display: string; initial: string; onSave: (v: string) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(initial)
-  const ref = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editing) ref.current?.select()
-  }, [editing])
-
-  const commit = () => {
-    setEditing(false)
-    if (draft !== initial) onSave(draft)
-  }
-
-  if (editing) {
-    return (
-      <input
-        ref={ref}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') { setDraft(initial); setEditing(false) }
-        }}
-        placeholder="Nome do gasto"
-        className="w-full max-w-[220px] rounded-lg border border-accent bg-surface px-2 py-1 text-sm text-text focus:outline-none"
-      />
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={() => { setDraft(initial); setEditing(true) }}
-      title="Clica para editar o nome"
-      className="block max-w-full truncate rounded text-left text-sm font-medium text-text hover:text-accent-strong"
-    >
-      {display}
-    </button>
-  )
-}

@@ -168,8 +168,8 @@ export function ProgressBar({
 }
 
 export function Modal({
-  open, onClose, title, children, wide,
-}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  open, onClose, title, children, wide, action,
+}: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; action?: ReactNode }) {
   if (!open) return null
   return createPortal(
     <div
@@ -185,7 +185,10 @@ export function Modal({
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-base font-bold">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+          <div className="flex items-center gap-1">
+            {action}
+            <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Fechar"><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>
+          </div>
         </div>
         {children}
       </div>
