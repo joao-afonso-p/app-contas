@@ -391,6 +391,18 @@ export const GUIDE: GuideSection[] = [
             ],
           },
           {
+            t: 'p',
+            text: 'Há movimentos previstos que se gastam aos poucos, como as prendas de Natal. Em vez de os marcares como feitos à mão, **liga-os ao registar a saída**: em Movimentos, ao criar (ou editar) uma saída, usa "Ligar a um movimento previsto nas Projeções" e escolhe o previsto. Depois diz o que aquela saída é: **só uma parte** (o previsto desce esse valor e continua aberto) ou **o valor total** (o previsto ajusta-se ao valor real e fica concluído, e o que sobrar deixa de contar). A app pede confirmação antes de guardar.',
+          },
+          {
+            t: 'p',
+            text: 'Os movimentos ligados mostram um pequeno ícone das Projeções. No computador, o ícone leva-te à linha certa nas Projeções, onde uma setinha abre a lista de entradas, com o valor original e o que ainda falta. Se apagares o movimento, o valor volta ao previsto. Esta opção só aparece depois de as Projeções abrirem.',
+          },
+          {
+            t: 'example',
+            text: 'A Marta previu 300 € de "Prendas de Natal" em dezembro. Compra um presente de 60 €, regista a saída do balde Geral e liga-a a esse previsto como "só uma parte". O previsto passa a 240 €. Quando compra as mochilas dos sobrinhos (previstas a 100 €) por 80 €, liga como "valor total": o previsto fica em 80 € e concluído.',
+          },
+          {
             t: 'example',
             text: 'A Marta quer ir a Itália em julho de 2027 e já tem o balde Férias, um objetivo de 1 800 €. Em Projeções vê que, ao ritmo de 150 € por mês, atinge os 1 800 € em janeiro, bem antes de julho. Acrescenta também o seguro anual do carro, 480 € em março, com "+ Movimento". A projeção mostra que o balde Carro desce em março mas continua positivo, por isso ela não precisa de mexer na entrada mensal.',
           },
