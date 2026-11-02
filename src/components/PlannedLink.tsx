@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { InfoHint, cx } from './ui'
 import { fmtEUR, monthShort } from '../lib/format'
 import { applyPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
 import { usePlannedFocus } from '../lib/plannedFocus'
 import { useStore } from '../store/useStore'
 import type { PlannedMovement, SavingsMovement } from '../types'
-import { TrendingUp } from 'lucide-react'
+import { Search, TrendingUp } from 'lucide-react'
 
 // ---------- Seletor dentro do formulário de movimento ----------
 
@@ -19,11 +19,35 @@ interface PickerProps {
   onChange: (plannedId: string, effect: LinkEffect) => void
 }
 
+const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+// Quanto da linha seguinte fica à vista ao abrir a lista completa (sugere que há scroll).
+const PEEK_PX = 20
+const SEARCH_MAX_PX = 176
+
 export function PlannedLinkPicker({ main, later, selectedId, effect, spent, bucketName, onChange }: PickerProps) {
   const [more, setMore] = useState(false)
-  const showLater = more || later.some((m) => m.id === selectedId)
-  const list = showLater ? [...main, ...later] : main
-  const selected = [...main, ...later].find((m) => m.id === selectedId)
+  const [query, setQuery] = useState('')
+  const [peekHeight, setPeekHeight] = useState<number | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  const all = [...main, ...later]
+  const q = norm(query.trim())
+  const searching = q.length > 0
+  const expanded = more || later.some((m) => m.id === selectedId)
+  const list = searching
+    ? all.filter((m) => norm(`${m.description} ${bucketName(m.bucketId)}`).includes(q))
+    : expanded ? all : main
+  const selected = all.find((m) => m.id === selectedId)
+
+  // Ao abrir "Mostrar mais", a lista passa a ter scroll e a altura corta a linha
+  // seguinte a meio: assim vê-se logo que há mais para ver.
+  useLayoutEffect(() => {
+    if (!expanded || searching || !listRef.current) return
+    const last = listRef.current.children[main.length] as HTMLElement | undefined // 0 = "Não ligar"
+    if (!last) return
+    setPeekHeight(last.offsetTop + last.offsetHeight + PEEK_PX)
+  }, [expanded, searching, main.length])
 
   const outcome = selected && spent ? applyPlannedLink(selected, spent, effect) : null
   const before = selected ? Math.abs(selected.amount) : 0
@@ -31,22 +55,36 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
   return (
     <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
       <div>
-        <div className="text-xs font-semibold text-text">Ligar a um movimento previsto nas Projeções (opcional)</div>
+        <div className="text-sm text-text">Ligar a um movimento previsto nas Projeções (opcional)</div>
         <p className="mt-0.5 text-[11px] leading-snug text-muted">
           Para saídas que fazem parte de um orçamento das Projeções, como «Prendas de Natal».
         </p>
       </div>
 
+      {all.length > 3 && (
+        <div className="relative">
+          <Search size={12} strokeWidth={2} aria-hidden="true" className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Procurar entre os previstos…"
+            aria-label="Procurar movimento previsto"
+            className="w-full rounded-lg border border-border bg-surface py-1 pl-6 pr-2 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none"
+          />
+        </div>
+      )}
+
       <div
+        ref={listRef}
         role="radiogroup"
         aria-label="Movimento previsto"
-        className={cx('flex flex-col gap-1', showLater && 'thin-scroll max-h-44 overflow-y-auto pr-0.5')}
+        className={cx('relative flex flex-col gap-1', (searching || expanded) && 'thin-scroll overflow-y-auto pr-0.5')}
+        style={searching ? { maxHeight: SEARCH_MAX_PX } : expanded && peekHeight ? { maxHeight: peekHeight } : undefined}
       >
-        <PlannedOption
-          selected={selectedId === ''}
-          onClick={() => onChange('', effect)}
-          title="Não ligar a nenhum"
-        />
+        {!searching && (
+          <PlannedOption selected={selectedId === ''} onClick={() => onChange('', effect)} title="Não ligar a nenhum" />
+        )}
         {list.map((m) => (
           <PlannedOption
             key={m.id}
@@ -57,9 +95,10 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
             amount={fmtEUR(Math.abs(m.amount))}
           />
         ))}
+        {searching && list.length === 0 && <p className="px-1 py-1 text-[11px] text-muted">Nenhum movimento previsto encontrado.</p>}
       </div>
 
-      {!showLater && later.length > 0 && (
+      {!expanded && !searching && later.length > 0 && (
         <button type="button" onClick={() => setMore(true)} className="self-start text-xs font-semibold text-accent-strong hover:underline">
           {`Mostrar mais (${later.length})`}
         </button>
@@ -67,7 +106,7 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
 
       {selected && (
         <div className="mt-0.5 flex flex-col gap-1.5 border-t border-border pt-2">
-          <div className="text-xs font-semibold text-text">Este movimento corresponde a…</div>
+          <div className="text-xs font-medium text-text">Este movimento corresponde a…</div>
           <EffectOption
             checked={effect === 'part'}
             onClick={() => onChange(selectedId, 'part')}
@@ -119,10 +158,10 @@ function PlannedOption({
         className={cx('h-3.5 w-3.5 shrink-0 rounded-full border-2', selected ? 'border-accent-strong bg-accent-strong' : 'border-border')}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium leading-tight text-text">{title}</span>
+        <span className="block truncate text-xs leading-tight text-text">{title}</span>
         {meta && <span className="block truncate text-[11px] leading-tight text-muted">{meta}</span>}
       </span>
-      {amount && <span className="tnum shrink-0 text-sm font-semibold text-text">{amount}</span>}
+      {amount && <span className="tnum shrink-0 text-xs font-medium text-text">{amount}</span>}
     </button>
   )
 }
@@ -146,7 +185,7 @@ function EffectOption({
         className={cx('mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2', checked ? 'border-accent-strong bg-accent-strong' : 'border-border')}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-medium leading-tight text-text">{title}</span>
+        <span className="block text-xs font-medium leading-tight text-text">{title}</span>
         <span className="mt-0.5 block text-[11px] leading-snug text-muted">{text}</span>
       </span>
     </button>
