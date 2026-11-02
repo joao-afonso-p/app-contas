@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useSessionState } from '../lib/sessionState'
 import { Badge, Button, EmptyState, Input, Modal, Select, cx } from '../components/ui'
-import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, parseAmount, todayISO } from '../lib/format'
+import { addMonths, currentMonthKey, fmtDate, fmtEUR, monthOfDate, monthShort, parseAmount, todayISO } from '../lib/format'
 import { activeBuckets, activeVehicles, useStore } from '../store/useStore'
+import { activeAccountingMonth } from '../lib/calc/balances'
+import { applyPlannedLink, plannedOptions, revertPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
+import { featureStatus } from '../lib/unlock'
+import { PlannedLinkBadge, PlannedLinkPicker } from '../components/PlannedLink'
 import type { SavingsMovement } from '../types'
 import { Pencil, Trash } from 'lucide-react'
 
@@ -17,6 +21,9 @@ interface MovementForm {
   description: string
   toVehicle: boolean
   vehicleId: string
+  // Ligação opcional a um movimento previsto das Projeções ('' = sem ligação).
+  plannedId: string
+  plannedEffect: LinkEffect
 }
 
 const emptyForm = (): MovementForm => ({
@@ -28,16 +35,18 @@ const emptyForm = (): MovementForm => ({
   description: '',
   toVehicle: false,
   vehicleId: '',
+  plannedId: '',
+  plannedEffect: 'part',
 })
 
 const draftAmount = (value: number) => String(Math.abs(value)).replace('.', ',')
 
 export function Movimentos() {
   const data = useStore((s) => s.data)
-  const addMovement = useStore((s) => s.addMovement)
+  const saveSimpleMovement = useStore((s) => s.saveSimpleMovement)
+  const deleteMovement = useStore((s) => s.deleteMovement)
   const addTransfer = useStore((s) => s.addTransfer)
   const put = useStore((s) => s.put)
-  const remove = useStore((s) => s.remove)
 
   const [modalOpen, setModalOpen] = useState(false)
   const [error, setError] = useState('')
@@ -54,6 +63,21 @@ export function Movimentos() {
 
   const buckets = useMemo(() => activeBuckets(data), [data])
   const vehicles = useMemo(() => activeVehicles(data), [data])
+
+  // Ligar a movimentos previstos: só com as Projeções desbloqueadas (à mão ou pelo tempo).
+  const projecoesOpen = !featureStatus(data.meta[0], 'projecoes', todayISO()).locked
+  const baseMonth = activeAccountingMonth(data.monthlyPlans, currentMonthKey())
+  const editingMovement = editingId ? data.savingsMovements.find((m) => m.id === editingId) : undefined
+  const plannedChoices = useMemo(() => {
+    const keepId = editingMovement?.plannedLink?.plannedMovementId
+    const { main, later } = plannedOptions(data.plannedMovements, baseMonth, keepId)
+    // Ao editar, o previsto ligado mostra-se como estaria sem este movimento.
+    const link = editingMovement?.plannedLink
+    const undo = (p: (typeof main)[number]) => (link && p.id === link.plannedMovementId ? revertPlannedLink(p, link) : p)
+    return { main: main.map(undo), later: later.map(undo) }
+  }, [data.plannedMovements, baseMonth, editingMovement])
+  const linkAllowed = projecoesOpen && form.kind === 'saida' && !form.toVehicle
+  const hasPlannedChoices = plannedChoices.main.length + plannedChoices.later.length > 0
 
   const movements = useMemo(
     () =>
@@ -93,6 +117,8 @@ export function Movimentos() {
         description: m.description,
         toVehicle: false,
         vehicleId: '',
+        plannedId: '',
+        plannedEffect: 'part',
       })
       setEditingId(null)
       setEditingTransferGroupId(m.transferGroupId)
@@ -106,6 +132,8 @@ export function Movimentos() {
         description: m.description,
         toVehicle: !!m.vehicleId,
         vehicleId: m.vehicleId ?? '',
+        plannedId: m.plannedLink?.plannedMovementId ?? '',
+        plannedEffect: m.plannedLink?.effect ?? 'part',
       })
       setEditingId(m.id)
       setEditingTransferGroupId(null)
@@ -153,29 +181,39 @@ export function Movimentos() {
     }
     const sign = form.kind === 'entrada' ? 1 : -1
     const vehicleId = form.kind === 'saida' && form.toVehicle && form.vehicleId ? form.vehicleId : undefined
-    if (editingId) {
-      void put('savingsMovements', {
-        id: editingId,
-        date: form.date,
-        bucketId: form.bucketId,
-        amount: parsed * sign,
-        description: form.description.trim(),
-        vehicleId,
-      })
-    } else {
-      void addMovement({
-        date: form.date,
-        bucketId: form.bucketId,
-        amount: parsed * sign,
-        description: form.description.trim(),
-        vehicleId,
-      })
+
+    // Ligação a um movimento previsto: só em saídas que não vão para investimento.
+    const target = linkAllowed && form.plannedId ? [...plannedChoices.main, ...plannedChoices.later].find((p) => p.id === form.plannedId) : undefined
+    if (target) {
+      const out = applyPlannedLink(target, parsed, form.plannedEffect)
+      const name = target.description || 'Sem descrição'
+      const msg = form.plannedEffect === 'close'
+        ? `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto passa de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e fica CONCLUÍDO: deixa de contar nas projeções.\n\nConfirmas?`
+        : `Vais ligar este movimento ao movimento previsto «${name}» (${monthShort(target.month)}).\n\nO previsto desce de ${fmtEUR(Math.abs(target.amount))} para ${fmtEUR(Math.abs(out.planned.amount))} e continua aberto.${out.clamped ? '\n\nAtenção: gastaste mais do que restava, por isso o previsto fica a 0 €.' : ''}\n\nConfirmas?`
+      if (!window.confirm(msg)) return
     }
+
+    void saveSimpleMovement({
+      id: editingId ?? undefined,
+      fields: {
+        date: form.date,
+        bucketId: form.bucketId,
+        amount: parsed * sign,
+        description: form.description.trim(),
+        vehicleId,
+      },
+      link: target ? { plannedMovementId: target.id, effect: form.plannedEffect } : undefined,
+    })
     setModalOpen(false)
   }
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Apagar este movimento?')) void remove('savingsMovements', id)
+    const m = data.savingsMovements.find((x) => x.id === id)
+    const planned = m?.plannedLink ? data.plannedMovements.find((p) => p.id === m.plannedLink!.plannedMovementId) : undefined
+    const msg = planned
+      ? `Apagar este movimento? O valor volta ao movimento previsto «${planned.description || 'Sem descrição'}»${m?.plannedLink?.closed ? ', que reabre' : ''}.`
+      : 'Apagar este movimento?'
+    if (window.confirm(msg)) void deleteMovement(id)
   }
 
   const bucketName = (id: string) => data.savingsBuckets.find((b) => b.id === id)?.name ?? '–'
@@ -226,6 +264,7 @@ export function Movimentos() {
                   </div>
                   <div className="text-xs text-muted">{fmtDate(m.date)} · {bucket?.name ?? '–'}</div>
                 </button>
+                <PlannedLinkBadge movement={m} />
                 <span className={cx('tnum shrink-0 text-sm font-semibold', m.amount >= 0 ? 'text-positive' : 'text-negative')}>
                   {m.amount >= 0 ? '+' : ''}{fmtEUR(m.amount)}
                 </span>
@@ -265,6 +304,7 @@ export function Movimentos() {
                       <span className="flex items-center gap-1.5">
                         <span className="min-w-0 truncate">{m.description || 'Sem descrição'}</span>
                         {isTransfer && <Badge tone="accent">Transferência</Badge>}
+                        <PlannedLinkBadge movement={m} />
                       </span>
                     </td>
                     <td
@@ -425,6 +465,18 @@ export function Movimentos() {
                 )
               )}
             </div>
+          )}
+
+          {linkAllowed && hasPlannedChoices && (
+            <PlannedLinkPicker
+              main={plannedChoices.main}
+              later={plannedChoices.later}
+              selectedId={form.plannedId}
+              effect={form.plannedEffect}
+              spent={(() => { const v = parseAmount(form.amount); return v !== null && v > 0 ? v : null })()}
+              bucketName={bucketName}
+              onChange={(plannedId, plannedEffect) => setForm((f) => ({ ...f, plannedId, plannedEffect }))}
+            />
           )}
 
           <div>
