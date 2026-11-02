@@ -1,110 +1,87 @@
 # Contas
 
-App privada de gestão de finanças pessoais para 2 pessoas — uma reimaginação moderna da folha de Excel "Contas Inês e João". Sem logins: a partilha faz-se por um **código de espaço** secreto.
+Aplicação web de gestão de finanças pessoais: planeamento mensal por baldes, gastos reais, poupança, investimento e projeções. Funciona offline, instala-se como PWA e pode sincronizar entre dispositivos.
 
-- **Desktop**: versão completa (Planeamento, Movimentos, Gastos, Analytics, Investimento, Projeções, Overview).
-- **Mobile (PWA)**: o essencial do dia-a-dia — registar gastos e movimentos, ver saldos e os números-chave do mês.
-- **Offline-first**: funciona sem rede e sincroniza quando voltar a haver ligação.
+**App:** [asminhascontas.com](https://asminhascontas.com)
+
+## Funcionalidades
+
+- **Planeamento**: rendimentos, despesas e baldes de poupança por mês, com uma barra de alocação até 100%.
+- **Movimentos e Gastos**: entradas, saídas e transferências entre baldes; importação de extratos (PDF, Excel ou texto) com sugestão de categoria e deteção de duplicados; ligação de gastos a movimentos de poupança.
+- **Projeções**: grelha editável mês a mês, objetivos com meta e prazo, movimentos previstos que se podem ligar a saídas reais.
+- **Analytics, Investimento e Overview**: planeado vs. real, veículos de investimento com checkpoints e simulador, saldo total ao longo do tempo.
+- **Guia e visitas guiadas**: guia dentro da app (também em PDF), onboarding interativo e desbloqueio progressivo das partes avançadas.
+- **PWA**: o desktop tem a versão completa; o telemóvel cobre o essencial do dia a dia.
 
 ## Stack
 
-React 19 + Vite + TypeScript · Tailwind CSS v4 · Zustand · Recharts · Firebase (Firestore + Anonymous Auth) · IndexedDB (`idb`) · vite-plugin-pwa · Vitest.
+React 19, Vite, TypeScript, Tailwind CSS v4, Zustand, Recharts, `vite-plugin-pwa`, Vitest. Dados em IndexedDB (`idb`) ou Firestore (Firebase, com autenticação anónima).
 
-## Correr localmente
+## Desenvolvimento
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm test         # testes dos módulos de cálculo
-npm run build    # typecheck + build de produção
+npm run dev        # http://localhost:5173
+npm test           # testes (Vitest)
+npm run build      # typecheck + build de produção
 ```
 
-Sem configurar nada, a app corre em **modo local** (IndexedDB). No primeiro arranque passas pelo onboarding (configuras fontes de rendimento, categorias e baldes) ou, se vens de outro dispositivo, importas uma cópia de segurança.
+Sem configuração, a app corre em modo local. Para testar a sincronização, copia `.env.example` para `.env` e preenche as variáveis.
 
-### Cópia de segurança / mudar de dispositivo
-
-Só no modo local: em Definições → Dados, "Exportar dados" gera um ficheiro `contas-backup-AAAA-MM-DD.json` com todos os dados (não inclui a chave da OpenAI nem o tema). No dispositivo novo, escolhe "Usar localmente" e, no ecrã inicial, "Importar cópia de segurança". Importar substitui tudo o que existir no dispositivo; é uma fotografia do momento da exportação. O ficheiro contém dados financeiros — mantém-no privado.
+| Variável | Para quê |
+| --- | --- |
+| `VITE_FIREBASE_*` (6 variáveis) | Config do projeto Firebase. Sem elas, só há modo local. |
+| `VITE_PREMIUM_CODES` | Códigos de uso único para criar espaços sincronizados. Opcional. |
+| `VITE_GOATCOUNTER_CODE` | Estatísticas anónimas. Só entra no build de produção. |
+| `VITE_BASE` | Base path do build (`/` em produção). |
 
 ## Arquitetura
 
 ```
 src/
-  types.ts               # modelo de dados (tudo tipado)
+  types.ts               modelo de dados
   lib/
-    format.ts            # €, datas e meses em pt-PT
-    calc/                # lógica pura e testada (Vitest)
-      allocation.ts      #   alocação do mês, "deixar na conta", "transferir p/ poupança"
-      balances.ts        #   saldos SEMPRE calculados (plano + movimentos + overrides)
-      projections.ts     #   projeções, objetivos, viagens, poupança mensal necessária
-      budgets.ts         #   gastos por categoria, tetos, parse de extrato, aprendizagem
+    calc/                lógica pura e testada: alocação, saldos, projeções,
+                         categorias, deduplicação, ligações movimento/previsto
+    ai/                  extração de extratos (PDF/Excel) com a chave do utilizador
+    unlock.ts, coach.ts  desbloqueio progressivo e visitas guiadas
+    backup.ts            exportar e importar cópias de segurança
   data/
-    adapter.ts           # interface DataAdapter
-    localAdapter.ts      # IndexedDB (default, 100% offline)
-    firebaseAdapter.ts   # Firestore em tempo real (código de espaço)
-  store/                 # Zustand + seeds
-  screens/               # 1 ficheiro por ecrã
-  components/            # ui base (Card, MoneyCell, ProgressBar, …)
+    adapter.ts           interface DataAdapter
+    localAdapter.ts      IndexedDB (por defeito, 100% offline)
+    firebaseAdapter.ts   Firestore em tempo real
+  store/                 Zustand: estado, ações e seeds
+  screens/               um ficheiro por ecrã
+  components/            UI base e componentes partilhados
+  content/               guia e visitas guiadas (dados, com testes)
+data/marta/              backup de demonstração (9 meses)
+scripts/                 geração do PDF do guia e dos dados de demonstração
 ```
 
-**Princípio central**: os saldos nunca são escritos à mão. `saldo(mês) = saldo(mês−1) + alocado no planeamento + movimentos do mês`, com *overrides* opcionais ("a partir deste mês o saldo é X") usados nas projeções e no botão **Sincronizar com a realidade**.
+Princípios:
 
-## Configurar o Firebase (sincronização entre dispositivos)
+- **Saldos sempre calculados**, nunca escritos à mão: `saldo(mês) = saldo(mês − 1) + alocado no planeamento + movimentos do mês`. As projeções reutilizam o mesmo motor, separando a realidade confirmada do futuro projetado.
+- **Lógica em `lib/calc`**: funções puras, sem acesso a dados nem a UI, cobertas por testes.
+- **Dados atrás de um adapter**: o resto da app não sabe se está em modo local ou sincronizado.
+- **Alterações aditivas**: campos novos são opcionais, para nunca invalidar dados existentes.
 
-1. Cria um projeto em [console.firebase.google.com](https://console.firebase.google.com) (podes desativar o Analytics).
-2. **Firestore Database** → Criar base de dados → modo produção.
-3. **Authentication** → Sign-in method → ativa **Anonymous**.
-4. Separador **Regras** do Firestore → cola o conteúdo de [`firestore.rules`](firestore.rules) e publica.
-5. Definições do projeto → As tuas apps → adiciona uma **app Web** → copia a config.
-6. `cp .env.example .env` e preenche as variáveis `VITE_FIREBASE_*`.
-7. `npm run dev` → Definições → **Criar espaço novo**. Copia o código gerado e introduce-o no outro dispositivo ("Entrar com código existente" ou no ecrã inicial).
+## Dados e sincronização
 
-**Modelo de segurança**: as regras exigem autenticação (anónima e invisível para vocês); a privacidade assenta no código de espaço ser longo, aleatório e secreto (ex.: `k7m2-9xqa-4pl3-vn8w`). Adequado para uso doméstico — não partilhes o código.
+- **Modo local**: IndexedDB no próprio dispositivo. Tem exportação e importação de backup (Definições → Dados), em JSON.
+- **Modo sincronizado**: espaço no Firestore identificado por um código longo e aleatório. As regras (`firestore.rules`) exigem autenticação anónima, e a privacidade assenta no código ser secreto. Ao entrar num espaço vazio, os dados locais migram automaticamente.
+- Os dados locais e as preferências do browser são por endereço (origem). Mudar de domínio exige exportar e importar um backup.
 
-Ao entrar num espaço vazio, a app **migra automaticamente os dados locais** para o espaço.
+## Deploy
 
-### Códigos de acesso premium
+O workflow [`deploy.yml`](.github/workflows/deploy.yml) faz o build e publica no GitHub Pages a cada push para `main`. Usa secrets do repositório para as variáveis `VITE_*`. O domínio próprio configura-se em Settings → Pages (registos `A` e `CNAME` no DNS), com `public/CNAME` no repositório, e o domínio tem de constar dos domínios autorizados do Firebase Authentication.
 
-Para dares acesso gratuito à sincronização a outras pessoas (ex.: um casal amigo), sem sistema de
-pagamento nenhum: define `VITE_PREMIUM_CODES` no `.env` com uma lista de códigos separados por
-vírgulas (ex.: `VITE_PREMIUM_CODES=abcd-1234,efgh-5678`). Cada código só pode ser usado **uma vez**
-para criar um espaço sincronizado novo (ecrã inicial → "Criar um espaço novo", ou Definições →
-"Criar espaço novo"); depois disso fica inválido. Só é preciso 1 código por casal/agregado — a
-segunda pessoa entra no mesmo espaço com o código de sincronização gerado (não precisa de outro
-código de acesso). Podes ver quais códigos já foram usados e quando na consola Firebase, coleção
-`premiumCodeRedemptions`.
+## Guia e dados de demonstração
 
-Nota: como esta app é um site estático (sem servidor), esta lista fica no bundle final e é
-tecnicamente extraível por alguém com conhecimentos técnicos — mas como cada código só serve uma
-vez, isso só permite "roubar" um código ainda não usado, nunca reutilizar um já gasto.
+O conteúdo do guia vive em `src/content/guide.ts`. Para regenerar o PDF (`public/guia-contas.pdf`):
 
-## Deploy no GitHub Pages
+```bash
+node scripts/dump-guide.cjs
+python3 scripts/build-guide-pdf.py
+```
 
-1. Cria um repositório no GitHub e faz push do projeto para o branch `main`.
-2. No repositório: **Settings → Pages → Source: GitHub Actions**.
-3. (Para sincronização) **Settings → Secrets and variables → Actions** → adiciona os 6 secrets `VITE_FIREBASE_*` com os valores do teu `.env`, e opcionalmente `VITE_PREMIUM_CODES` se quiseres dar acesso premium a alguém.
-4. O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) faz build e publica a cada push para `main`. A app serve-se na raiz (`VITE_BASE=/`), por causa do domínio próprio.
-
-A app fica em `https://asminhascontas.com`.
-
-### Domínio próprio (asminhascontas.com)
-
-1. No DNS do registador: quatro registos `A` para `@` (`185.199.108.153`, `185.199.109.153`, `185.199.110.153`, `185.199.111.153`) e um `CNAME` de `www` para `<utilizador>.github.io`.
-2. **Settings → Pages → Custom domain**: `asminhascontas.com`; quando disponível, ativa **Enforce HTTPS**.
-3. Firebase → Authentication → Settings → **Authorized domains**: adiciona `asminhascontas.com` (e `www.asminhascontas.com`).
-
-> **Dados locais:** o IndexedDB e o localStorage são por endereço. Ao passar do `github.io` para o domínio próprio, os dados locais não acompanham. Antes de ativar o custom domain, exporta um backup (Definições → Dados) e importa-o no novo endereço. Espaços sincronizados (Firebase) vêm com o login. Quem instalou a app no ecrã principal tem de a reinstalar a partir do novo endereço.
-
-## Instalar como app no iPhone
-
-1. Abre o URL no **Safari**.
-2. Botão de partilha → **Adicionar ao ecrã principal**.
-3. A app "Contas" abre em ecrã inteiro, como nativa, e funciona offline.
-
-No Mac (Chrome/Edge/Safari): ícone de instalação na barra de endereço.
-
-## Notas de uso
-
-- **Início do mês**: abre o Planeamento, ajusta os valores e leva a barra de alocação a 100%. Os dois números do topo dizem-te quanto deixar na conta corrente e quanto transferir já para a poupança (as rendas são descontadas porque se transferem quando chegarem).
-- **Objetivos extraordinários** (baldes com alvo e prazo): barra de progresso, pagamento parcial/total, concluir, adiar.
-- **Gastos → Importar extrato**: cola linhas `data;descrição;valor` — a app sugere categorias e aprende com as tuas correções.
-- **Projeções**: grelha editável mês a mês; viagens vivem dentro do balde "Viajar" com pagamentos faseados; usa "Sincronizar com a realidade" quando as projeções destoarem.
+`data/marta/` tem um backup realista para mostrar a app sem dados pessoais (ver o README dessa pasta).
