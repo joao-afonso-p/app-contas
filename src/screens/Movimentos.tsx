@@ -78,7 +78,8 @@ export function Movimentos() {
     const undo = (p: (typeof main)[number]) => (link && p.id === link.plannedMovementId ? revertPlannedLink(p, link) : p)
     return { main: main.map(undo), later: later.map(undo) }
   }, [data.plannedMovements, baseMonth, editingMovement])
-  // A secção aparece em qualquer saída; fica desativada se a saída é para investimento.
+  // Aparece em qualquer saída. "Ligar ao previsto" e "Saída para investimento" excluem-se:
+  // ativar um desativa o outro (ver os dois onChange abaixo).
   const linkVisible = projecoesOpen && form.kind === 'saida'
   const linkAllowed = linkVisible && !form.toVehicle
   const plannedList = useMemo(() => [...plannedChoices.main, ...plannedChoices.later], [plannedChoices])
@@ -461,7 +462,7 @@ export function Movimentos() {
                   className="peer sr-only"
                   checked={form.toVehicle}
                   disabled={vehicles.length === 0}
-                  onChange={(e) => setForm((f) => ({ ...f, toVehicle: e.target.checked }))}
+                  onChange={(e) => setForm((f) => ({ ...f, toVehicle: e.target.checked, linkPlanned: e.target.checked ? false : f.linkPlanned }))}
                 />
                 {/* Mesmo indicador redondo das opções de ligação às Projeções. */}
                 <span
@@ -497,8 +498,8 @@ export function Movimentos() {
             <PlannedLinkField
               options={plannedList}
               checked={form.linkPlanned}
-              onCheck={(linkPlanned) => setForm((f) => ({ ...f, linkPlanned }))}
-              disabled={form.toVehicle}
+              // Escolher um ou o outro: ativar este desativa "Saída para investimento".
+              onCheck={(linkPlanned) => setForm((f) => ({ ...f, linkPlanned, toVehicle: linkPlanned ? false : f.toVehicle }))}
               selectedId={form.plannedId}
               onSelect={(plannedId) => setForm((f) => ({ ...f, plannedId }))}
               effect={form.plannedEffect}

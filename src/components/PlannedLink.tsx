@@ -22,8 +22,6 @@ interface FieldProps {
   options: PlannedMovement[] // por ordem: este mês e o seguinte primeiro, depois os restantes
   checked: boolean
   onCheck: (checked: boolean) => void
-  // Fica visível mas desativado (ex.: quando a saída é para investimento).
-  disabled?: boolean
   selectedId: string
   onSelect: (plannedId: string) => void
   effect: LinkEffect | '' // '' = ainda não escolheu
@@ -33,23 +31,22 @@ interface FieldProps {
 }
 
 export function PlannedLinkField({
-  options, checked, onCheck, disabled, selectedId, onSelect, effect, onEffect, spent, bucketName,
+  options, checked, onCheck, selectedId, onSelect, effect, onEffect, spent, bucketName,
 }: FieldProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const active = checked && !disabled
+  const active = checked
   const selected = options.find((m) => m.id === selectedId)
   const q = norm(query.trim())
   const list = q ? options.filter((m) => norm(`${m.description} ${bucketName(m.bucketId)}`).includes(q)) : options
 
   return (
-    <div className={cx('flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5', disabled && 'opacity-60')}>
-      <label className={cx('flex items-center gap-2 text-sm', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}>
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
+      <label className="flex cursor-pointer items-center gap-2 text-sm">
         <input
           type="checkbox"
           className="peer sr-only"
           checked={checked}
-          disabled={disabled}
           onChange={(e) => { onCheck(e.target.checked); setOpen(false) }}
         />
         <span
