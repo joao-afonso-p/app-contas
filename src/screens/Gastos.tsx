@@ -527,7 +527,13 @@ export function Gastos() {
             </label>
           ) : undefined}
         >
-          Transações
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            Transações
+            <span className="flex items-center gap-1.5 normal-case tracking-normal" aria-label="Legenda das cores das categorias">
+              <Badge>Orçamento do mês</Badge>
+              <Badge tone="goal">Pago pela poupança</Badge>
+            </span>
+          </span>
         </SectionTitle>
         {selectedIds.length > 0 && (
           <div className="sticky top-2 z-10 mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent/40 bg-surface px-3 py-2 shadow-lg">
