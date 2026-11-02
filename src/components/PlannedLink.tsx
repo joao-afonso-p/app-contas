@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { InfoHint, Modal, Button, cx } from './ui'
+import { InfoHint, cx } from './ui'
 import { fmtEUR, monthShort } from '../lib/format'
 import { applyPlannedLink, type LinkEffect } from '../lib/calc/plannedLink'
 import { usePlannedFocus } from '../lib/plannedFocus'
@@ -15,59 +15,78 @@ const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').t
 
 // ---------- Campo dentro do formulário de movimento ----------
 // Mesmo padrão de "Saída para investimento": caixa por ativar e, quando ativa,
-// uma lista simples (com pesquisa) dos movimentos previstos.
+// uma lista simples (com pesquisa) dos movimentos previstos. Ao escolher um,
+// aparece por baixo o que a saída é para o previsto: só uma parte, ou o total.
 
 interface FieldProps {
   options: PlannedMovement[] // por ordem: este mês e o seguinte primeiro, depois os restantes
   checked: boolean
   onCheck: (checked: boolean) => void
+  // Fica visível mas desativado (ex.: quando a saída é para investimento).
+  disabled?: boolean
   selectedId: string
   onSelect: (plannedId: string) => void
+  effect: LinkEffect | '' // '' = ainda não escolheu
+  onEffect: (effect: LinkEffect) => void
+  spent: number | null // valor da saída já escrito (positivo)
   bucketName: (id: string) => string
 }
 
-export function PlannedLinkField({ options, checked, onCheck, selectedId, onSelect, bucketName }: FieldProps) {
+export function PlannedLinkField({
+  options, checked, onCheck, disabled, selectedId, onSelect, effect, onEffect, spent, bucketName,
+}: FieldProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const active = checked && !disabled
   const selected = options.find((m) => m.id === selectedId)
   const q = norm(query.trim())
   const list = q ? options.filter((m) => norm(`${m.description} ${bucketName(m.bucketId)}`).includes(q)) : options
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
+    <div className={cx('flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5', disabled && 'opacity-60')}>
+      <label className={cx('flex items-center gap-2 text-sm', disabled ? 'cursor-not-allowed' : 'cursor-pointer')}>
         <input
           type="checkbox"
           className="peer sr-only"
           checked={checked}
+          disabled={disabled}
           onChange={(e) => { onCheck(e.target.checked); setOpen(false) }}
         />
         <span
           aria-hidden="true"
           className={cx(
             'h-3.5 w-3.5 shrink-0 rounded-full border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-accent',
-            checked ? 'border-accent-strong bg-accent-strong' : 'border-border',
+            active ? 'border-accent-strong bg-accent-strong' : 'border-border',
           )}
         />
         Ligar a um movimento previsto nas Projeções
       </label>
 
-      {checked && (
+      {active && (
         <>
-          <button
-            type="button"
-            aria-haspopup="listbox"
-            aria-expanded={open}
-            onClick={() => setOpen((o) => !o)}
-            className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-left text-sm text-text focus:border-accent focus:outline-none"
-          >
-            {selected ? (
-              <PlannedRowContent m={selected} bucketName={bucketName} />
-            ) : (
-              <span className="flex-1 text-muted">Escolher o movimento previsto…</span>
-            )}
-            <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={cx('shrink-0 text-muted transition-transform', open && 'rotate-180')} />
-          </button>
+          {/* Mesmo aspeto do <Select> de "Saída para investimento". */}
+          <div className="relative">
+            <button
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={open}
+              onClick={() => setOpen((o) => !o)}
+              className="flex w-full items-center gap-2 rounded-xl border border-border bg-surface py-2 pl-3 pr-9 text-left text-sm text-text focus:border-accent focus:outline-none"
+            >
+              {selected ? (
+                <PlannedRowContent m={selected} bucketName={bucketName} large />
+              ) : (
+                <span className="flex-1 truncate text-text">Escolhe o movimento previsto…</span>
+              )}
+            </button>
+            <ChevronDown
+              size={16}
+              strokeWidth={2.5}
+              aria-hidden="true"
+              style={{ color: '#94a3b8' }}
+              className="pointer-events-none absolute right-[0.7rem] top-1/2 -translate-y-1/2"
+            />
+          </div>
 
           {open && (
             <div className="rounded-xl border border-border bg-surface p-1.5">
@@ -91,7 +110,7 @@ export function PlannedLinkField({ options, checked, onCheck, selectedId, onSele
                     aria-selected={m.id === selectedId}
                     onClick={() => { onSelect(m.id); setOpen(false); setQuery('') }}
                     className={cx(
-                      'flex w-full items-center rounded-lg px-2 py-1.5 text-left text-sm transition-colors',
+                      'flex w-full items-center rounded-lg px-2 py-1.5 text-left transition-colors',
                       m.id === selectedId ? 'bg-accent-soft' : 'hover:bg-surface-2',
                     )}
                   >
@@ -102,6 +121,10 @@ export function PlannedLinkField({ options, checked, onCheck, selectedId, onSele
               </div>
             </div>
           )}
+
+          {selected && (
+            <EffectChoice planned={selected} spent={spent} effect={effect} onEffect={onEffect} />
+          )}
         </>
       )}
     </div>
@@ -109,97 +132,66 @@ export function PlannedLinkField({ options, checked, onCheck, selectedId, onSele
 }
 
 // Uma linha só: título (corta com «…»), «(11/26 · Geral)» mais pequeno e valor arredondado.
-function PlannedRowContent({ m, bucketName }: { m: PlannedMovement; bucketName: (id: string) => string }) {
+function PlannedRowContent({ m, bucketName, large }: { m: PlannedMovement; bucketName: (id: string) => string; large?: boolean }) {
   return (
     <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-      <span className="min-w-0 truncate text-xs text-text">{m.description || 'Sem descrição'}</span>
+      <span className={cx('min-w-0 truncate text-text', large ? 'text-sm' : 'text-xs')}>{m.description || 'Sem descrição'}</span>
       <span className="max-w-[55%] shrink-0 truncate text-[10px] text-muted">{`(${monthNumeric(m.month)} · ${bucketName(m.bucketId)})`}</span>
-      <span className="tnum ml-auto shrink-0 text-xs font-medium text-text">{wholeEUR(Math.abs(m.amount))}</span>
+      <span className={cx('tnum ml-auto shrink-0 font-medium text-text', large ? 'text-sm' : 'text-xs')}>{wholeEUR(Math.abs(m.amount))}</span>
     </span>
   )
 }
 
-// ---------- Pop-up mínimo: o que é este movimento para o previsto? ----------
-// Abre ao guardar um movimento ligado. Mostra o resultado e só então confirma.
-
-interface ConfirmProps {
-  planned: PlannedMovement
-  spent: number // valor da saída (positivo)
-  initialEffect: LinkEffect
-  bucketName: (id: string) => string
-  onCancel: () => void
-  onConfirm: (effect: LinkEffect) => void
-}
-
-// Monta-se só quando é preciso (ver Movimentos), por isso a escolha começa sempre em `initialEffect`.
-export function PlannedLinkConfirm({ planned, spent, initialEffect, bucketName, onCancel, onConfirm }: ConfirmProps) {
-  const [effect, setEffect] = useState<LinkEffect>(initialEffect)
-
+// Duas opções lado a lado, minimalistas. A explicação da escolhida (com os números) aparece por baixo.
+function EffectChoice({
+  planned, spent, effect, onEffect,
+}: { planned: PlannedMovement; spent: number | null; effect: LinkEffect | ''; onEffect: (e: LinkEffect) => void }) {
   const before = Math.abs(planned.amount)
-  const part = applyPlannedLink(planned, spent, 'part')
-  const total = applyPlannedLink(planned, spent, 'close')
+  const part = spent ? applyPlannedLink(planned, spent, 'part') : null
+  const total = spent ? applyPlannedLink(planned, spent, 'close') : null
+
+  let help = 'Toca numa opção para veres o que acontece ao previsto.'
+  if (effect === 'part') {
+    help = part
+      ? `O previsto desce de ${fmtEUR(before)} para ${fmtEUR(Math.abs(part.planned.amount))} e continua aberto, para as próximas compras.`
+      : 'O previsto desce o valor da saída e continua aberto, para as próximas compras.'
+  } else if (effect === 'close') {
+    help = total
+      ? `O previsto passa a ${fmtEUR(Math.abs(total.planned.amount))} e fica concluído.${before > (spent ?? 0) ? ` Os ${fmtEUR(before - (spent ?? 0))} que sobram deixam de contar nas projeções.` : ''}`
+      : 'O previsto ajusta-se ao valor da saída e fica concluído. Já não conta nas projeções.'
+  }
 
   return (
-    <Modal open onClose={onCancel} title="Ligar ao movimento previsto">
-      <div className="flex flex-col gap-3">
-        <div className="rounded-xl bg-surface-2 px-3 py-2">
-          <PlannedRowContent m={planned} bucketName={bucketName} />
-          <div className="mt-0.5 text-[11px] text-muted">{`Esta saída: ${fmtEUR(spent)}`}</div>
-        </div>
-
-        <div className="text-xs font-medium text-text">Esta saída corresponde a…</div>
-        <div role="radiogroup" className="flex flex-col gap-1.5">
-          <EffectOption
-            checked={effect === 'part'}
-            onClick={() => setEffect('part')}
-            title="Só uma parte do previsto"
-            text={`O previsto desce de ${fmtEUR(before)} para ${fmtEUR(Math.abs(part.planned.amount))} e continua aberto, para as próximas compras.`}
-          />
-          <EffectOption
-            checked={effect === 'close'}
-            onClick={() => setEffect('close')}
-            title="O valor total do previsto"
-            text={`O previsto passa a ${fmtEUR(Math.abs(total.planned.amount))} e fica concluído.${before > spent ? ` Os ${fmtEUR(before - spent)} que sobram deixam de contar nas projeções.` : ''}`}
-          />
-        </div>
-        {effect === 'part' && part.clamped && (
-          <p className="text-[11px] text-warn">
-            Gastaste mais do que restava no previsto, por isso ele fica a 0 €. Se esta era a última compra, escolhe «O valor total».
-          </p>
-        )}
-
-        <div className="mt-1 flex justify-end gap-2">
-          <Button variant="ghost" onClick={onCancel}>Voltar</Button>
-          <Button onClick={() => onConfirm(effect)}>Confirmar e guardar</Button>
-        </div>
+    <div className="flex flex-col gap-1">
+      <div className="text-[11px] text-muted">Esta saída é…</div>
+      <div role="radiogroup" aria-label="O que esta saída é para o previsto" className="grid grid-cols-2 gap-1.5">
+        {([['part', 'Só uma parte'], ['close', 'O valor total']] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={effect === id}
+            onClick={() => onEffect(id)}
+            className={cx(
+              'flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors',
+              effect === id ? 'border-accent bg-accent-soft text-text' : 'border-border bg-surface text-text hover:bg-surface-2',
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cx('h-3.5 w-3.5 shrink-0 rounded-full border-2', effect === id ? 'border-accent-strong bg-accent-strong' : 'border-border')}
+            />
+            {label}
+          </button>
+        ))}
       </div>
-    </Modal>
-  )
-}
-
-function EffectOption({
-  checked, onClick, title, text,
-}: { checked: boolean; onClick: () => void; title: string; text: string }) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={checked}
-      onClick={onClick}
-      className={cx(
-        'flex w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
-        checked ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
+      <p className="text-[11px] leading-snug text-muted">{help}</p>
+      {effect === 'part' && part?.clamped && (
+        <p className="text-[11px] text-warn">
+          Gastaste mais do que restava no previsto, por isso ele fica a 0 €. Se esta era a última compra, escolhe «O valor total».
+        </p>
       )}
-    >
-      <span
-        aria-hidden="true"
-        className={cx('mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2', checked ? 'border-accent-strong bg-accent-strong' : 'border-border')}
-      />
-      <span className="min-w-0">
-        <span className="block text-xs font-medium leading-tight text-text">{title}</span>
-        <span className="mt-0.5 block text-[11px] leading-snug text-muted">{text}</span>
-      </span>
-    </button>
+    </div>
   )
 }
 
