@@ -626,43 +626,45 @@ export function Projecoes() {
                           {fmtEUR(m.amount)}
                         </td>
                         <td className="whitespace-nowrap px-2 py-1.5 text-right">
-                          <button
-                            onClick={() => void setPlannedMovementDone(m, !m.done)}
-                            className="group rounded-lg p-1 align-middle hover:bg-surface-2"
-                            aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
-                            aria-pressed={!!m.done}
-                            title={m.done ? 'Feito (clica para voltar a por fazer)' : 'Marcar como feito (já aconteceu)'}
-                          >
-                            <span
-                              className={cx(
-                                'inline-flex h-4 w-4 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none transition-colors',
-                                m.done
-                                  ? 'border-positive bg-positive text-white'
-                                  : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
-                              )}
+                          <div className="flex items-center justify-end">
+                            <button
+                              onClick={() => void setPlannedMovementDone(m, !m.done)}
+                              className="group rounded-lg p-1 hover:bg-surface-2"
+                              aria-label={m.done ? 'Marcar como por fazer' : 'Marcar como feito'}
+                              aria-pressed={!!m.done}
+                              title={m.done ? 'Feito (clica para voltar a por fazer)' : 'Marcar como feito (já aconteceu)'}
                             >
-                              <Check size={10} strokeWidth={3.5} aria-hidden="true" />
-                            </span>
-                          </button>
-                          <button
-                            onClick={() => openEditMovement(m)}
-                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
-                            aria-label="Editar movimento"
-                          >
-                            <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const msg = isTransfer
-                                ? 'Apagar esta transferência prevista (as duas pernas)?'
-                                : 'Apagar este movimento previsto?'
-                              if (window.confirm(msg)) void removePlannedMovement(m)
-                            }}
-                            className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
-                            aria-label="Apagar movimento"
-                          >
-                            <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
-                          </button>
+                              <span
+                                className={cx(
+                                  'inline-flex h-4 w-4 items-center justify-center rounded-full border-2 text-[10px] font-bold leading-none transition-colors',
+                                  m.done
+                                    ? 'border-positive bg-positive text-white'
+                                    : 'border-border text-transparent group-hover:border-positive group-hover:text-positive',
+                                )}
+                              >
+                                <Check size={10} strokeWidth={3.5} aria-hidden="true" />
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => openEditMovement(m)}
+                              className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-text"
+                              aria-label="Editar movimento"
+                            >
+                              <Pencil size={15} strokeWidth={1.75} aria-hidden="true" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const msg = isTransfer
+                                  ? 'Apagar esta transferência prevista (as duas pernas)?'
+                                  : 'Apagar este movimento previsto?'
+                                if (window.confirm(msg)) void removePlannedMovement(m)
+                              }}
+                              className="rounded-lg p-1 text-muted hover:bg-surface-2 hover:text-negative"
+                              aria-label="Apagar movimento"
+                            >
+                              <Trash size={15} strokeWidth={1.75} aria-hidden="true" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                       {expanded && (
