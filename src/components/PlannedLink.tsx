@@ -19,6 +19,11 @@ interface PickerProps {
   onChange: (plannedId: string, effect: LinkEffect) => void
 }
 
+// "2026-11" -> "11/26"
+const monthNumeric = (key: string): string => `${key.slice(5, 7)}/${key.slice(2, 4)}`
+// Valor arredondado, sem cêntimos: 249,6 -> "250€".
+const wholeEUR = (n: number): string => `${Math.round(n).toLocaleString('pt-PT', { maximumFractionDigits: 0 })}€`
+
 const norm = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 
 // Quanto da linha seguinte fica à vista ao abrir a lista completa (sugere que há scroll).
@@ -55,9 +60,9 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
   return (
     <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
       <div>
-        <div className="text-sm text-text">Ligar a um movimento previsto nas Projeções (opcional)</div>
+        <div className="text-sm text-text">Ligar a um movimento previsto nas Projeções</div>
         <p className="mt-0.5 text-[11px] leading-snug text-muted">
-          Para saídas que fazem parte de um orçamento das Projeções, como «Prendas de Natal».
+          Para saídas que fazem parte de um orçamento das Projeções.
         </p>
       </div>
 
@@ -91,8 +96,8 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
             selected={selectedId === m.id}
             onClick={() => onChange(m.id, effect)}
             title={m.description || 'Sem descrição'}
-            meta={`${monthShort(m.month)} · ${bucketName(m.bucketId)}`}
-            amount={fmtEUR(Math.abs(m.amount))}
+            meta={`(${monthNumeric(m.month)} · ${bucketName(m.bucketId)})`}
+            amount={wholeEUR(Math.abs(m.amount))}
           />
         ))}
         {searching && list.length === 0 && <p className="px-1 py-1 text-[11px] text-muted">Nenhum movimento previsto encontrado.</p>}
@@ -149,7 +154,7 @@ function PlannedOption({
       aria-checked={selected}
       onClick={onClick}
       className={cx(
-        'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+        'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1 text-left transition-colors',
         selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
       )}
     >
@@ -157,9 +162,9 @@ function PlannedOption({
         aria-hidden="true"
         className={cx('h-3.5 w-3.5 shrink-0 rounded-full border-2', selected ? 'border-accent-strong bg-accent-strong' : 'border-border')}
       />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs leading-tight text-text">{title}</span>
-        {meta && <span className="block truncate text-[11px] leading-tight text-muted">{meta}</span>}
+      <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+        <span className="min-w-0 truncate text-xs text-text">{title}</span>
+        {meta && <span className="max-w-[55%] shrink-0 truncate text-[10px] text-muted">{meta}</span>}
       </span>
       {amount && <span className="tnum shrink-0 text-xs font-medium text-text">{amount}</span>}
     </button>
