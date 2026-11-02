@@ -1,87 +1,87 @@
 # Contas
 
-Aplicação web de gestão de finanças pessoais: planeamento mensal por baldes, gastos reais, poupança, investimento e projeções. Funciona offline, instala-se como PWA e pode sincronizar entre dispositivos.
+Personal finance web app: monthly planning by buckets, real expenses, savings, investments and projections. It works offline, installs as a PWA and can sync across devices. The interface is in European Portuguese.
 
 **App:** [asminhascontas.com](https://asminhascontas.com)
 
-## Funcionalidades
+## Features
 
-- **Planeamento**: rendimentos, despesas e baldes de poupança por mês, com uma barra de alocação até 100%.
-- **Movimentos e Gastos**: entradas, saídas e transferências entre baldes; importação de extratos (PDF, Excel ou texto) com sugestão de categoria e deteção de duplicados; ligação de gastos a movimentos de poupança.
-- **Projeções**: grelha editável mês a mês, objetivos com meta e prazo, movimentos previstos que se podem ligar a saídas reais.
-- **Analytics, Investimento e Overview**: planeado vs. real, veículos de investimento com checkpoints e simulador, saldo total ao longo do tempo.
-- **Guia e visitas guiadas**: guia dentro da app (também em PDF), onboarding interativo e desbloqueio progressivo das partes avançadas.
-- **PWA**: o desktop tem a versão completa; o telemóvel cobre o essencial do dia a dia.
+- **Planning**: income, expenses and savings buckets per month, with an allocation bar that must reach 100%.
+- **Movements and Expenses**: inflows, outflows and transfers between buckets; statement import (PDF, Excel or text) with category suggestions and duplicate detection; linking expenses to savings movements.
+- **Projections**: month-by-month editable grid, goals with a target and deadline, and planned movements that can be linked to real outflows.
+- **Analytics, Investment and Overview**: planned vs. actual, investment vehicles with checkpoints and a simulator, total balance over time.
+- **Guide and tours**: in-app guide (also as a PDF), interactive onboarding and progressive unlock of the advanced parts.
+- **PWA**: desktop has the full app; mobile covers the essentials of day-to-day use.
 
 ## Stack
 
-React 19, Vite, TypeScript, Tailwind CSS v4, Zustand, Recharts, `vite-plugin-pwa`, Vitest. Dados em IndexedDB (`idb`) ou Firestore (Firebase, com autenticação anónima).
+React 19, Vite, TypeScript, Tailwind CSS v4, Zustand, Recharts, `vite-plugin-pwa`, Vitest. Data lives in IndexedDB (`idb`) or Firestore (Firebase, with anonymous auth).
 
-## Desenvolvimento
+## Development
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm test           # testes (Vitest)
-npm run build      # typecheck + build de produção
+npm test           # tests (Vitest)
+npm run build      # typecheck + production build
 ```
 
-Sem configuração, a app corre em modo local. Para testar a sincronização, copia `.env.example` para `.env` e preenche as variáveis.
+With no configuration the app runs in local mode. To try sync, copy `.env.example` to `.env` and fill in the variables.
 
-| Variável | Para quê |
+| Variable | Purpose |
 | --- | --- |
-| `VITE_FIREBASE_*` (6 variáveis) | Config do projeto Firebase. Sem elas, só há modo local. |
-| `VITE_PREMIUM_CODES` | Códigos de uso único para criar espaços sincronizados. Opcional. |
-| `VITE_GOATCOUNTER_CODE` | Estatísticas anónimas. Só entra no build de produção. |
-| `VITE_BASE` | Base path do build (`/` em produção). |
+| `VITE_FIREBASE_*` (6 variables) | Firebase project config. Without them, local mode only. |
+| `VITE_PREMIUM_CODES` | Single-use codes to create synced spaces. Optional. |
+| `VITE_GOATCOUNTER_CODE` | Anonymous usage stats. Only used in production builds. |
+| `VITE_BASE` | Build base path (`/` in production). |
 
-## Arquitetura
+## Architecture
 
 ```
 src/
-  types.ts               modelo de dados
+  types.ts               data model
   lib/
-    calc/                lógica pura e testada: alocação, saldos, projeções,
-                         categorias, deduplicação, ligações movimento/previsto
-    ai/                  extração de extratos (PDF/Excel) com a chave do utilizador
-    unlock.ts, coach.ts  desbloqueio progressivo e visitas guiadas
-    backup.ts            exportar e importar cópias de segurança
+    calc/                pure, tested logic: allocation, balances, projections,
+                         categories, deduplication, movement/planned links
+    ai/                  statement extraction (PDF/Excel) with the user's own key
+    unlock.ts, coach.ts  progressive unlock and guided tours
+    backup.ts            backup export and import
   data/
-    adapter.ts           interface DataAdapter
-    localAdapter.ts      IndexedDB (por defeito, 100% offline)
-    firebaseAdapter.ts   Firestore em tempo real
-  store/                 Zustand: estado, ações e seeds
-  screens/               um ficheiro por ecrã
-  components/            UI base e componentes partilhados
-  content/               guia e visitas guiadas (dados, com testes)
-data/marta/              backup de demonstração (9 meses)
-scripts/                 geração do PDF do guia e dos dados de demonstração
+    adapter.ts           DataAdapter interface
+    localAdapter.ts      IndexedDB (default, fully offline)
+    firebaseAdapter.ts   real-time Firestore
+  store/                 Zustand: state, actions and seeds
+  screens/               one file per screen
+  components/            base UI and shared components
+  content/               guide and tours (data, with tests)
+data/marta/              demo backup (9 months)
+scripts/                 guide PDF and demo data generation
 ```
 
-Princípios:
+Principles:
 
-- **Saldos sempre calculados**, nunca escritos à mão: `saldo(mês) = saldo(mês − 1) + alocado no planeamento + movimentos do mês`. As projeções reutilizam o mesmo motor, separando a realidade confirmada do futuro projetado.
-- **Lógica em `lib/calc`**: funções puras, sem acesso a dados nem a UI, cobertas por testes.
-- **Dados atrás de um adapter**: o resto da app não sabe se está em modo local ou sincronizado.
-- **Alterações aditivas**: campos novos são opcionais, para nunca invalidar dados existentes.
+- **Balances are always computed**, never typed in: `balance(month) = balance(month − 1) + planned allocation + month movements`. Projections reuse the same engine, separating confirmed reality from the projected future.
+- **Logic lives in `lib/calc`**: pure functions with no data or UI access, covered by tests.
+- **Data sits behind an adapter**: the rest of the app does not know whether it is in local or synced mode.
+- **Additive changes**: new fields are optional, so existing data is never invalidated.
 
-## Dados e sincronização
+## Data and sync
 
-- **Modo local**: IndexedDB no próprio dispositivo. Tem exportação e importação de backup (Definições → Dados), em JSON.
-- **Modo sincronizado**: espaço no Firestore identificado por um código longo e aleatório. As regras (`firestore.rules`) exigem autenticação anónima, e a privacidade assenta no código ser secreto. Ao entrar num espaço vazio, os dados locais migram automaticamente.
-- Os dados locais e as preferências do browser são por endereço (origem). Mudar de domínio exige exportar e importar um backup.
+- **Local mode**: IndexedDB on the device. Backup export and import (Settings → Data) as JSON.
+- **Synced mode**: a Firestore space identified by a long random code. The rules (`firestore.rules`) require anonymous auth, and privacy relies on the code staying secret. Joining an empty space migrates the local data automatically.
+- Local data and browser preferences are per origin, so changing domain requires exporting and importing a backup.
 
 ## Deploy
 
-O workflow [`deploy.yml`](.github/workflows/deploy.yml) faz o build e publica no GitHub Pages a cada push para `main`. Usa secrets do repositório para as variáveis `VITE_*`. O domínio próprio configura-se em Settings → Pages (registos `A` e `CNAME` no DNS), com `public/CNAME` no repositório, e o domínio tem de constar dos domínios autorizados do Firebase Authentication.
+The [`deploy.yml`](.github/workflows/deploy.yml) workflow builds and publishes to GitHub Pages on every push to `main`, using repository secrets for the `VITE_*` variables. The custom domain is configured in Settings → Pages (`A` and `CNAME` DNS records), with `public/CNAME` in the repo, and the domain must be listed in Firebase Authentication's authorized domains.
 
-## Guia e dados de demonstração
+## Guide and demo data
 
-O conteúdo do guia vive em `src/content/guide.ts`. Para regenerar o PDF (`public/guia-contas.pdf`):
+The guide content lives in `src/content/guide.ts`. To regenerate the PDF (`public/guia-contas.pdf`):
 
 ```bash
 node scripts/dump-guide.cjs
 python3 scripts/build-guide-pdf.py
 ```
 
-`data/marta/` tem um backup realista para mostrar a app sem dados pessoais (ver o README dessa pasta).
+`data/marta/` holds a realistic backup for showing the app without personal data (see the README in that folder).
