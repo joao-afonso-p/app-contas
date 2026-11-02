@@ -29,16 +29,19 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
   const before = selected ? Math.abs(selected.amount) : 0
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 p-3">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface-2 p-2.5">
       <div>
         <div className="text-xs font-semibold text-text">Ligar a um movimento previsto nas Projeções (opcional)</div>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted">
-          Usa isto se esta saída faz parte de um orçamento que criaste nas Projeções, como «Prendas de Natal». Assim o
-          previsto acompanha o que já gastaste.
+        <p className="mt-0.5 text-[11px] leading-snug text-muted">
+          Para saídas que fazem parte de um orçamento das Projeções, como «Prendas de Natal».
         </p>
       </div>
 
-      <div role="radiogroup" aria-label="Movimento previsto" className="flex flex-col gap-1.5">
+      <div
+        role="radiogroup"
+        aria-label="Movimento previsto"
+        className={cx('flex flex-col gap-1', showLater && 'thin-scroll max-h-44 overflow-y-auto pr-0.5')}
+      >
         <PlannedOption
           selected={selectedId === ''}
           onClick={() => onChange('', effect)}
@@ -63,7 +66,7 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
       )}
 
       {selected && (
-        <div className="mt-1 flex flex-col gap-2 border-t border-border pt-3">
+        <div className="mt-0.5 flex flex-col gap-1.5 border-t border-border pt-2">
           <div className="text-xs font-semibold text-text">Este movimento corresponde a…</div>
           <EffectOption
             checked={effect === 'part'}
@@ -85,9 +88,9 @@ export function PlannedLinkPicker({ main, later, selectedId, effect, spent, buck
                 : 'O previsto ajusta-se ao valor que gastaste e fica concluído. Já não conta nas projeções.'
             }
           />
-          {!spent && <p className="text-xs text-muted">Indica o valor da saída acima para veres o resultado.</p>}
+          {!spent && <p className="text-[11px] text-muted">Indica o valor da saída acima para veres o resultado.</p>}
           {outcome?.clamped && (
-            <p className="text-xs text-warn">
+            <p className="text-[11px] text-warn">
               Gastaste mais do que restava no previsto. Ele fica a 0 €. Se esta era a última compra, escolhe «O valor total».
             </p>
           )}
@@ -107,7 +110,7 @@ function PlannedOption({
       aria-checked={selected}
       onClick={onClick}
       className={cx(
-        'flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors',
+        'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
         selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
       )}
     >
@@ -116,8 +119,8 @@ function PlannedOption({
         className={cx('h-3.5 w-3.5 shrink-0 rounded-full border-2', selected ? 'border-accent-strong bg-accent-strong' : 'border-border')}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-text">{title}</span>
-        {meta && <span className="block truncate text-xs text-muted">{meta}</span>}
+        <span className="block truncate text-sm font-medium leading-tight text-text">{title}</span>
+        {meta && <span className="block truncate text-[11px] leading-tight text-muted">{meta}</span>}
       </span>
       {amount && <span className="tnum shrink-0 text-sm font-semibold text-text">{amount}</span>}
     </button>
@@ -134,7 +137,7 @@ function EffectOption({
       aria-checked={checked}
       onClick={onClick}
       className={cx(
-        'flex w-full items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors',
+        'flex w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
         checked ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
       )}
     >
@@ -143,8 +146,8 @@ function EffectOption({
         className={cx('mt-1 h-3.5 w-3.5 shrink-0 rounded-full border-2', checked ? 'border-accent-strong bg-accent-strong' : 'border-border')}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-medium text-text">{title}</span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted">{text}</span>
+        <span className="block text-sm font-medium leading-tight text-text">{title}</span>
+        <span className="mt-0.5 block text-[11px] leading-snug text-muted">{text}</span>
       </span>
     </button>
   )
