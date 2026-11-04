@@ -476,7 +476,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'p',
-            text: 'A página Imóveis só está disponível no computador e é independente do resto da app. Adiciona cada casa com o mês desde que está arrendada (pode ser antigo), a renda, a prestação, as despesas fixas e o imposto. O capital investido e o valor do imóvel são opcionais.',
+            text: 'A página Imóveis só está disponível no computador e é independente do resto da app. Adiciona cada casa com o mês desde que está arrendada (pode ser antigo), a renda, a prestação, as despesas fixas e o imposto. As despesas fixas têm nome e podem ser mensais ou anuais (as anuais, como o IMI, são divididas por 12). O capital investido e o valor do imóvel são opcionais.',
           },
           {
             t: 'list',
@@ -490,7 +490,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'tip',
-            text: 'Passa o rato por cima de um valor ou do cabeçalho de uma coluna para ver a fórmula com os teus números. Quando a renda ou a prestação mudam, usa "A partir de…" para a mudança valer só daí em diante.',
+            text: 'Passa o rato por cima de um valor ou do cabeçalho de uma coluna para ver a fórmula com os teus números. Quando um valor muda, usa "A partir de…" para a mudança valer só daí em diante. O detalhe mês a mês da tabela abre em "Ver detalhe por período".',
           },
         ],
       },
