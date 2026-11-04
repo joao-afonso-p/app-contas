@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash } from 'lucide-react'
+import { Pencil, Plus, Trash } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, HoverTip, Input, MetricCard, Modal, SectionTitle, Select, cx } from '../components/ui'
 import {
   annualize, combineMonths, fixedList, fixedSeries, fixedTotalAt, grossYield, pointAt, groupRows, propertyMonths, rangeFor, returnOnCapital, sumMonths,
@@ -60,7 +60,6 @@ function ImoveisDesktop() {
   const [presetRaw, setPreset] = useSessionState<RangePreset>('imoveis-preset', 'last12')
   const preset: RangePreset = presetRaw === 'all' ? 'all' : 'last12'
   const [byRaw, setBy] = useSessionState<GroupBy>('imoveis-by', 'month')
-  const [detail, setDetail] = useSessionState<boolean>('imoveis-detail', false)
   const [adding, setAdding] = useState(false)
 
   const selected = properties.find((p) => p.id === selRaw)
@@ -131,7 +130,7 @@ function ImoveisDesktop() {
               {hasPrincipal && <PrincipalLine items={items} totals={totals} />}
               <PeriodTable
                 groups={groups} totals={totals} by={by} showPrincipal={hasPrincipal}
-                detail={detail} onToggle={() => setDetail(!detail)} onBy={setBy} yearOk={yearOk}
+                onBy={setBy} yearOk={yearOk}
               />
               {sel === 'all' && properties.length > 1 && <HouseSummary items={items} onOpen={setSel} />}
             </>
@@ -247,14 +246,12 @@ function Th({ children, tip, left }: { children: ReactNode; tip?: ReactNode; lef
 }
 
 function PeriodTable({
-  groups, totals, by, showPrincipal, detail, onToggle, onBy, yearOk,
+  groups, totals, by, showPrincipal, onBy, yearOk,
 }: {
   groups: { key: string; label: string; totals: RentalTotals }[]
   totals: RentalTotals
   by: GroupBy
   showPrincipal: boolean
-  detail: boolean
-  onToggle: () => void
   onBy: (b: GroupBy) => void
   yearOk: boolean
 }) {
@@ -274,7 +271,7 @@ function PeriodTable({
   )
   return (
     <Card className="p-0">
-      <div className="max-h-72 overflow-auto rounded-t-2xl">
+      <div className="h-72 overflow-auto rounded-t-2xl">
         <table className="w-full text-sm">
           <thead className="sticky top-0 z-10 bg-surface">
             <tr>
@@ -289,39 +286,31 @@ function PeriodTable({
               {showPrincipal && <Th tip="Parte da prestação que amortiza a dívida. Já está incluída na prestação.">Amortizado</Th>}
             </tr>
           </thead>
-          <tbody>
-            {row('Total', totals, true)}
-            {detail && groups.map((g) => row(label(g), g.totals))}
-          </tbody>
+          <tbody>{groups.map((g) => row(label(g), g.totals))}</tbody>
+          <tfoot className="sticky bottom-0 z-10 bg-surface-2 shadow-[0_-1px_0_var(--border)]">{row('Total', totals, true)}</tfoot>
         </table>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
-        <button type="button" onClick={onToggle} className="inline-flex items-center gap-1 text-xs font-semibold text-accent-strong hover:underline">
-          {detail ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
-          {detail ? 'Esconder detalhe' : 'Ver detalhe por período'}
-        </button>
-        {detail && (
-          <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
-            {GROUPS.map((x) => {
-              const off = x.id === 'year' && !yearOk
-              return (
-                <button
-                  key={x.id}
-                  type="button"
-                  disabled={off}
-                  title={off ? 'Só com mais de 12 meses' : undefined}
-                  onClick={() => onBy(x.id)}
-                  className={cx(
-                    'rounded-lg px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
-                    by === x.id ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',
-                  )}
-                >
-                  {x.label}
-                </button>
-              )
-            })}
-          </div>
-        )}
+      <div className="flex items-center justify-end border-t border-border px-3 py-2">
+        <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
+          {GROUPS.map((x) => {
+            const off = x.id === 'year' && !yearOk
+            return (
+              <button
+                key={x.id}
+                type="button"
+                disabled={off}
+                title={off ? 'Só com mais de 12 meses' : undefined}
+                onClick={() => onBy(x.id)}
+                className={cx(
+                  'rounded-lg px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                  by === x.id ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',
+                )}
+              >
+                {x.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
     </Card>
   )

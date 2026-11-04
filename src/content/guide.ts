@@ -490,7 +490,7 @@ export const GUIDE: GuideSection[] = [
           },
           {
             t: 'tip',
-            text: 'Passa o rato por cima de um valor ou do cabeçalho de uma coluna para ver a fórmula com os teus números. Quando um valor muda, usa "A partir de…" para a mudança valer só daí em diante. O detalhe mês a mês da tabela abre em "Ver detalhe por período".',
+            text: 'Passa o rato por cima de um valor ou do cabeçalho de uma coluna para ver a fórmula com os teus números. Quando um valor muda, usa "A partir de…" para a mudança valer só daí em diante. A tabela tem scroll e o total fica sempre visível em baixo.',
           },
         ],
       },
