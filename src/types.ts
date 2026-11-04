@@ -281,6 +281,47 @@ export interface AppMeta {
   unlockedFeatures?: string[]
   // Partes cujo aviso "Já podes usar…" no Overview já foi visto ou fechado.
   unlockNoticesSeen?: string[]
+  // Menus visíveis (Definições → Menus visíveis). Sem valor = o default de cada um
+  // (Investimento e Guia visíveis, Imóveis escondido). Ver lib/menus.ts.
+  menus?: { investimentos?: boolean; guia?: boolean; imoveis?: boolean }
+}
+
+// ---------- Imóveis arrendados ----------
+// Independente do resto da app (não toca em planeamento, movimentos ou gastos).
+
+// Valor que vale a partir de um mês, até haver um novo ("a partir de…").
+export interface RentalPoint {
+  from: MonthKey
+  value: number // renda, prestação ou despesa fixa em € por mês; imposto em % (0 a 100)
+  // Só na prestação: parte dessa prestação que amortiza capital (€ por mês, opcional).
+  principal?: number
+}
+
+export type RentalExpenseKind = 'manutencao' | 'imobiliaria' | 'outro'
+
+// Despesa pontual (manutenção, imobiliária…), no mês em que aconteceu.
+export interface RentalOneOff {
+  id: string
+  month: MonthKey
+  amount: number // € (positivo)
+  kind: RentalExpenseKind
+  note: string
+}
+
+export interface RentalProperty {
+  id: string
+  name: string
+  // Primeiro mês em que esteve arrendada (pode ser anterior ao uso da app).
+  rentedFrom: MonthKey
+  capitalInvested?: number // dinheiro próprio: entrada, escritura, obras…
+  propertyValue?: number // valor do imóvel (para a rentabilidade bruta)
+  rent: RentalPoint[]
+  mortgage: RentalPoint[]
+  fixedCosts: RentalPoint[] // condomínio, seguro…
+  taxRate: RentalPoint[]
+  oneOffs: RentalOneOff[]
+  order: number
+  archived?: boolean
 }
 
 // ---------- Coleções ----------
@@ -303,6 +344,7 @@ export interface DataSet {
   investmentAssets: InvestmentAsset[]
   assetEntries: AssetEntry[]
   valueCheckpoints: ValueCheckpoint[]
+  rentalProperties: RentalProperty[]
   meta: AppMeta[]
 }
 
@@ -327,6 +369,7 @@ export const COLLECTIONS: CollectionName[] = [
   'investmentAssets',
   'assetEntries',
   'valueCheckpoints',
+  'rentalProperties',
   'meta',
 ]
 
@@ -349,6 +392,7 @@ export function emptyDataSet(): DataSet {
     investmentAssets: [],
     assetEntries: [],
     valueCheckpoints: [],
+    rentalProperties: [],
     meta: [],
   }
 }
