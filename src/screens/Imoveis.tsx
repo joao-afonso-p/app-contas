@@ -1,31 +1,29 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Pencil, Plus, Trash } from 'lucide-react'
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, HoverTip, Input, MetricCard, Modal, SectionTitle, Select, cx } from '../components/ui'
 import {
-  annualize, combineMonths, grossYield, groupRows, propertyMonths, rangeFor, returnOnCapital, sumMonths,
+  annualize, combineMonths, fixedList, fixedSeries, fixedTotalAt, grossYield, pointAt, groupRows, propertyMonths, rangeFor, returnOnCapital, sumMonths,
   type GroupBy, type RangePreset, type RentalTotals,
 } from '../lib/calc/rentals'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useSessionState } from '../lib/sessionState'
 import { currentMonthKey, fmtEUR, fmtPct, monthLabel, monthShort, parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
-import type { MonthKey, RentalExpenseKind, RentalOneOff, RentalPoint, RentalProperty } from '../types'
+import type { MonthKey, RentalExpenseKind, RentalFixedExpense, RentalOneOff, RentalPoint, RentalProperty } from '../types'
 
-type SeriesKey = 'rent' | 'mortgage' | 'fixedCosts' | 'taxRate'
+type SeriesKey = 'rent' | 'mortgage' | 'taxRate'
 
 const SERIES: { key: SeriesKey; label: string; unit: 'eur' | 'pct' }[] = [
   { key: 'rent', label: 'Renda mensal', unit: 'eur' },
   { key: 'mortgage', label: 'Prestação mensal', unit: 'eur' },
-  { key: 'fixedCosts', label: 'Despesas fixas mensais', unit: 'eur' },
   { key: 'taxRate', label: 'Imposto sobre a renda', unit: 'pct' },
 ]
 
 const KIND_LABEL: Record<RentalExpenseKind, string> = { manutencao: 'Manutenção', imobiliaria: 'Imobiliária', outro: 'Outro' }
 
 const PRESETS: { id: RangePreset; label: string }[] = [
-  { id: 'last12', label: 'Últimos 12 meses' },
-  { id: 'year', label: 'Este ano' },
-  { id: 'all', label: 'Desde o início' },
+  { id: 'last12', label: 'Último ano' },
+  { id: 'all', label: 'Desde sempre' },
 ]
 const GROUPS: { id: GroupBy; label: string }[] = [
   { id: 'month', label: 'Mês' },
@@ -59,8 +57,10 @@ function ImoveisDesktop() {
   const properties = useMemo(() => [...all].filter((p) => !p.archived).sort((a, b) => a.order - b.order), [all])
 
   const [selRaw, setSel] = useSessionState<string>('imoveis-sel', 'all')
-  const [preset, setPreset] = useSessionState<RangePreset>('imoveis-preset', 'last12')
-  const [by, setBy] = useSessionState<GroupBy>('imoveis-by', 'month')
+  const [presetRaw, setPreset] = useSessionState<RangePreset>('imoveis-preset', 'last12')
+  const preset: RangePreset = presetRaw === 'all' ? 'all' : 'last12'
+  const [byRaw, setBy] = useSessionState<GroupBy>('imoveis-by', 'month')
+  const [detail, setDetail] = useSessionState<boolean>('imoveis-detail', false)
   const [adding, setAdding] = useState(false)
 
   const selected = properties.find((p) => p.id === selRaw)
@@ -79,6 +79,9 @@ function ImoveisDesktop() {
   )
   const monthRows = useMemo(() => combineMonths(items.map((i) => i.months)), [items])
   const totals = useMemo(() => sumMonths(monthRows), [monthRows])
+  // Agrupar por ano só faz sentido com mais de 12 meses; senão volta a "Mês".
+  const yearOk = monthRows.length > 12
+  const by: GroupBy = byRaw === 'year' && !yearOk ? 'month' : byRaw
   const groups = useMemo(() => groupRows(monthRows, by), [monthRows, by])
   const hasPrincipal = totals.principal > 0
 
@@ -117,11 +120,6 @@ function ImoveisDesktop() {
                 <Seg key={x.id} active={preset === x.id} onClick={() => setPreset(x.id)}>{x.label}</Seg>
               ))}
             </div>
-            <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
-              {GROUPS.map((x) => (
-                <Seg key={x.id} active={by === x.id} onClick={() => setBy(x.id)}>{x.label}</Seg>
-              ))}
-            </div>
             <span className="text-xs text-muted">{monthLabel(range.from)} a {monthLabel(range.to)}</span>
           </div>
 
@@ -131,7 +129,10 @@ function ImoveisDesktop() {
             <>
               <Kpis items={items} totals={totals} />
               {hasPrincipal && <PrincipalLine items={items} totals={totals} />}
-              <PeriodTable groups={groups} totals={totals} by={by} showPrincipal={hasPrincipal} />
+              <PeriodTable
+                groups={groups} totals={totals} by={by} showPrincipal={hasPrincipal}
+                detail={detail} onToggle={() => setDetail(!detail)} onBy={setBy} yearOk={yearOk}
+              />
               {sel === 'all' && properties.length > 1 && <HouseSummary items={items} onOpen={setSel} />}
             </>
           )}
@@ -246,8 +247,17 @@ function Th({ children, tip, left }: { children: ReactNode; tip?: ReactNode; lef
 }
 
 function PeriodTable({
-  groups, totals, by, showPrincipal,
-}: { groups: { key: string; label: string; totals: RentalTotals }[]; totals: RentalTotals; by: GroupBy; showPrincipal: boolean }) {
+  groups, totals, by, showPrincipal, detail, onToggle, onBy, yearOk,
+}: {
+  groups: { key: string; label: string; totals: RentalTotals }[]
+  totals: RentalTotals
+  by: GroupBy
+  showPrincipal: boolean
+  detail: boolean
+  onToggle: () => void
+  onBy: (b: GroupBy) => void
+  yearOk: boolean
+}) {
   const label = (g: { key: string; label: string }) => (by === 'month' ? monthShort(g.key as MonthKey) : g.label)
   const row = (name: string, t: RentalTotals, strong?: boolean) => (
     <tr key={name} className={cx('border-t border-border', strong && 'bg-surface-2 font-bold')}>
@@ -263,26 +273,56 @@ function PeriodTable({
     </tr>
   )
   return (
-    <Card className="overflow-x-auto p-0">
-      <table className="w-full text-sm">
-        <thead>
-          <tr>
-            <Th left>Período</Th>
-            <Th tip="Renda mensal em vigor em cada mês.">Renda</Th>
-            <Th tip="Prestação do crédito em vigor em cada mês.">Prestação</Th>
-            <Th tip="Despesas fixas mensais (condomínio, seguro, IMI, etc.).">Fixas</Th>
-            <Th tip="Despesas pontuais (manutenção, imobiliária, outras) lançadas neste período.">Pontuais</Th>
-            <Th tip="Renda × taxa de imposto em vigor.">Imposto</Th>
-            <Th tip="Renda − prestação − fixas − pontuais.">Lucro bruto</Th>
-            <Th tip="Lucro bruto − imposto.">Lucro líquido</Th>
-            {showPrincipal && <Th tip="Parte da prestação que amortiza a dívida. Já está incluída na prestação.">Amortizado</Th>}
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((g) => row(label(g), g.totals))}
-          {row('Total', totals, true)}
-        </tbody>
-      </table>
+    <Card className="p-0">
+      <div className="max-h-72 overflow-auto rounded-t-2xl">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-surface">
+            <tr>
+              <Th left>Período</Th>
+              <Th tip="Renda mensal em vigor em cada mês.">Renda</Th>
+              <Th tip="Prestação do crédito em vigor em cada mês.">Prestação</Th>
+              <Th tip="Despesas fixas mensais (as anuais já divididas por 12).">Fixas</Th>
+              <Th tip="Despesas pontuais (manutenção, imobiliária, outras) lançadas neste período.">Pontuais</Th>
+              <Th tip="Renda × taxa de imposto em vigor.">Imposto</Th>
+              <Th tip="Renda − prestação − fixas − pontuais.">Lucro bruto</Th>
+              <Th tip="Lucro bruto − imposto.">Lucro líquido</Th>
+              {showPrincipal && <Th tip="Parte da prestação que amortiza a dívida. Já está incluída na prestação.">Amortizado</Th>}
+            </tr>
+          </thead>
+          <tbody>
+            {row('Total', totals, true)}
+            {detail && groups.map((g) => row(label(g), g.totals))}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-3 py-2">
+        <button type="button" onClick={onToggle} className="inline-flex items-center gap-1 text-xs font-semibold text-accent-strong hover:underline">
+          {detail ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+          {detail ? 'Esconder detalhe' : 'Ver detalhe por período'}
+        </button>
+        {detail && (
+          <div className="flex gap-1 rounded-xl bg-surface-2 p-1">
+            {GROUPS.map((x) => {
+              const off = x.id === 'year' && !yearOk
+              return (
+                <button
+                  key={x.id}
+                  type="button"
+                  disabled={off}
+                  title={off ? 'Só com mais de 12 meses' : undefined}
+                  onClick={() => onBy(x.id)}
+                  className={cx(
+                    'rounded-lg px-3 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                    by === x.id ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',
+                  )}
+                >
+                  {x.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
@@ -337,12 +377,20 @@ function fmtPoint(key: SeriesKey, p: RentalPoint): string {
   return eur(p.value)
 }
 
+// Valor em vigor hoje; se ainda não começou, o primeiro; sem pontos, nada.
+function currentPoint(points: RentalPoint[], now: MonthKey): RentalPoint | undefined {
+  return pointAt(points, now) ?? [...points].sort((a, b) => a.from.localeCompare(b.from))[0]
+}
+
 function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; onDeleted: () => void }) {
   const put = useStore((s) => s.put)
   const remove = useStore((s) => s.remove)
+  const now = currentMonthKey()
   const [editHouse, setEditHouse] = useState(false)
   const [point, setPoint] = useState<{ key: SeriesKey; existing?: RentalPoint } | null>(null)
   const [oneOff, setOneOff] = useState<{ existing?: RentalOneOff } | null>(null)
+  const [history, setHistory] = useState<SeriesKey | null>(null)
+  const [fixedOpen, setFixedOpen] = useState(false)
 
   const save = (patch: Partial<RentalProperty>) => put('rentalProperties', { ...p, ...patch })
 
@@ -360,9 +408,11 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
   }
 
   const oneOffs = [...p.oneOffs].sort((a, b) => b.month.localeCompare(a.month))
+  const fixedPts = fixedSeries(p)
+  const fixedNow = currentPoint(fixedPts, now)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <SectionTitle
         right={
           <div className="flex gap-2">
@@ -374,7 +424,7 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
         {p.name}
       </SectionTitle>
 
-      <Card>
+      <Card className="py-3">
         <div className="grid grid-cols-3 gap-4 text-sm">
           <div><div className="text-xs text-muted">A arrendar desde</div><div className="font-semibold">{monthLabel(p.rentedFrom, true)}</div></div>
           <div><div className="text-xs text-muted">Capital investido</div><div className="tnum font-semibold">{p.capitalInvested ? eur(p.capitalInvested) : '-'}</div></div>
@@ -382,27 +432,33 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
         </div>
       </Card>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-3">
         {SERIES.map((s) => {
           const pts = [...p[s.key]].sort((a, b) => a.from.localeCompare(b.from))
+          const cur = currentPoint(pts, now)
           return (
-            <Card key={s.key}>
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">{s.label}</h3>
+            <Card key={s.key} className="flex flex-col gap-2 py-3">
+              <div className="text-xs font-semibold text-muted">{s.label}</div>
+              <div className="tnum text-lg font-bold">{cur ? fmtPoint(s.key, cur) : '-'}</div>
+              {cur && pts.length > 1 && <div className="text-xs text-muted">Desde {monthLabel(cur.from)}</div>}
+              <div className="mt-auto flex items-center justify-between gap-1">
                 <Button size="sm" variant="soft" onClick={() => setPoint({ key: s.key })}><Plus size={13} aria-hidden="true" /> A partir de…</Button>
+                {pts.length > 0 && (
+                  <button type="button" onClick={() => setHistory(history === s.key ? null : s.key)} className="text-xs font-semibold text-accent-strong hover:underline">
+                    Histórico ({pts.length})
+                  </button>
+                )}
               </div>
-              {pts.length === 0 ? (
-                <p className="text-xs text-muted">Sem valor (conta como 0).</p>
-              ) : (
-                <ul className="flex flex-col">
+              {history === s.key && (
+                <ul className="flex max-h-40 flex-col overflow-y-auto border-t border-border pt-1">
                   {pts.map((pt) => (
-                    <li key={pt.from} className="flex items-center justify-between gap-2 border-t border-border py-1.5 text-sm first:border-t-0">
-                      <span className="text-muted">Desde {monthLabel(pt.from)}</span>
-                      <span className="flex items-center gap-2">
+                    <li key={pt.from} className="flex items-center justify-between gap-1 py-1 text-xs">
+                      <span className="text-muted">{monthLabel(pt.from)}</span>
+                      <span className="flex items-center gap-1">
                         <span className="tnum font-semibold">{fmtPoint(s.key, pt)}</span>
-                        {s.key === 'mortgage' && pt.principal !== undefined && <Badge>capital {eur(pt.principal)}</Badge>}
-                        <button type="button" aria-label="Editar" onClick={() => setPoint({ key: s.key, existing: pt })} className="rounded-lg p-1 text-muted hover:bg-surface-2"><Pencil size={13} aria-hidden="true" /></button>
-                        <button type="button" aria-label="Apagar" onClick={() => removePoint(s.key, pt.from)} className="rounded-lg p-1 text-muted hover:bg-surface-2"><Trash size={13} aria-hidden="true" /></button>
+                        {s.key === 'mortgage' && pt.principal !== undefined && <Badge>cap. {eur(pt.principal)}</Badge>}
+                        <button type="button" aria-label="Editar" onClick={() => setPoint({ key: s.key, existing: pt })} className="rounded p-0.5 text-muted hover:bg-surface-2"><Pencil size={12} aria-hidden="true" /></button>
+                        <button type="button" aria-label="Apagar" onClick={() => removePoint(s.key, pt.from)} className="rounded p-0.5 text-muted hover:bg-surface-2"><Trash size={12} aria-hidden="true" /></button>
                       </span>
                     </li>
                   ))}
@@ -411,17 +467,25 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
             </Card>
           )
         })}
+        <Card className="flex flex-col gap-2 py-3">
+          <div className="text-xs font-semibold text-muted">Despesas fixas mensais</div>
+          <div className="tnum text-lg font-bold">{fixedNow ? eur(fixedNow.value) : '-'}</div>
+          {fixedNow && fixedPts.length > 1 && <div className="text-xs text-muted">Desde {monthLabel(fixedNow.from)}</div>}
+          <div className="mt-auto">
+            <Button size="sm" variant="soft" onClick={() => setFixedOpen(true)}>Ver / editar</Button>
+          </div>
+        </Card>
       </div>
 
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
+      <Card className="py-3">
+        <div className="mb-1 flex items-center justify-between">
           <h3 className="text-sm font-semibold">Despesas pontuais</h3>
           <Button size="sm" variant="soft" onClick={() => setOneOff({})}><Plus size={13} aria-hidden="true" /> Adicionar</Button>
         </div>
         {oneOffs.length === 0 ? (
           <p className="text-xs text-muted">Sem despesas pontuais.</p>
         ) : (
-          <ul className="flex flex-col">
+          <ul className="flex max-h-44 flex-col overflow-y-auto">
             {oneOffs.map((o) => (
               <li key={o.id} className="flex items-center justify-between gap-2 border-t border-border py-1.5 text-sm first:border-t-0">
                 <span className="flex min-w-0 items-center gap-2">
@@ -471,7 +535,198 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
           }}
         />
       )}
+      {fixedOpen && (
+        <FixedModal
+          property={p}
+          onClose={() => setFixedOpen(false)}
+          onChange={(list) => save({ fixedExpenses: list, fixedCosts: [] })}
+        />
+      )}
     </div>
+  )
+}
+
+// ---------- Despesas fixas ----------
+
+const perLabel = (e: RentalFixedExpense) => (e.period === 'annual' ? 'ano' : 'mês')
+
+function FixedModal({
+  property: p, onClose, onChange,
+}: { property: RentalProperty; onClose: () => void; onChange: (list: RentalFixedExpense[]) => void | Promise<void> }) {
+  const list = fixedList(p)
+  const now = currentMonthKey()
+  const [editing, setEditing] = useState<{ existing?: RentalFixedExpense } | null>(null)
+  const [valueFor, setValueFor] = useState<RentalFixedExpense | null>(null)
+  const replace = (e: RentalFixedExpense) => onChange(list.some((x) => x.id === e.id) ? list.map((x) => (x.id === e.id ? e : x)) : [...list, e])
+
+  return (
+    <Modal open onClose={onClose} title="Despesas fixas" wide>
+      <div className="flex flex-col gap-3">
+        {list.length === 0 && <p className="text-sm text-muted">Ainda sem despesas fixas.</p>}
+        {list.map((e) => {
+          const cur = currentPoint(e.points, now)
+          const pts = [...e.points].sort((a, b) => a.from.localeCompare(b.from))
+          return (
+            <div key={e.id} className="rounded-xl border border-border p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{e.name || 'Despesa fixa'}</span>
+                  <Badge>{e.period === 'annual' ? 'Anual' : 'Mensal'}</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="tnum text-sm font-semibold">
+                    {cur ? `${eur(cur.value)} / ${perLabel(e)}` : '-'}
+                    {cur && e.period === 'annual' && <span className="ml-1 font-normal text-muted">({eur(cur.value / 12)} / mês)</span>}
+                  </span>
+                  <Button size="sm" variant="soft" onClick={() => setValueFor(e)}>Mudar valor</Button>
+                  <button type="button" aria-label="Editar nome" onClick={() => setEditing({ existing: e })} className="rounded-lg p-1 text-muted hover:bg-surface-2"><Pencil size={13} aria-hidden="true" /></button>
+                  <button
+                    type="button"
+                    aria-label="Apagar despesa"
+                    onClick={() => { if (window.confirm(`Apagar "${e.name || 'Despesa fixa'}"?`)) void onChange(list.filter((x) => x.id !== e.id)) }}
+                    className="rounded-lg p-1 text-muted hover:bg-surface-2"
+                  ><Trash size={13} aria-hidden="true" /></button>
+                </div>
+              </div>
+              {pts.length > 1 && (
+                <ul className="mt-2 flex flex-col border-t border-border pt-1 text-xs">
+                  {pts.map((pt) => (
+                    <li key={pt.from} className="flex items-center justify-between py-0.5">
+                      <span className="text-muted">Desde {monthLabel(pt.from)}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="tnum font-semibold">{eur(pt.value)}</span>
+                        <button type="button" aria-label="Apagar valor" onClick={() => void replace({ ...e, points: e.points.filter((x) => x.from !== pt.from) })} className="rounded p-0.5 text-muted hover:bg-surface-2"><Trash size={12} aria-hidden="true" /></button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )
+        })}
+        <div className="flex items-center justify-between">
+          <Button size="sm" variant="soft" onClick={() => setEditing({})}><Plus size={13} aria-hidden="true" /> Adicionar despesa</Button>
+          <span className="tnum text-sm">
+            <span className="text-muted">Total por mês agora:</span> <strong>{eur(fixedTotalAt(p, now))}</strong>
+          </span>
+        </div>
+      </div>
+      {editing && (
+        <ExpenseModal
+          existing={editing.existing}
+          defaultFrom={p.rentedFrom}
+          onClose={() => setEditing(null)}
+          onSave={async (e) => { await replace(e); setEditing(null) }}
+        />
+      )}
+      {valueFor && (
+        <ExpenseValueModal
+          expense={valueFor}
+          defaultFrom={p.rentedFrom}
+          onClose={() => setValueFor(null)}
+          onSave={async (e) => { await replace(e); setValueFor(null) }}
+        />
+      )}
+    </Modal>
+  )
+}
+
+// Nova despesa (com o primeiro valor) ou edição do nome e da periodicidade.
+function ExpenseModal({
+  existing, defaultFrom, onClose, onSave,
+}: { existing?: RentalFixedExpense; defaultFrom: MonthKey; onClose: () => void; onSave: (e: RentalFixedExpense) => void | Promise<void> }) {
+  const [name, setName] = useState(existing?.name ?? '')
+  const [period, setPeriod] = useState<'monthly' | 'annual'>(existing?.period ?? 'monthly')
+  const [value, setValue] = useState('')
+  const [from, setFrom] = useState<string>(defaultFrom)
+  const n = parseAmount(value)
+  const valid = existing ? true : n !== null && n >= 0 && /^\d{4}-\d{2}$/.test(from) && from >= defaultFrom
+
+  return (
+    <Modal open onClose={onClose} title={existing ? 'Editar despesa' : 'Nova despesa fixa'}>
+      <div className="flex flex-col gap-3">
+        <Field label="Nome" hint="Opcional. Ex.: Condomínio, IMI, Seguro.">
+          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        </Field>
+        <Field label="Periodicidade" hint={period === 'annual' ? 'O valor anual é dividido por 12 nas contas.' : undefined}>
+          <Select value={period} onChange={(e) => setPeriod(e.target.value as 'monthly' | 'annual')}>
+            <option value="monthly">Mensal</option>
+            <option value="annual">Anual</option>
+          </Select>
+        </Field>
+        {existing ? (
+          period !== existing.period && <p className="text-xs text-warn">Os valores guardados mantêm-se e passam a contar como {period === 'annual' ? 'anuais' : 'mensais'}. Confirma-os depois.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={period === 'annual' ? 'Valor anual (€)' : 'Valor mensal (€)'}><Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
+            <Field label="Desde" hint={from < defaultFrom ? 'Não pode ser antes de "a arrendar desde".' : undefined}>
+              <Input type="month" value={from} min={defaultFrom} onChange={(e) => setFrom(e.target.value)} />
+            </Field>
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button
+            disabled={!valid}
+            onClick={() => {
+              if (!valid) return
+              void onSave(existing
+                ? { ...existing, name: name.trim(), period }
+                : { id: uid(), name: name.trim(), period, points: [{ from, value: n ?? 0 }] })
+            }}
+          >
+            Guardar
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// Mudar o valor: só a partir de um mês, ou sempre (substitui todo o histórico).
+function ExpenseValueModal({
+  expense, defaultFrom, onClose, onSave,
+}: { expense: RentalFixedExpense; defaultFrom: MonthKey; onClose: () => void; onSave: (e: RentalFixedExpense) => void | Promise<void> }) {
+  const [value, setValue] = useState('')
+  const [mode, setMode] = useState<'from' | 'always'>('from')
+  const [from, setFrom] = useState<string>(currentMonthKey())
+  const n = parseAmount(value)
+  const valid = n !== null && n >= 0 && (mode === 'always' || (/^\d{4}-\d{2}$/.test(from) && from >= defaultFrom))
+
+  function submit() {
+    if (!valid || n === null) return
+    const points = mode === 'always'
+      ? [{ from: defaultFrom, value: n }]
+      : [...expense.points.filter((x) => x.from !== from), { from, value: n }].sort((a, b) => a.from.localeCompare(b.from))
+    void onSave({ ...expense, points })
+  }
+
+  const radio = (id: 'from' | 'always', title: string, hint: string) => (
+    <label className={cx('flex cursor-pointer items-start gap-2 rounded-xl border p-2.5 text-sm', mode === id ? 'border-accent-strong bg-accent-soft' : 'border-border')}>
+      <input type="radio" checked={mode === id} onChange={() => setMode(id)} className="mt-1" />
+      <span><span className="font-semibold">{title}</span><span className="block text-xs text-muted">{hint}</span></span>
+    </label>
+  )
+
+  return (
+    <Modal open onClose={onClose} title={`Mudar valor: ${expense.name || 'Despesa fixa'}`}>
+      <div className="flex flex-col gap-3">
+        <Field label={expense.period === 'annual' ? 'Novo valor anual (€)' : 'Novo valor mensal (€)'}>
+          <Input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} autoFocus />
+        </Field>
+        {radio('from', 'A partir de um mês', 'Os meses anteriores mantêm o valor antigo.')}
+        {mode === 'from' && (
+          <Field label="A partir de" hint={from < defaultFrom ? 'Não pode ser antes de "a arrendar desde".' : undefined}>
+            <Input type="month" value={from} min={defaultFrom} onChange={(e) => setFrom(e.target.value)} />
+          </Field>
+        )}
+        {radio('always', 'Sempre', 'Corrige o valor em todos os meses, incluindo os passados. Apaga os valores antigos desta despesa.')}
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={submit} disabled={!valid}>Guardar</Button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -523,7 +778,7 @@ function HouseModal({
       rentedFrom: from,
       capitalInvested: cap !== null && cap > 0 ? cap : undefined,
       propertyValue: val !== null && val > 0 ? val : undefined,
-      ...(isNew ? { rent: at(rent, true), mortgage: at(mortgage), fixedCosts: at(fixed), taxRate: at(tax) } : {}),
+      ...(isNew ? { rent: at(rent, true), mortgage: at(mortgage), fixedCosts: [], fixedExpenses: at(fixed).length ? [{ id: uid(), name: '', period: 'monthly', points: at(fixed) }] : [], taxRate: at(tax) } : {}),
     })
   }
 
@@ -531,7 +786,7 @@ function HouseModal({
     <Modal open onClose={onClose} title={isNew ? 'Adicionar casa' : 'Editar casa'}>
       <div className="flex flex-col gap-3">
         <Field label="Nome"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Casa do Porto" autoFocus /></Field>
-        <Field label="A arrendar desde" hint="Os meses anteriores não contam. Podes ir para trás no tempo.">
+        <Field label="A arrendar desde" hint="A casa só conta a partir deste mês. Pode ser um mês antigo.">
           <Input type="month" value={from} onChange={(e) => setFrom(e.target.value)} />
         </Field>
         {isNew && (
@@ -539,7 +794,7 @@ function HouseModal({
             <div className="grid grid-cols-2 gap-3">
               <Field label="Renda mensal (€)"><Input inputMode="decimal" value={rent} onChange={(e) => setRent(e.target.value)} /></Field>
               <Field label="Prestação mensal (€)"><Input inputMode="decimal" value={mortgage} onChange={(e) => setMortgage(e.target.value)} placeholder="Opcional" /></Field>
-              <Field label="Despesas fixas mensais (€)"><Input inputMode="decimal" value={fixed} onChange={(e) => setFixed(e.target.value)} placeholder="Opcional" /></Field>
+              <Field label="Despesas fixas mensais (€)" hint="Depois podes dividir por nome (condomínio, IMI…)."><Input inputMode="decimal" value={fixed} onChange={(e) => setFixed(e.target.value)} placeholder="Opcional" /></Field>
               <Field label="Imposto sobre a renda (%)"><Input inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value)} placeholder="Ex.: 25" /></Field>
             </div>
             <p className="text-xs text-muted">Estes valores valem desde o mês escolhido. Depois podes acrescentar mudanças &quot;a partir de…&quot;.</p>
