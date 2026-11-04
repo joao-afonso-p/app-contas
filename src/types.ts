@@ -308,6 +308,15 @@ export interface RentalOneOff {
   note: string
 }
 
+// Despesa fixa com nome (condomínio, IMI, seguro…). Os valores são "a partir de" e estão
+// na periodicidade escolhida; as anuais são divididas por 12 nas contas.
+export interface RentalFixedExpense {
+  id: string
+  name: string // pode ficar vazio
+  period: 'monthly' | 'annual'
+  points: RentalPoint[]
+}
+
 export interface RentalProperty {
   id: string
   name: string
@@ -317,7 +326,10 @@ export interface RentalProperty {
   propertyValue?: number // valor do imóvel (para a rentabilidade bruta)
   rent: RentalPoint[]
   mortgage: RentalPoint[]
-  fixedCosts: RentalPoint[] // condomínio, seguro…
+  // Formato antigo (uma só série de despesas fixas mensais). Continua a ser lido se
+  // `fixedExpenses` não existir, para nunca perder dados; ver `fixedList` em calc/rentals.ts.
+  fixedCosts: RentalPoint[]
+  fixedExpenses?: RentalFixedExpense[]
   taxRate: RentalPoint[]
   oneOffs: RentalOneOff[]
   order: number

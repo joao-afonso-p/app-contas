@@ -8,7 +8,7 @@
 //   retorno       = lucro líquido anualizado ÷ capital investido
 //   rent. bruta   = renda anualizada ÷ valor do imóvel
 
-import type { MonthKey, RentalPoint, RentalProperty } from '../../types'
+import type { MonthKey, RentalFixedExpense, RentalPoint, RentalProperty } from '../../types'
 import { addMonths, monthDiff, monthRange } from '../format'
 
 const round2 = (n: number): number => Math.round(n * 100) / 100
@@ -20,6 +20,33 @@ export function pointAt(points: RentalPoint[], month: MonthKey): RentalPoint | u
     if (p.from <= month && (!best || p.from >= best.from)) best = p
   }
   return best
+}
+
+// Despesas fixas da casa. Se só existe a série antiga, vira uma despesa sem nome.
+export function fixedList(p: RentalProperty): RentalFixedExpense[] {
+  if (p.fixedExpenses) return p.fixedExpenses
+  return p.fixedCosts.length > 0 ? [{ id: 'legacy', name: '', period: 'monthly', points: p.fixedCosts }] : []
+}
+
+// Valor mensal de uma despesa num mês (anual ÷ 12).
+export function fixedMonthly(e: RentalFixedExpense, month: MonthKey): number {
+  const v = pointAt(e.points, month)?.value ?? 0
+  return e.period === 'annual' ? v / 12 : v
+}
+
+export function fixedTotalAt(p: RentalProperty, month: MonthKey): number {
+  return round2(fixedList(p).reduce((acc, e) => acc + fixedMonthly(e, month), 0))
+}
+
+// Série combinada "a partir de" (total mensal): um ponto por mês em que alguma despesa muda.
+export function fixedSeries(p: RentalProperty): RentalPoint[] {
+  const months = [...new Set(fixedList(p).flatMap((e) => e.points.map((x) => x.from)))].sort()
+  const out: RentalPoint[] = []
+  for (const from of months) {
+    const value = fixedTotalAt(p, from)
+    if (out.length === 0 || out[out.length - 1].value !== value) out.push({ from, value })
+  }
+  return out
 }
 
 export interface RentalMonth {
@@ -41,7 +68,7 @@ export function propertyMonths(p: RentalProperty, from: MonthKey, to: MonthKey):
     const rent = pointAt(p.rent, month)?.value ?? 0
     const mortgagePoint = pointAt(p.mortgage, month)
     const mortgage = mortgagePoint?.value ?? 0
-    const fixed = pointAt(p.fixedCosts, month)?.value ?? 0
+    const fixed = fixedTotalAt(p, month)
     const oneOff = p.oneOffs.filter((o) => o.month === month).reduce((acc, o) => acc + o.amount, 0)
     const rate = pointAt(p.taxRate, month)?.value ?? 0
     const tax = round2((rent * rate) / 100)

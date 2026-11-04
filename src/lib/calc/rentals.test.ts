@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  annualize, combineMonths, grossYield, groupRows, pointAt, propertyMonths, rangeFor, returnOnCapital, sumMonths,
+  annualize, combineMonths, fixedList, fixedSeries, fixedTotalAt, grossYield, groupRows, pointAt, propertyMonths, rangeFor, returnOnCapital, sumMonths,
 } from './rentals'
 import type { RentalProperty } from '../../types'
 
@@ -130,5 +130,36 @@ describe('várias casas, períodos e grupos', () => {
     expect(rangeFor('last12', '2026-10', p)).toEqual({ from: '2025-11', to: '2026-10' })
     expect(rangeFor('year', '2026-10', p)).toEqual({ from: '2026-01', to: '2026-10' })
     expect(rangeFor('all', '2026-10', p)).toEqual({ from: '2024-11', to: '2026-10' })
+  })
+})
+
+describe('despesas fixas com nome', () => {
+  const h = house({
+    fixedCosts: [],
+    fixedExpenses: [
+      { id: 'a', name: 'Condomínio', period: 'monthly', points: [{ from: '2025-01', value: 30 }, { from: '2026-06', value: 36 }] },
+      { id: 'b', name: 'IMI', period: 'annual', points: [{ from: '2025-01', value: 240 }] },
+    ],
+  })
+
+  it('anual divide por 12 e soma com as mensais', () => {
+    expect(fixedTotalAt(h, '2026-05')).toBe(50)
+    expect(fixedTotalAt(h, '2026-06')).toBe(56)
+  })
+
+  it('a série combinada só tem um ponto por mudança real', () => {
+    expect(fixedSeries(h)).toEqual([{ from: '2025-01', value: 50 }, { from: '2026-06', value: 56 }])
+  })
+
+  it('entra no lucro', () => {
+    const s = sumMonths(propertyMonths(h, '2026-05', '2026-06'))
+    expect(s.fixed).toBe(106)
+  })
+
+  it('o formato antigo continua a ser lido', () => {
+    const old = house({ fixedCosts: [{ from: '2025-01', value: 26 }] })
+    expect(fixedList(old)).toHaveLength(1)
+    expect(fixedTotalAt(old, '2026-05')).toBe(26)
+    expect(fixedList(house({ fixedCosts: [] }))).toEqual([])
   })
 })
