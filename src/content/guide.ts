@@ -437,7 +437,8 @@ export const GUIDE: GuideSection[] = [
             t: 'list',
             items: [
               'A lista mostra sempre os 150 gastos mais recentes. Usa "Mostrar mais" para ver mais.',
-              'Filtra por mês, categoria ou subcategoria.',
+              'Filtra por mês, categoria, subcategoria ou tags. O cartão "Total filtrado" no topo soma os gastos que estão a ser mostrados.',
+              '**Tags**: ao editar um gasto, junta as tags que quiseres (várias por gasto), por exemplo "Férias" ou "Prenda". No filtro, a lista de tags tem pesquisa e podes escolher várias: aparecem os gastos que tenham qualquer uma delas. Na edição em grupo podes juntar ou tirar tags de vários gastos.',
               'Clica num gasto para editar o nome, a categoria ou a subcategoria.',
               '"Exportar CSV" guarda os gastos num ficheiro.',
             ],

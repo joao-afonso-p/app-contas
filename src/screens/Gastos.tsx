@@ -3,6 +3,8 @@ import {
   Badge, Button, Card, EmptyState, Input, MetricCard, Modal, Money, SectionTitle, Select, Spinner, cx,
 } from '../components/ui'
 import { CategoryPicker } from '../components/CategoryPicker'
+import { TagChips, TagFilter, TagInput } from '../components/Tags'
+import { addTags, allTags, matchesAnyTag, removeTags, tagKey } from '../lib/calc/tags'
 import { normalizeDesc, parseBankStatement } from '../lib/calc/budgets'
 import {
   activeGroups, allGroups, categoryOptions, isUnassigned, labelFor, legacyNeedingMapping, makeResolver, matchOptionByText,
@@ -85,17 +87,22 @@ export function Gastos() {
   const [bulkDate, setBulkDate] = useState('')
   const [bulkGroup, setBulkGroup] = useState('')
   const [bulkSub, setBulkSub] = useState('')
+  const [bulkAddTags, setBulkAddTags] = useState<string[]>([])
+  const [bulkRemoveTags, setBulkRemoveTags] = useState<string[]>([])
   const [exportOpen, setExportOpen] = useState(false)
   const [exportFrom, setExportFrom] = useState('')
   const [exportTo, setExportTo] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [subFilter, setSubFilter] = useState<string>('all') // 'all' | 'none' | subcategoryId
+  const [tagFilter, setTagFilter] = useState<string[]>([])
+  const tagOptions = allTags(data.transactions)
   const filterSubs = categoryFilter !== 'all' && categoryFilter !== 'none'
     ? subcategoriesOf(data.subcategories, categoryFilter)
     : []
 
   const filtered = data.transactions
     .filter((t) => !selectedMonth || monthOfDate(t.date) === selectedMonth)
+    .filter((t) => matchesAnyTag(t, tagFilter))
     .filter((t) => {
       if (categoryFilter === 'all') return true
       if (categoryFilter === 'none') return isUnassigned(resolve(t))
@@ -120,21 +127,23 @@ export function Gastos() {
   // Seleção só conta gastos ainda visíveis/existentes.
   const selectedIds = visible.filter((t) => selected.has(t.id)).map((t) => t.id)
   const allSelected = visible.length > 0 && selectedIds.length === visible.length
+  const bulkTagsPresent = allTags(data.transactions.filter((t) => selectedIds.includes(t.id)))
   const toggleOne = (id: string) => setSelected((prev) => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id); else next.add(id)
     return next
   })
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(visible.map((t) => t.id)))
-  const openBulk = () => { setBulkDate(''); setBulkGroup(''); setBulkSub(''); setBulkOpen(true) }
+  const openBulk = () => { setBulkDate(''); setBulkGroup(''); setBulkSub(''); setBulkAddTags([]); setBulkRemoveTags([]); setBulkOpen(true) }
   const applyBulk = () => {
-    if (!bulkDate && !bulkGroup) return
+    if (!bulkDate && !bulkGroup && bulkAddTags.length === 0 && bulkRemoveTags.length === 0) return
     if (bulkGroup && !data.savingsBuckets.some((b) => b.id === bulkGroup)) {
       const hadLinked = data.savingsMovements.some((m) => selectedIds.includes(m.transactionId ?? ''))
       if (hadLinked && !window.confirm('Alguns gastos estavam pagos pela poupança. Ao mudar de categoria, a saída do balde é removida. Continuar?')) return
     }
     void bulkUpdateTransactions(selectedIds, {
       date: bulkDate || undefined, groupId: bulkGroup || undefined, subcategoryId: bulkSub || undefined,
+      addTags: bulkAddTags, removeTags: bulkRemoveTags,
     })
     setBulkOpen(false)
     setSelected(new Set())
@@ -165,6 +174,7 @@ export function Gastos() {
   const [amountStr, setAmountStr] = useState('')
   const [nome, setNome] = useState('')
   const [description, setDescription] = useState('')
+  const [tagsVal, setTagsVal] = useState<string[]>([])
   const [addError, setAddError] = useState('')
 
   // Cartão com todos os detalhes de um gasto (só leitura; o botão Editar abre a edição).
@@ -181,6 +191,7 @@ export function Gastos() {
     setAmountStr(String(t.amount).replace('.', ','))
     setNome(t.nome ?? '')
     setDescription(t.description)
+    setTagsVal(t.tags ?? [])
     setAddError('')
     setAddOpen(true)
   }
@@ -203,17 +214,19 @@ export function Gastos() {
       if (linked.length && !window.confirm('Este gasto tem uma saída automática do balde (de uma versão anterior). Ao tirar a categoria, essa saída é removida. Continuar?')) return
       void put('transactions', {
         ...existing, date, amount, nome: nome.trim() || undefined, description: description.trim(),
+        tags: tagsVal.length > 0 ? tagsVal : undefined,
         planCategoryId: undefined, subcategoryId: undefined, repoePoupanca: false, fonteBucketId: undefined, reposto: false,
       })
       for (const m of linked) void remove('savingsMovements', m.id)
     } else if (!groupId) {
       void addTransactions([{
         date, categoryId: '', amount, nome: nome.trim() || undefined, description: description.trim(),
+        tags: tagsVal.length > 0 ? tagsVal : undefined,
         repoePoupanca: false, reposto: false,
       }])
     } else {
       void saveTransaction(
-        { date, amount, nome: nome.trim() || undefined, description: description.trim(), groupId, subcategoryId: finalSub || undefined },
+        { date, amount, nome: nome.trim() || undefined, description: description.trim(), groupId, subcategoryId: finalSub || undefined, tags: tagsVal },
         editingId ?? undefined,
       )
     }
@@ -474,6 +487,10 @@ export function Gastos() {
               ))}
             </Select>
           </div>
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs text-muted">Tags</label>
+            <TagFilter selected={tagFilter} onChange={setTagFilter} options={tagOptions} />
+          </div>
           {filterSubs.length > 0 && (
             <div className="col-span-2 md:col-span-1">
               <label className="mb-1 block text-xs text-muted">Subcategoria</label>
@@ -576,6 +593,7 @@ export function Gastos() {
                     </Badge>
                   )}
                 </div>
+                <TagChips tags={t.tags} />
               </div>
               {/* Computador: colunas fixas (data | categoria | título | valor | movimento | ações), para tudo ficar alinhado. */}
               <div className="hidden items-center gap-3 py-3 md:flex">
@@ -598,17 +616,20 @@ export function Gastos() {
                     onCreateSubcategory={createSubcategory}
                   />
                 </div>
+                <div className="min-w-0 flex-1">
                 <button
                   type="button"
                   onClick={() => setViewId(t.id)}
                   title="Ver detalhes"
-                  className="group min-w-0 flex-1 text-left"
+                  className="group block w-full min-w-0 text-left"
                 >
                   <div className="truncate text-sm font-medium text-text group-hover:text-accent-strong">{clipText(t.nome || t.description)}</div>
                   {t.nome && t.description && (
                     <div className="truncate text-xs text-muted">{clipText(t.description)}</div>
                   )}
                 </button>
+                <TagChips tags={t.tags} className="mt-1" onTagClick={(tag) => setTagFilter((cur) => addTags(cur, [tag]))} />
+                </div>
                 <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
                 <div className="flex w-[5.5rem] shrink-0 justify-end">
                   {movementOf(t) ? (
@@ -744,6 +765,10 @@ export function Gastos() {
             <label className="mb-1 block text-xs text-muted">Descrição</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Opcional" />
           </div>
+          <div>
+            <label className="mb-1 block text-xs text-muted">Tags</label>
+            <TagInput value={tagsVal} onChange={setTagsVal} suggestions={tagOptions} />
+          </div>
           {editingId && (() => {
             const t = data.transactions.find((x) => x.id === editingId)
             if (!t) return null
@@ -810,6 +835,12 @@ export function Gastos() {
                   <>
                     <dt className="text-muted">Descrição</dt>
                     <dd className="break-words text-text">{viewing.description}</dd>
+                  </>
+                )}
+                {viewing.tags && viewing.tags.length > 0 && (
+                  <>
+                    <dt className="text-muted">Tags</dt>
+                    <dd><TagChips tags={viewing.tags} /></dd>
                   </>
                 )}
                 {mv && (
@@ -915,9 +946,36 @@ export function Gastos() {
           {bulkGroup && (
             <p className="text-xs text-muted">Os gastos passam todos para esta categoria; sem subcategoria escolhida, ficam sem subcategoria.</p>
           )}
+          <div>
+            <label className="mb-1 block text-xs text-muted">Juntar tags</label>
+            <TagInput value={bulkAddTags} onChange={setBulkAddTags} suggestions={tagOptions} placeholder="Opcional" />
+          </div>
+          {bulkTagsPresent.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs text-muted">Tirar tags</label>
+              <div className="flex flex-wrap gap-1.5">
+                {bulkTagsPresent.map((o) => {
+                  const on = bulkRemoveTags.some((x) => tagKey(x) === tagKey(o.tag))
+                  return (
+                    <button
+                      key={o.tag}
+                      type="button"
+                      onClick={() => setBulkRemoveTags(on ? removeTags(bulkRemoveTags, [o.tag]) : [...bulkRemoveTags, o.tag])}
+                      className={cx(
+                        'rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                        on ? 'border-negative bg-negative/10 text-negative line-through' : 'border-border text-muted hover:bg-surface-2',
+                      )}
+                    >
+                      {o.tag}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="mt-1 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setBulkOpen(false)}>Cancelar</Button>
-            <Button disabled={!bulkDate && !bulkGroup} onClick={applyBulk}>Aplicar</Button>
+            <Button disabled={!bulkDate && !bulkGroup && bulkAddTags.length === 0 && bulkRemoveTags.length === 0} onClick={applyBulk}>Aplicar</Button>
           </div>
         </div>
       </Modal>

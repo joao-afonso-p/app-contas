@@ -123,6 +123,8 @@ export interface Transaction {
   // categoria antiga (ver lib/calc/categories.ts).
   planCategoryId?: string
   subcategoryId?: string
+  // Etiquetas livres (várias por gasto), para filtrar. Opcional: gastos antigos não têm.
+  tags?: string[]
 }
 
 // Categoria "antiga" de gastos. Mantém-se guardada (nada é apagado), mas deixou
