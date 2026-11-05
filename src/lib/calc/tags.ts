@@ -5,7 +5,7 @@ export const MAX_TAG_LENGTH = 30
 
 // "  #Férias  2026 " -> "Férias 2026"
 export function normalizeTag(raw: string): string {
-  return raw.replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LENGTH).trim()
+  return raw.trim().replace(/^#+/, '').replace(/\s+/g, ' ').trim().slice(0, MAX_TAG_LENGTH).trim()
 }
 
 export function tagKey(tag: string): string {
