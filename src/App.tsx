@@ -15,23 +15,26 @@ import { Overview } from './screens/Overview'
 import { Definicoes } from './screens/Definicoes'
 import { Historico } from './screens/Historico'
 import { Guia } from './screens/Guia'
+import { Imoveis } from './screens/Imoveis'
 import { CoachOverlay, CoachPrompt } from './components/Coach'
 import { LockedScreen } from './screens/Locked'
 import { featureStatus, isLockedFeature } from './lib/unlock'
+import { menuVisible, type OptionalMenu } from './lib/menus'
 import { todayISO } from './lib/format'
 import { InstallNudge } from './components/InstallGuide'
 import { LogoMark, Wordmark } from './components/Logo'
-import { ArrowLeftRight, BookOpen, Lock, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, Building2, Lock, CalendarDays, LayoutDashboard, Moon, Receipt, ScanSearch, Settings, Sprout, Sun, TrendingUp, type LucideIcon } from 'lucide-react'
 
-const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean }[] = [
+const NAV: { id: Screen; label: string; icon: LucideIcon; mobile: boolean; optional?: OptionalMenu }[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, mobile: true },
   { id: 'planeamento', label: 'Planeamento', icon: CalendarDays, mobile: true },
   { id: 'movimentos', label: 'Movimentos', icon: ArrowLeftRight, mobile: true },
   { id: 'gastos', label: 'Gastos', icon: Receipt, mobile: true },
   { id: 'budgets', label: 'Analytics', icon: ScanSearch, mobile: false },
-  { id: 'investimentos', label: 'Investimento', icon: Sprout, mobile: false },
+  { id: 'investimentos', label: 'Investimento', icon: Sprout, mobile: false, optional: 'investimentos' },
   { id: 'projecoes', label: 'Projeções', icon: TrendingUp, mobile: false },
-  { id: 'guia', label: 'Guia', icon: BookOpen, mobile: false },
+  { id: 'imoveis', label: 'Imóveis', icon: Building2, mobile: false, optional: 'imoveis' },
+  { id: 'guia', label: 'Guia', icon: BookOpen, mobile: false, optional: 'guia' },
   { id: 'definicoes', label: 'Definições', icon: Settings, mobile: true },
 ]
 
@@ -46,6 +49,7 @@ const SCREENS: Record<Screen, () => React.JSX.Element> = {
   definicoes: Definicoes,
   historico: Historico,
   guia: Guia,
+  imoveis: Imoveis,
 }
 
 export function App() {
@@ -110,6 +114,12 @@ export function App() {
     if (status === 'ready') trackEvent(mode === 'space' ? 'mode-space' : 'mode-local')
   }, [status, mode])
 
+  // Imóveis escondido (o default) não tem atalhos dentro da app: um endereço direto volta ao Overview.
+  const imoveisHidden = status === 'ready' && !menuVisible(data.meta[0], 'imoveis')
+  useEffect(() => {
+    if (imoveisHidden && screen === 'imoveis') setScreen('overview')
+  }, [imoveisHidden, screen, setScreen])
+
   if (status === 'boot') {
     return <div className="flex h-dvh items-center justify-center text-muted">A carregar…</div>
   }
@@ -137,6 +147,7 @@ export function App() {
   const metaDoc = data.meta[0]
   const today = todayISO()
   const isLocked = (id: Screen) => isLockedFeature(id) && featureStatus(metaDoc, id, today).locked
+  const shown = (i: (typeof NAV)[number]) => !i.optional || menuVisible(metaDoc, i.optional)
 
   return (
     <div className="flex min-h-dvh">
@@ -150,7 +161,7 @@ export function App() {
           </div>
         </div>
         <nav className="flex flex-col gap-1">
-          {NAV.map((item) => (
+          {NAV.filter(shown).map((item) => (
             <button
               key={item.id}
               data-coach={`nav-${item.id}`}
@@ -188,7 +199,7 @@ export function App() {
       {/* Tab bar mobile */}
       <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 backdrop-blur md:hidden">
         <div className="flex justify-around">
-          {NAV.filter((i) => i.mobile).map((item) => (
+          {NAV.filter((i) => i.mobile && shown(i)).map((item) => (
             <button
               key={item.id}
               data-coach={`nav-${item.id}`}

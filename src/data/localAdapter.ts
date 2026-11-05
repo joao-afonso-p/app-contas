@@ -4,7 +4,7 @@ import { COLLECTIONS, emptyDataSet } from '../types'
 import type { DataAdapter } from './adapter'
 
 const DB_NAME = 'contas'
-const DB_VERSION = 4
+const DB_VERSION = 5 // 5: coleção rentalProperties (o upgrade só cria stores em falta)
 
 export class LocalAdapter implements DataAdapter {
   private db: IDBPDatabase | null = null

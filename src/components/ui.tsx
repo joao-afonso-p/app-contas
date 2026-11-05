@@ -278,6 +278,50 @@ export function InfoHint({
   )
 }
 
+// Explicação que aparece ao passar o rato por cima (só desktop; em ecrãs tácteis não há hover).
+// Para ajuda com números reais: KPIs e cabeçalhos de colunas.
+export function HoverTip({
+  tip, children, className, as: Tag = 'div',
+}: { tip: ReactNode; children: ReactNode; className?: string; as?: 'div' | 'span' }) {
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number } | null>(null)
+  const ref = useRef<HTMLElement>(null)
+  const show = () => {
+    if (!ref.current) return
+    const r = ref.current.getBoundingClientRect()
+    const width = Math.min(340, window.innerWidth - 16)
+    const left = Math.min(Math.max(8, r.left + r.width / 2 - width / 2), window.innerWidth - width - 8)
+    setPos(
+      r.bottom > window.innerHeight * 0.6
+        ? { left, width, bottom: window.innerHeight - r.top + 6 }
+        : { left, width, top: r.bottom + 6 },
+    )
+  }
+  const hide = () => setPos(null)
+  useEffect(() => {
+    if (!pos) return
+    window.addEventListener('scroll', hide, true)
+    return () => window.removeEventListener('scroll', hide, true)
+  }, [pos])
+  return (
+    <>
+      <Tag ref={ref as never} onMouseEnter={show} onMouseLeave={hide} className={className}>
+        {children}
+      </Tag>
+      {pos &&
+        createPortal(
+          <div
+            role="tooltip"
+            className="pointer-events-none fixed z-[60] rounded-xl border border-border bg-surface p-3 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-text shadow-xl"
+            style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }}
+          >
+            {tip}
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
 // Bolinha de processamento animada.
 export function Spinner({ className }: { className?: string }) {
   return (

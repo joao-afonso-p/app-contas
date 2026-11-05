@@ -467,6 +467,33 @@ export const GUIDE: GuideSection[] = [
           },
         ],
       },
+      {
+        title: 'Menus visíveis e Imóveis',
+        blocks: [
+          {
+            t: 'p',
+            text: 'Em Definições → Menus visíveis escolhes que menus aparecem. Investimento e Guia estão ligados por defeito. **Imóveis** está desligado: liga-o se tens casas arrendadas. Esconder um menu não apaga nada.',
+          },
+          {
+            t: 'p',
+            text: 'A página Imóveis só está disponível no computador e é independente do resto da app. Adiciona cada casa com o mês desde que está arrendada (pode ser antigo), a renda, a prestação, as despesas fixas e o imposto. As despesas fixas têm nome e podem ser mensais ou anuais (as anuais, como o IMI, são divididas por 12). O capital investido e o valor do imóvel são opcionais.',
+          },
+          {
+            t: 'list',
+            items: [
+              '**Lucro bruto**: renda menos prestação, despesas fixas e despesas pontuais.',
+              '**Lucro líquido**: o lucro bruto menos o imposto sobre a renda.',
+              '**Margem**: quanto da renda sobra, sem contar despesas pontuais.',
+              '**Retorno**: lucro líquido anualizado a dividir pelo capital investido.',
+              '**Rentabilidade bruta**: renda anualizada a dividir pelo valor do imóvel.',
+            ],
+          },
+          {
+            t: 'tip',
+            text: 'Passa o rato por cima de um valor ou do cabeçalho de uma coluna para ver a fórmula com os teus números. Quando um valor muda, usa "A partir de…" para a mudança valer só daí em diante. A tabela tem scroll e o total fica sempre visível em baixo.',
+          },
+        ],
+      },
     ],
   },
 ]
