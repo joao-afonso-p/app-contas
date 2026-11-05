@@ -460,11 +460,15 @@ function HouseSettings({ property: p, onDeleted }: { property: RentalProperty; o
               {history === s.key && (
                 <ul className="flex max-h-40 flex-col overflow-y-auto border-t border-border pt-1">
                   {pts.map((pt) => (
-                    <li key={pt.from} className="flex items-center justify-between gap-1 py-1 text-xs">
-                      <span className="text-muted">{monthLabel(pt.from)}</span>
-                      <span className="flex items-center gap-1">
+                    <li key={pt.from} className="flex items-center justify-between gap-2 py-1 text-xs">
+                      <span className="min-w-0">
+                        <span className="block text-muted">{monthLabel(pt.from)}</span>
+                        {s.key === 'mortgage' && pt.principal !== undefined && (
+                          <span className="block text-[11px] text-muted">Capital amortizado: {eur(pt.principal)}</span>
+                        )}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1">
                         <span className="tnum font-semibold">{fmtPoint(s.key, pt)}</span>
-                        {s.key === 'mortgage' && pt.principal !== undefined && <Badge>cap. {eur(pt.principal)}</Badge>}
                         <button type="button" aria-label="Editar" onClick={() => setPoint({ key: s.key, existing: pt })} className="rounded p-0.5 text-muted hover:bg-surface-2"><Pencil size={12} aria-hidden="true" /></button>
                         <button type="button" aria-label="Apagar" onClick={() => removePoint(s.key, pt.from)} className="rounded p-0.5 text-muted hover:bg-surface-2"><Trash size={12} aria-hidden="true" /></button>
                       </span>
