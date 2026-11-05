@@ -222,13 +222,32 @@ function Kpis({ items, totals: t }: { items: Item[]; totals: RentalTotals }) {
 function PrincipalLine({ items, totals: t }: { items: Item[]; totals: RentalTotals }) {
   const n = items.filter((i) => i.totals.principal > 0).length
   const total = items.filter((i) => i.totals.months > 0).length
+  // Retorno com o capital amortizado, só nas casas com capital investido.
+  const used = items.filter((i) => i.totals.months > 0 && (i.property.capitalInvested ?? 0) > 0)
+  const capital = used.reduce((a, i) => a + (i.property.capitalInvested ?? 0), 0)
+  const annual = used.reduce((a, i) => a + annualize(i.totals.net + i.totals.principal, i.totals.months), 0)
+  const ret = capital > 0 ? annual / capital : null
   return (
     <HoverTip
-      tip={<><div className="mb-1 font-semibold">Capital amortizado</div><div>Parte das prestações que reduz a dívida (já está contada como custo no lucro).</div><Line>{signed(t.net)} + {eur(t.principal)} = {signed(t.net + t.principal)}</Line></>}
+      tip={
+        <>
+          <div className="mb-1 font-semibold">Capital amortizado</div>
+          <div>Parte das prestações que reduz a dívida (já está contada como custo no lucro).</div>
+          <Line>{signed(t.net)} + {eur(t.principal)} = {signed(t.net + t.principal)}</Line>
+          {ret !== null && (
+            <>
+              <div className="mt-2">Retorno com capital amortizado: (líquido + amortizado) anualizado ÷ capital investido</div>
+              <Line>{eur(annual)} ÷ {eur(capital)} = {pctOf(ret)}</Line>
+              {used.length < total && <div className="mt-1 text-muted">Inclui {used.length} de {total} casas (as outras não têm capital investido).</div>}
+            </>
+          )}
+        </>
+      }
     >
       <Card className="flex flex-wrap items-center gap-x-6 gap-y-1 py-3 text-sm">
         <span><span className="text-muted">Capital amortizado:</span> <strong className="tnum">{eur(t.principal)}</strong></span>
         <span><span className="text-muted">Lucro líquido + capital amortizado:</span> <strong className="tnum">{signed(t.net + t.principal)}</strong></span>
+        {ret !== null && <span><span className="text-muted">Retorno com capital amortizado:</span> <strong className="tnum">{pctOf(ret)}</strong></span>}
         {n < total && <span className="text-xs text-muted">Inclui {n} de {total} casas</span>}
       </Card>
     </HoverTip>
