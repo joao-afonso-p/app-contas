@@ -7,7 +7,7 @@ import {
 } from '../lib/calc/rentals'
 import { useIsDesktop } from '../lib/useIsDesktop'
 import { useSessionState } from '../lib/sessionState'
-import { currentMonthKey, fmtEUR, fmtPct, monthLabel, monthShort, parseAmount, uid } from '../lib/format'
+import { currentMonthKey, fmtEUR, fmtEURWhole, fmtPct, monthLabel, monthShort, parseAmount, uid } from '../lib/format'
 import { useStore } from '../store/useStore'
 import type { MonthKey, RentalExpenseKind, RentalFixedExpense, RentalOneOff, RentalPoint, RentalProperty } from '../types'
 
@@ -34,6 +34,8 @@ const GROUPS: { id: GroupBy; label: string }[] = [
 const eur = (n: number) => fmtEUR(n)
 const pctOf = (f: number) => fmtPct(f * 100)
 const signed = (n: number) => (n < 0 ? `−${eur(Math.abs(n))}` : eur(n))
+// Euros inteiros (arredonda para baixo) nos números grandes; nas tabelas e nos tooltips ficam os cêntimos.
+const whole = (n: number) => fmtEURWhole(n)
 const tone = (n: number) => (n > 0.004 ? 'positive' : n < -0.004 ? 'negative' : 'default')
 
 export function Imoveis() {
@@ -200,10 +202,10 @@ function Kpis({ items, totals: t }: { items: Item[]; totals: RentalTotals }) {
   return (
     <div className="grid grid-cols-5 gap-3">
       <HoverTip tip={<><div className="mb-1 font-semibold">Lucro bruto</div><div>Renda − prestação − despesas fixas − pontuais</div><Line>{eur(t.rent)} − {eur(t.mortgage)} − {eur(t.fixed)} − {eur(t.oneOff)} = {signed(t.gross)}</Line></>}>
-        <MetricCard label="Lucro bruto" value={signed(t.gross)} tone={tone(t.gross)} hint={`${t.months} ${t.months === 1 ? 'mês' : 'meses'}`} />
+        <MetricCard label="Lucro bruto" value={whole(t.gross)} tone={tone(t.gross)} hint={`${t.months} ${t.months === 1 ? 'mês' : 'meses'}`} />
       </HoverTip>
       <HoverTip tip={<><div className="mb-1 font-semibold">Lucro líquido</div><div>Lucro bruto − imposto sobre a renda</div><Line>{signed(t.gross)} − {eur(t.tax)} = {signed(t.net)}</Line></>}>
-        <MetricCard label="Lucro líquido" value={signed(t.net)} tone={tone(t.net)} hint="Depois de impostos" />
+        <MetricCard label="Lucro líquido" value={whole(t.net)} tone={tone(t.net)} hint="Depois de impostos" />
       </HoverTip>
       <HoverTip tip={<><div className="mb-1 font-semibold">Margem</div><div>(Renda − prestação − fixas − imposto) ÷ renda. Não conta despesas pontuais.</div><Line>({eur(t.rent)} − {eur(t.mortgage)} − {eur(t.fixed)} − {eur(t.tax)}) ÷ {eur(t.rent)} = {t.margin === null ? '-' : pctOf(t.margin)}</Line></>}>
         <MetricCard label="Margem" value={t.margin === null ? '-' : pctOf(t.margin)} tone={t.margin === null ? 'default' : tone(t.margin)} hint="Sem pontuais" />
@@ -245,8 +247,8 @@ function PrincipalLine({ items, totals: t }: { items: Item[]; totals: RentalTota
       }
     >
       <Card className="flex flex-wrap items-center gap-x-6 gap-y-1 py-3 text-sm">
-        <span><span className="text-muted">Capital amortizado:</span> <strong className="tnum">{eur(t.principal)}</strong></span>
-        <span><span className="text-muted">Lucro líquido + capital amortizado:</span> <strong className="tnum">{signed(t.net + t.principal)}</strong></span>
+        <span><span className="text-muted">Capital amortizado:</span> <strong className="tnum">{whole(t.principal)}</strong></span>
+        <span><span className="text-muted">Lucro líquido + capital amortizado:</span> <strong className="tnum">{whole(t.net + t.principal)}</strong></span>
         {ret !== null && <span><span className="text-muted">Retorno com capital amortizado:</span> <strong className="tnum">{pctOf(ret)}</strong></span>}
         {n < total && <span className="text-xs text-muted">Inclui {n} de {total} casas</span>}
       </Card>
