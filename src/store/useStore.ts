@@ -10,6 +10,7 @@ import { activeOnly, allocatedMonths, SECTION_OF } from '../lib/calc/archive'
 import { txCategoryFields } from '../lib/calc/categories'
 import { planMerge } from '../lib/calc/mergeExpenses'
 import { applyPlannedLink, revertPlannedLink } from '../lib/calc/plannedLink'
+import { addTags, removeTags } from '../lib/calc/tags'
 import type {
   AnyDoc,
   AppMeta,
@@ -122,14 +123,17 @@ interface Store {
   // ou balde de poupança) + subcategoria opcional. Se a categoria for um balde,
   // cria/atualiza a saída correspondente na poupança; se deixar de ser, remove-a.
   saveTransaction(
-    fields: { date: string; amount: number; nome?: string; description: string; groupId: string; subcategoryId?: string },
+    fields: { date: string; amount: number; nome?: string; description: string; groupId: string; subcategoryId?: string; tags?: string[] },
     existingId?: string,
   ): Promise<void>
   setTransactionCategory(transactionId: string, groupId: string, subcategoryId?: string): Promise<void>
   deleteTransaction(transactionId: string): Promise<void>
   // Edição em massa: muda a data e/ou a categoria (+subcategoria) de vários gastos.
   // Campos omitidos ficam como estão. Mantém as saídas da poupança em sincronia.
-  bulkUpdateTransactions(ids: string[], changes: { date?: string; groupId?: string; subcategoryId?: string }): Promise<void>
+  bulkUpdateTransactions(
+    ids: string[],
+    changes: { date?: string; groupId?: string; subcategoryId?: string; addTags?: string[]; removeTags?: string[] },
+  ): Promise<void>
   // Junta o valor planeado de despesas apagadas/arquivadas (planos reais e
   // projeções, todos os meses) numa despesa ativa. Opcionalmente reclassifica
   // também os gastos que estavam nessas despesas.
@@ -574,7 +578,8 @@ export const useStore = create<Store>((set, get) => ({
     const { data } = get()
     const existing = existingId ? data.transactions.find((t) => t.id === existingId) : undefined
     if (existingId && !existing) return
-    const base = { date: fields.date, amount: fields.amount, nome: fields.nome, description: fields.description }
+    const tags = fields.tags && fields.tags.length > 0 ? fields.tags : undefined
+    const base = { date: fields.date, amount: fields.amount, nome: fields.nome, description: fields.description, tags }
     await writeTransaction(data, existing, base, fields.groupId, fields.subcategoryId)
   },
 
@@ -586,8 +591,9 @@ export const useStore = create<Store>((set, get) => ({
   },
 
   async bulkUpdateTransactions(ids, changes) {
-    const { date, groupId, subcategoryId } = changes
-    if (!date && !groupId) return
+    const { date, groupId, subcategoryId, addTags: toAdd, removeTags: toRemove } = changes
+    const tagChange = Boolean(toAdd?.length || toRemove?.length)
+    if (!date && !groupId && !tagChange) return
     for (const id of ids) {
       const data = get().data
       const existing = data.transactions.find((t) => t.id === id)
@@ -599,6 +605,14 @@ export const useStore = create<Store>((set, get) => ({
         // Movimentos registados à mão e ligados depois mantêm a sua própria data.
         for (const m of data.savingsMovements.filter((x) => x.transactionId === id && !x.linkedAfter)) {
           await adapter!.put('savingsMovements', { ...m, date })
+        }
+      }
+      if (tagChange) {
+        // Lê outra vez: os passos acima podem ter reescrito o gasto.
+        const fresh = get().data.transactions.find((t) => t.id === id)
+        if (fresh) {
+          const next = removeTags(addTags(fresh.tags, toAdd ?? []), toRemove ?? [])
+          await adapter!.put('transactions', { ...fresh, tags: next.length > 0 ? next : undefined })
         }
       }
     }
@@ -748,7 +762,7 @@ export const isAutoBucketMovement = (m: SavingsMovement): boolean =>
 async function writeTransaction(
   data: DataSet,
   existing: Transaction | undefined,
-  base: Partial<Pick<Transaction, 'date' | 'amount' | 'nome' | 'description'>>,
+  base: Partial<Pick<Transaction, 'date' | 'amount' | 'nome' | 'description' | 'tags'>>,
   groupId: string,
   subcategoryId: string | undefined,
 ): Promise<void> {
