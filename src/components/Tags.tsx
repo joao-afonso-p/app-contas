@@ -6,25 +6,32 @@ import { MAX_TAG_LENGTH, addTags, normalizeTag, removeTags, tagKey } from '../li
 type TagOption = { tag: string; count: number }
 
 // Etiquetas pequenas. Com `onTagClick`, cada uma é um botão (usado para filtrar a lista).
-export function TagChips({ tags, onTagClick, className }: { tags?: string[]; onTagClick?: (tag: string) => void; className?: string }) {
+// Com `max`, mostra só as primeiras e um "+N" (a lista completa fica no title).
+export function TagChips({
+  tags, onTagClick, className, max,
+}: { tags?: string[]; onTagClick?: (tag: string) => void; className?: string; max?: number }) {
   if (!tags || tags.length === 0) return null
+  const shown = max !== undefined && tags.length > max ? tags.slice(0, max) : tags
+  const extra = tags.length - shown.length
+  const chip = 'rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-medium leading-4 text-muted'
   return (
-    <span className={cx('flex flex-wrap items-center gap-1', className)}>
-      {tags.map((t) =>
+    <span className={cx('flex flex-wrap items-center gap-1', className)} title={extra > 0 ? tags.join(', ') : undefined}>
+      {shown.map((t) =>
         onTagClick ? (
           <button
             key={t}
             type="button"
             onClick={(e) => { e.stopPropagation(); onTagClick(t) }}
             title="Filtrar por esta tag"
-            className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted hover:bg-accent-soft hover:text-accent-strong"
+            className={cx(chip, 'hover:bg-accent-soft hover:text-accent-strong')}
           >
             {t}
           </button>
         ) : (
-          <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">{t}</span>
+          <span key={t} className={chip}>{t}</span>
         ),
       )}
+      {extra > 0 && <span className={chip}>+{extra}</span>}
     </span>
   )
 }

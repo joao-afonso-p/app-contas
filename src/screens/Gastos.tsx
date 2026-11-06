@@ -628,7 +628,9 @@ export function Gastos() {
                     <div className="truncate text-xs text-muted">{clipText(t.description)}</div>
                   )}
                 </button>
-                <TagChips tags={t.tags} className="mt-1" onTagClick={(tag) => setTagFilter((cur) => addTags(cur, [tag]))} />
+                </div>
+                <div className="flex w-36 shrink-0 justify-end">
+                  <TagChips tags={t.tags} max={2} className="justify-end" onTagClick={(tag) => setTagFilter((cur) => addTags(cur, [tag]))} />
                 </div>
                 <Money value={-t.amount} className="w-20 shrink-0 text-right font-semibold" />
                 <div className="flex w-[5.5rem] shrink-0 justify-end">
